@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>your name</title>
+  <link rel="icon" href="">
+  <style>
+    @font-face {
+      font-family: 'JetBrains Mono';
+      font-style: normal;
+      font-weight: 400;
+      src: url(https://fonts.gstatic.com/s/jetbrainsmono/v18/HMfZUoAmKf6b_JgPcR8TG0NPvL_DrY4F-3I_E1FA.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      font-display: swap;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #030303;
+      font-family: 'JetBrains Mono', monospace;
+      color: white;
+      overflow: hidden;
+    }
+
+    .stars-layer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 1;
+      overflow: hidden;
+    }
+
+    .profile-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 3;
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    @keyframes fadeInUp {
+      0% {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-in-up {
+      animation: fadeInUp 0.6s ease forwards;
+    }
+
+    .bounce-animation {
+      animation: bounceFadeInUp 1s ease forwards;
+    }
+
+    @keyframes bounceFadeInUp {
+      0% {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      60% {
+        opacity: 1;
+        transform: translateY(-10px);
+      }
+      80% {
+        transform: translateY(5px);
+      }
+      100% {
+        transform: translateY(0);
+      }
+    }
+
+    .card {
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(5, 5, 5, 0.08);
+      border-radius: 24px;
+      padding: 40px 20px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(10px);
+      transition: box-shadow 0.3s ease;
+      margin-bottom: 20px;
+      max-width: 420px;
+      width: 90vw;
+    }
+
+    .card:hover {
+      box-shadow: 0 0 20px #000000;
+    }
+
+    .avatar-wrapper {
+      width: 160px;
+      height: 160px;
+      margin: 0 auto 30px;
+      overflow: hidden;
+    }
+
+    .avatar-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      border-radius: 50%;
+    }
+
+    .username {
+      font-weight: 900;
+      font-size: 2.8rem;
+      letter-spacing: 0.03em;
+      user-select: none;
+      text-align: center;
+      color: white;
+      text-shadow: 0 0 12px #ffffff;
+      animation: pulseOpacity 1.2s infinite alternate ease-in-out;
+    }
+
+    .username span {
+      color: #5865F2;
+      margin-right: 6px;
+      font-weight: 900;
+      text-shadow: 0 0 12px #5865F2;
+    }
+
+    @keyframes pulseOpacity {
+      0% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0.6;
+      }
+    }
+
+    .typing-note {
+      font-size: 1rem;
+      color: #999;
+      text-align: center;
+      margin: 12px auto 24px;
+      font-weight: 400;
+      overflow: hidden;
+      white-space: nowrap;
+      border-right: 2px solid #5865F2;
+      width: 0ch;
+      display: block;
+      max-width: 100%;
+      animation: typing 4s steps(19) infinite, blink 0.8s step-end infinite;
+    }
+
+    @keyframes typing {
+      0% {
+        width: 0ch;
+      }
+      40% {
+        width: 19ch;
+      }
+      80% {
+        width: 19ch;
+      }
+      100% {
+        width: 0ch;
+      }
+    }
+
+    @keyframes blink {
+      0%, 100% {
+        border-color: transparent;
+      }
+      50% {
+        border-color: #5865F2;
+      }
+    }
+
+    .button {
+      display: block;
+      width: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 14px;
+      color: white;
+      font-size: 1.15rem;
+      padding: 14px 0;
+      margin-bottom: 16px;
+      text-decoration: none;
+      font-weight: 600;
+      box-shadow: 0 0 8px #010101;
+      transition: background 0.3s ease, box-shadow 0.3s ease;
+      user-select: none;
+      text-align: center;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      position: relative;
+    }
+
+    .button:hover {
+      background: rgba(88, 101, 242, 0.95);
+      box-shadow: 0 0 18px #5865F2;
+    }
+
+    .music-player {
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 16px;
+      padding: 16px;
+      margin-top: 16px;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.8);
+      position: relative;
+    }
+
+    .music-player img {
+      width: 60px;
+      height: 60px;
+      border-radius: 12px;
+      object-fit: cover;
+    }
+
+    .track-info {
+      flex-grow: 1;
+    }
+
+    .track-info p {
+      margin: 0;
+      font-size: 0.95rem;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: #333;
+      border-radius: 4px;
+      margin: 6px 0;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: #5865F2;
+      transition: width 0.1s linear;
+      box-shadow: 0 0 8px 2px #5865F2;
+      border-radius: 4px;
+    }
+
+    .satisfied-note {
+      font-size: 0.85rem;
+      color: #bbb;
+      text-align: center;
+      margin-top: 12px;
+      font-weight: 500;
+      user-select: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .satisfied-note img {
+      width: 24px;
+      height: 24px;
+    }
+
+    .star, .cursor-star {
+      position: fixed;
+      pointer-events: none;
+      background: white;
+      border-radius: 50%;
+      box-shadow: 0 0 6px white;
+      z-index: 0;
+    }
+
+    .star {
+      top: -10px;
+      animation: fall linear forwards;
+      opacity: 0.8;
+    }
+
+    @keyframes fall {
+      to {
+        transform: translateY(110vh);
+        opacity: 0;
+      }
+    }
+
+    .cursor-star {
+      animation: cursorFall 1.2s ease-out forwards;
+      opacity: 0.9;
+      filter: blur(0.4px);
+    }
+
+    @keyframes cursorFall {
+      0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.3);
+      }
+    }
+
+    #play-button {
+      background: rgba(52, 52, 52, 0.15);
+      border-radius: 6px;
+      padding: 4px;
+      cursor: pointer;
+      width: 32px;
+      height: 32px;
+      transition: background-color 0.3s ease;
+    }
+
+    #play-button:hover {
+      background: rgba(60, 60, 60, 0.5);
+    }
+
+    @media (max-width: 400px) {
+      .username {
+        font-size: 2.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="stars-layer" id="stars-layer"></div>
+
+  <div class="profile-container" id="profile-content">
+    <div class="card">
+      <div class="avatar-wrapper">
+        <img src="https://cdn.discordapp.com/attachments/1378370018185580705/1378448338676093060/giphy.gif?ex=6840980e&is=683f468e&hm=4c5130c9c789223f4296305165f909b1f9a494c45d28dd52a1b801e7748f82c3&" alt="Avatar" />
+      </div>
+
+      <div class="username"><span>$</span>your name</div>
+      <div class="typing-note">your name</div>
+
+      <a href="https://discord.gg/" class="button" target="_blank" rel="noopener noreferrer">Discord</a>
+      <a href="https://t.me/" class="button" target="_blank" rel="noopener noreferrer">Telegram</a>
+      <a href="https://www.youtube.com/channel/" class="button" target="_blank" rel="noopener noreferrer">YouTube</a>
+      <a href="https://instagram.com/" class="button" target="_blank" rel="noopener noreferrer">Instagram</a>
+
+      <div class="music-player">
+        <img src="your photo" alt="your photo" />
+        <div class="track-info">
+          <p><strong>your name</strong></p>
+          <div class="progress-bar">
+            <div class="progress-bar-fill" id="progress-fill"></div>
+          </div>
+          <p style="font-size: 0.8rem; color: #ccc;">
+            <span id="current-time">0:00</span> / <span id="duration">0:58</span>
+          </p>
+        </div>
+        <img
+          src="https://cdn3.iconfinder.com/data/icons/fluent-regular-24px-vol-5/24/ic_fluent_play_24_regular-256.png"
+          width="20"
+          height="20"
+          alt="Play/Pause"
+          id="play-button"
+        />
+      </div>
+
+      <div class="satisfied-note">
+        <img src="https://cdn0.iconfinder.com/data/icons/business-finance-1-1/128/handshake3-256.png" alt="Handshake Icon" />
+        
+      </div>
+
+      <audio id="player" src="your music" preload="metadata"></audio>
+    </div>
+  </div>
+
+  <script>
+    const profileContent = document.getElementById('profile-content');
+    const player = document.getElementById('player');
+    const playBtn = document.getElementById('play-button');
+    const progressFill = document.getElementById('progress-fill');
+    const currentTimeSpan = document.getElementById('current-time');
+    const durationSpan = document.getElementById('duration');
+    let isPlaying = false;
+
+    // Automatically display the profile content and start animation/music
+    profileContent.classList.add('active', 'fade-in-up');
+    const username = document.querySelector('.username');
+    username.classList.add('bounce-animation');
+    player.play();
+
+    function createFallingStar() {
+      const star = document.createElement('div');
+      star.className = 'star';
+      star.style.left = Math.random() * 100 + 'vw';
+      const size = Math.random() * 2 + 2;
+      star.style.width = size + 'px';
+      star.style.height = size + 'px';
+      star.style.animationDuration = (3 + Math.random() * 3) + 's';
+      document.getElementById('stars-layer').appendChild(star);
+      setTimeout(() => star.remove(), 6000);
+    }
+    setInterval(createFallingStar, 150);
+
+    document.addEventListener('mousemove', (e) => {
+      const star = document.createElement('div');
+      star.className = 'cursor-star';
+      const size = Math.random() * 1 + 0.5;
+      star.style.width = size + 'px';
+      star.style.height = size + 'px';
+      star.style.left = e.clientX + (Math.random() * 4 - 2) + 'px';
+      star.style.top = e.clientY + (Math.random() * 4 - 2) + 'px';
+      document.getElementById('stars-layer').appendChild(star);
+      setTimeout(() => star.remove(), 1200);
+    });
+
+    function formatTime(seconds) {
+      const min = Math.floor(seconds / 60);
+      const sec = Math.floor(seconds % 60);
+      return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+    }
+
+    playBtn.addEventListener('click', () => {
+      if (isPlaying) {
+        player.pause();
+      } else {
+        player.play();
+      }
+    });
+
+    player.addEventListener('play', () => {
+      isPlaying = true;
+      playBtn.src = 'https://cdn3.iconfinder.com/data/icons/fluent-regular-24px-vol-5/24/ic_fluent_pause_24_regular-256.png'; // Pause icon
+    });
+
+    player.addEventListener('pause', () => {
+      isPlaying = false;
+      playBtn.src = 'https://cdn3.iconfinder.com/data/icons/fluent-regular-24px-vol-5/24/ic_fluent_play_24_regular-256.png'; // Play icon
+    });
+
+    player.addEventListener('timeupdate', () => {
+      const progressPercent = (player.currentTime / player.duration) * 100 || 0;
+      progressFill.style.width = progressPercent + '%';
+      currentTimeSpan.textContent = formatTime(player.currentTime);
+    });
+
+    player.addEventListener('loadedmetadata', () => {
+      durationSpan.textContent = formatTime(player.duration);
+    });
+  </script>
+</body>
+</html>
