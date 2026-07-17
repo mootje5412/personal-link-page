@@ -5,46 +5,27 @@ class MessageHandler {
     const chatId = msg.chat.id;
     const messageText = msg.text;
 
-    console.log(`📨 Message from ${msg.from.first_name} (${msg.from.id}): ${messageText}`);
+    console.log(`Message from ${msg.from.first_name} (${msg.from.id}): ${messageText}`);
 
     const query = messageText.trim();
     
-    // Check if it looks like an email
+    bot.sendMessage(chatId, `Searching...`);
+
+    let results;
+    
     if (this.isEmail(query)) {
-      bot.sendMessage(chatId, `📧 Searching for email...`);
-      const results = await osintService.emailSearch(query);
-      bot.sendMessage(chatId, results, { parse_mode: 'Markdown', disable_web_page_preview: true });
-      return;
+      results = await osintService.emailSearch(query);
+    } else if (this.isIP(query)) {
+      results = await osintService.ipSearch(query);
+    } else if (this.isPhone(query)) {
+      results = await osintService.phoneSearch(query);
+    } else if (this.isUsername(query)) {
+      results = await osintService.usernameSearch(query);
+    } else {
+      results = await osintService.generalSearch(query);
     }
-
-    // Check if it looks like an IP address
-    if (this.isIP(query)) {
-      bot.sendMessage(chatId, `🌐 Analyzing IP address...`);
-      const results = await osintService.ipSearch(query);
-      bot.sendMessage(chatId, results, { parse_mode: 'Markdown', disable_web_page_preview: true });
-      return;
-    }
-
-    // Check if it looks like a phone number
-    if (this.isPhone(query)) {
-      bot.sendMessage(chatId, `📱 Searching phone number...`);
-      const results = await osintService.phoneSearch(query);
-      bot.sendMessage(chatId, results, { parse_mode: 'Markdown', disable_web_page_preview: true });
-      return;
-    }
-
-    // Check if it's a single word (possible username)
-    if (this.isUsername(query)) {
-      bot.sendMessage(chatId, `👤 Searching username...`);
-      const results = await osintService.usernameSearch(query);
-      bot.sendMessage(chatId, results, { parse_mode: 'Markdown', disable_web_page_preview: true });
-      return;
-    }
-
-    // Default: general search
-    bot.sendMessage(chatId, `🔍 Searching...`);
-    const results = await osintService.generalSearch(query);
-    bot.sendMessage(chatId, results, { parse_mode: 'Markdown', disable_web_page_preview: true });
+    
+    bot.sendMessage(chatId, results, { disable_web_page_preview: true });
   }
 
   isEmail(text) {
