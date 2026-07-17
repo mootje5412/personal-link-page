@@ -1,0 +1,74 @@
+const osintService = require('../services/osintService');
+
+class MessageHandler {
+  async handleMessage(bot, msg) {
+    const chatId = msg.chat.id;
+    const messageText = msg.text;
+
+    // Log the message
+    console.log(`📨 Message from ${msg.from.first_name} (${msg.from.id}): ${messageText}`);
+
+    // Auto-detect what type of search the user might want
+    const query = messageText.trim();
+    
+    // Check if it looks like an email
+    if (this.isEmail(query)) {
+      bot.sendMessage(chatId, `📧 Detected email address. Searching...\n\nUse /email ${query} for detailed lookup.`);
+      const results = await osintService.emailSearch(query);
+      bot.sendMessage(chatId, results, { parse_mode: 'Markdown', disable_web_page_preview: true });
+      return;
+    }
+
+    // Check if it looks like an IP address
+    if (this.isIP(query)) {
+      bot.sendMessage(chatId, `🌐 Detected IP address. Analyzing...\n\nUse /ip ${query} for detailed analysis.`);
+      const results = await osintService.ipSearch(query);
+      bot.sendMessage(chatId, results, { parse_mode: 'Markdown', disable_web_page_preview: true });
+      return;
+    }
+
+    // Check if it looks like a phone number
+    if (this.isPhone(query)) {
+      bot.sendMessage(chatId, `📱 Detected phone number. Searching...\n\nUse /phone ${query} for detailed lookup.`);
+      const results = await osintService.phoneSearch(query);
+      bot.sendMessage(chatId, results, { parse_mode: 'Markdown', disable_web_page_preview: true });
+      return;
+    }
+
+    // Check if it's a single word (possible username)
+    if (this.isUsername(query)) {
+      bot.sendMessage(chatId, `👤 Detected possible username. Scanning platforms...\n\nUse /username ${query} for detailed search.`);
+      const results = await osintService.usernameSearch(query);
+      bot.sendMessage(chatId, results, { parse_mode: 'Markdown', disable_web_page_preview: true });
+      return;
+    }
+
+    // Default: general search
+    bot.sendMessage(chatId, `🔍 Performing general search for: *${query}*`, { parse_mode: 'Markdown' });
+    const results = await osintService.generalSearch(query);
+    bot.sendMessage(chatId, results, { parse_mode: 'Markdown', disable_web_page_preview: true });
+  }
+
+  isEmail(text) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(text);
+  }
+
+  isIP(text) {
+    const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+    return ipRegex.test(text);
+  }
+
+  isPhone(text) {
+    const phoneRegex = /^[\+]?[(]?[0-9]{1,3}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,4}[-\s\.]?[0-9]{1,9}$/;
+    return phoneRegex.test(text.replace(/\s/g, ''));
+  }
+
+  isUsername(text) {
+    // Single word, alphanumeric with possible underscores/dots
+    const usernameRegex = /^[a-zA-Z0-9._-]{3,30}$/;
+    return usernameRegex.test(text) && !text.includes(' ');
+  }
+}
+
+module.exports = new MessageHandler();

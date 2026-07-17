@@ -1,21 +1,25 @@
 {
-  "name": "telegram-bot",
+  "name": "findnow-osint-bot",
   "version": "1.0.0",
-  "description": "A simple Telegram bot",
-  "main": "bot.js",
+  "description": "FindNow - OSINT Telegram Bot for Open Source Intelligence Gathering",
+  "main": "index.js",
   "scripts": {
-    "start": "node bot.js",
-    "dev": "nodemon bot.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "keywords": [
     "telegram",
     "bot",
+    "osint",
+    "intelligence",
+    "search",
     "nodejs"
   ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "node-telegram-bot-api": "^0.66.0"
+    "node-telegram-bot-api": "^0.66.0",
+    "axios": "^1.6.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
