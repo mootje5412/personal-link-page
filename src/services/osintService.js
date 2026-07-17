@@ -1,5 +1,3 @@
-const axios = require('axios');
-
 class OSINTService {
   async generalSearch(query) {
     // Simulate OSINT search with multiple sources
@@ -96,57 +94,24 @@ class OSINTService {
   }
 
   async ipSearch(ip) {
-    try {
-      // Use free IP API for real data
-      const response = await axios.get(`http://ip-api.com/json/${ip}`);
-      const data = response.data;
-      
-      if (data.status === 'success') {
-        let result = `🌐 *IP Address Analysis: ${ip}*\n\n`;
-        result += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-        result += `*📍 Location Information:*\n\n`;
-        result += `Country: ${data.country} (${data.countryCode})\n`;
-        result += `Region: ${data.regionName}\n`;
-        result += `City: ${data.city}\n`;
-        result += `ZIP: ${data.zip || 'N/A'}\n`;
-        result += `Timezone: ${data.timezone}\n\n`;
-        result += `*🌐 Network Information:*\n\n`;
-        result += `ISP: ${data.isp}\n`;
-        result += `Organization: ${data.org}\n`;
-        result += `AS: ${data.as}\n\n`;
-        result += `*📊 Coordinates:*\n\n`;
-        result += `Latitude: ${data.lat}\n`;
-        result += `Longitude: ${data.lon}\n\n`;
-        result += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-        result += `*🔎 Additional Tools:*\n\n`;
-        result += `• [View on Map](https://www.google.com/maps?q=${data.lat},${data.lon})\n`;
-        result += `• [Shodan](https://www.shodan.io/host/${ip})\n`;
-        result += `• [VirusTotal](https://www.virustotal.com/gui/ip-address/${ip})`;
-        
-        return result;
-      }
-    } catch (error) {
-      console.error('IP lookup error:', error);
-    }
-    
-    // Fallback if API fails
     let result = `🌐 *IP Address Analysis: ${ip}*\n\n`;
     result += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
     result += `*🔎 Lookup Resources:*\n\n`;
     result += `• [IPinfo.io](https://ipinfo.io/${ip})\n`;
     result += `• [Shodan](https://www.shodan.io/host/${ip})\n`;
     result += `• [VirusTotal](https://www.virustotal.com/gui/ip-address/${ip})\n`;
-    result += `• [AbuseIPDB](https://www.abuseipdb.com/check/${ip})`;
+    result += `• [AbuseIPDB](https://www.abuseipdb.com/check/${ip})\n`;
+    result += `• [IP-API](http://ip-api.com/#${ip})`;
     
     return result;
   }
 
   getSearchSources(query) {
-    const encoded = encodeURIComponent(query);
+    const encoded = query.replace(/ /g, '+');
     return [
-      { name: 'Google', url: `https://www.google.com/search?q="${encoded}"` },
-      { name: 'DuckDuckGo', url: `https://duckduckgo.com/?q="${encoded}"` },
-      { name: 'Bing', url: `https://www.bing.com/search?q="${encoded}"` },
+      { name: 'Google', url: `https://www.google.com/search?q=${encoded}` },
+      { name: 'DuckDuckGo', url: `https://duckduckgo.com/?q=${encoded}` },
+      { name: 'Bing', url: `https://www.bing.com/search?q=${encoded}` },
       { name: 'Twitter/X', url: `https://twitter.com/search?q=${encoded}` },
       { name: 'LinkedIn', url: `https://www.linkedin.com/search/results/all/?keywords=${encoded}` },
       { name: 'Facebook', url: `https://www.facebook.com/search/top?q=${encoded}` },

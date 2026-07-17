@@ -5,15 +5,13 @@ class MessageHandler {
     const chatId = msg.chat.id;
     const messageText = msg.text;
 
-    // Log the message
     console.log(`📨 Message from ${msg.from.first_name} (${msg.from.id}): ${messageText}`);
 
-    // Auto-detect what type of search the user might want
     const query = messageText.trim();
     
     // Check if it looks like an email
     if (this.isEmail(query)) {
-      bot.sendMessage(chatId, `📧 Detected email address. Searching...\n\nUse /email ${query} for detailed lookup.`);
+      bot.sendMessage(chatId, `📧 Searching for email...`);
       const results = await osintService.emailSearch(query);
       bot.sendMessage(chatId, results, { parse_mode: 'Markdown', disable_web_page_preview: true });
       return;
@@ -21,7 +19,7 @@ class MessageHandler {
 
     // Check if it looks like an IP address
     if (this.isIP(query)) {
-      bot.sendMessage(chatId, `🌐 Detected IP address. Analyzing...\n\nUse /ip ${query} for detailed analysis.`);
+      bot.sendMessage(chatId, `🌐 Analyzing IP address...`);
       const results = await osintService.ipSearch(query);
       bot.sendMessage(chatId, results, { parse_mode: 'Markdown', disable_web_page_preview: true });
       return;
@@ -29,7 +27,7 @@ class MessageHandler {
 
     // Check if it looks like a phone number
     if (this.isPhone(query)) {
-      bot.sendMessage(chatId, `📱 Detected phone number. Searching...\n\nUse /phone ${query} for detailed lookup.`);
+      bot.sendMessage(chatId, `📱 Searching phone number...`);
       const results = await osintService.phoneSearch(query);
       bot.sendMessage(chatId, results, { parse_mode: 'Markdown', disable_web_page_preview: true });
       return;
@@ -37,14 +35,14 @@ class MessageHandler {
 
     // Check if it's a single word (possible username)
     if (this.isUsername(query)) {
-      bot.sendMessage(chatId, `👤 Detected possible username. Scanning platforms...\n\nUse /username ${query} for detailed search.`);
+      bot.sendMessage(chatId, `👤 Searching username...`);
       const results = await osintService.usernameSearch(query);
       bot.sendMessage(chatId, results, { parse_mode: 'Markdown', disable_web_page_preview: true });
       return;
     }
 
     // Default: general search
-    bot.sendMessage(chatId, `🔍 Performing general search for: *${query}*`, { parse_mode: 'Markdown' });
+    bot.sendMessage(chatId, `🔍 Searching...`);
     const results = await osintService.generalSearch(query);
     bot.sendMessage(chatId, results, { parse_mode: 'Markdown', disable_web_page_preview: true });
   }
@@ -65,7 +63,6 @@ class MessageHandler {
   }
 
   isUsername(text) {
-    // Single word, alphanumeric with possible underscores/dots
     const usernameRegex = /^[a-zA-Z0-9._-]{3,30}$/;
     return usernameRegex.test(text) && !text.includes(' ');
   }
