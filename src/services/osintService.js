@@ -1,8 +1,22 @@
+const apiService = require('./apiService');
+
 class OSINTService {
   async generalSearch(query) {
-    const sources = this.getSearchSources(query);
-    
     let result = `Search results for: ${query}\n\n`;
+    
+    // Try API search first
+    const dbResults = await apiService.searchDatabase(query);
+    if (dbResults && dbResults.results && dbResults.results.length > 0) {
+      result += `Database Results:\n`;
+      dbResults.results.slice(0, 5).forEach((item) => {
+        result += `${item.name || item.title || 'Result'}\n`;
+        if (item.description) result += `${item.description.substring(0, 100)}...\n`;
+        result += `\n`;
+      });
+      result += `\n`;
+    }
+    
+    const sources = this.getSearchSources(query);
     
     sources.forEach((source) => {
       result += `${source.name}\n${source.url}\n\n`;
@@ -12,9 +26,21 @@ class OSINTService {
   }
 
   async usernameSearch(username) {
-    const platforms = this.getUsernamePlatforms(username);
-    
     let result = `Username search: ${username}\n\n`;
+    
+    // Try API search
+    const dbResults = await apiService.searchDatabase(username);
+    if (dbResults && dbResults.results && dbResults.results.length > 0) {
+      result += `Database Results:\n`;
+      dbResults.results.slice(0, 3).forEach((item) => {
+        result += `${item.name || item.username || 'Found'}\n`;
+        if (item.url) result += `${item.url}\n`;
+        result += `\n`;
+      });
+      result += `\n`;
+    }
+    
+    const platforms = this.getUsernamePlatforms(username);
     
     for (const platform of platforms) {
       result += `${platform.name}\n${platform.url}\n\n`;
@@ -25,6 +51,23 @@ class OSINTService {
 
   async emailSearch(email) {
     let result = `Email search: ${email}\n\n`;
+    
+    // Check breaches using API
+    const breachData = await apiService.searchBreach(email);
+    if (breachData) {
+      if (breachData.breaches && breachData.breaches.length > 0) {
+        result += `Breach Information:\n`;
+        result += `Found in ${breachData.breaches.length} breach(es)\n\n`;
+        breachData.breaches.slice(0, 5).forEach((breach) => {
+          result += `${breach.name || breach.title}\n`;
+          if (breach.date) result += `Date: ${breach.date}\n`;
+          result += `\n`;
+        });
+        result += `\n`;
+      } else if (breachData.message) {
+        result += `${breachData.message}\n\n`;
+      }
+    }
     
     const resources = [
       { name: 'Google Search', url: `https://www.google.com/search?q=${email}` },
