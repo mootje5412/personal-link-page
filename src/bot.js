@@ -2,6 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const config = require('../config/config');
 const commandHandler = require('./handlers/commandHandler');
 const messageHandler = require('./handlers/messageHandler');
+const paginationHandler = require('./handlers/paginationHandler');
 
 class FindNowBot {
   constructor() {
@@ -16,6 +17,11 @@ class FindNowBot {
     
     // Register command handlers
     this.bot.onText(/\/start/, (msg) => commandHandler.handleStart(this.bot, msg));
+    
+    // Handle callback queries for pagination
+    this.bot.on('callback_query', (query) => {
+      paginationHandler.handleCallback(this.bot, query);
+    });
     
     // Handle regular messages
     this.bot.on('message', (msg) => {

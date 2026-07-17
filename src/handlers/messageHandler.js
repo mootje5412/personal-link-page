@@ -1,4 +1,5 @@
 const osintService = require('../services/osintService');
+const paginationHandler = require('./paginationHandler');
 
 class MessageHandler {
   async handleMessage(bot, msg) {
@@ -25,7 +26,11 @@ class MessageHandler {
       results = await osintService.generalSearch(query);
     }
     
-    bot.sendMessage(chatId, results, { disable_web_page_preview: true });
+    if (results && results.length > 0) {
+      paginationHandler.sendPaginatedResults(bot, chatId, query, results, 0);
+    } else {
+      bot.sendMessage(chatId, 'No results found');
+    }
   }
 
   isEmail(text) {
