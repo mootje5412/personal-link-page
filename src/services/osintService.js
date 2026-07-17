@@ -5,6 +5,12 @@ class OSINTService {
     const results = [];
     
     const dbResults = await apiService.searchDatabase(query);
+    
+    if (dbResults && dbResults.error) {
+      results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
+      return results;
+    }
+    
     if (dbResults && dbResults.results && dbResults.results.length > 0) {
       dbResults.results.forEach((item) => {
         let itemText = item.name || item.title || 'Result';
@@ -16,6 +22,8 @@ class OSINTService {
         }
         results.push(itemText);
       });
+    } else if (!dbResults || !dbResults.results) {
+      results.push('No results found from API');
     }
     
     return results;
@@ -25,6 +33,12 @@ class OSINTService {
     const results = [];
     
     const dbResults = await apiService.searchDatabase(username);
+    
+    if (dbResults && dbResults.error) {
+      results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
+      return results;
+    }
+    
     if (dbResults && dbResults.results && dbResults.results.length > 0) {
       dbResults.results.forEach((item) => {
         let itemText = item.name || item.username || item.title || 'Found';
@@ -39,6 +53,8 @@ class OSINTService {
         }
         results.push(itemText);
       });
+    } else {
+      results.push('No results found from API');
     }
     
     return results;
@@ -48,6 +64,12 @@ class OSINTService {
     const results = [];
     
     const breachData = await apiService.searchBreach(email);
+    
+    if (breachData && breachData.error) {
+      results.push(`API Error: ${breachData.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
+      return results;
+    }
+    
     if (breachData) {
       if (breachData.breaches && breachData.breaches.length > 0) {
         breachData.breaches.forEach((breach) => {
@@ -67,7 +89,7 @@ class OSINTService {
     }
     
     const dbResults = await apiService.searchDatabase(email);
-    if (dbResults && dbResults.results && dbResults.results.length > 0) {
+    if (dbResults && !dbResults.error && dbResults.results && dbResults.results.length > 0) {
       dbResults.results.forEach((item) => {
         let itemText = item.name || item.title || 'Result';
         if (item.description) {
@@ -78,6 +100,10 @@ class OSINTService {
         }
         results.push(itemText);
       });
+    }
+    
+    if (results.length === 0) {
+      results.push('No results found from API');
     }
     
     return results;
@@ -87,6 +113,12 @@ class OSINTService {
     const results = [];
     
     const dbResults = await apiService.searchDatabase(phone);
+    
+    if (dbResults && dbResults.error) {
+      results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
+      return results;
+    }
+    
     if (dbResults && dbResults.results && dbResults.results.length > 0) {
       dbResults.results.forEach((item) => {
         let itemText = item.name || item.title || 'Result';
@@ -98,6 +130,8 @@ class OSINTService {
         }
         results.push(itemText);
       });
+    } else {
+      results.push('No results found from API');
     }
     
     return results;
@@ -107,6 +141,12 @@ class OSINTService {
     const results = [];
     
     const dbResults = await apiService.searchDatabase(ip);
+    
+    if (dbResults && dbResults.error) {
+      results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
+      return results;
+    }
+    
     if (dbResults && dbResults.results && dbResults.results.length > 0) {
       dbResults.results.forEach((item) => {
         let itemText = item.name || item.title || 'Result';
@@ -118,6 +158,8 @@ class OSINTService {
         }
         results.push(itemText);
       });
+    } else {
+      results.push('No results found from API');
     }
     
     return results;
