@@ -26,6 +26,7 @@ What I can search:
 
 Commands:
 /start - Show this message
+/myid - View your user ID
 /machine <query> - Search for machines and devices
 /prices - View pricing plans`;
 
@@ -51,6 +52,8 @@ Commands:
     if (!userInfo) {
       bot.sendMessage(chatId, `No Active Subscription
 
+Your User ID: ${userId}
+
 You don't have an active subscription.
 
 Use /prices to view available plans and contact @strafbaar to purchase.`);
@@ -59,6 +62,7 @@ Use /prices to view available plans and contact @strafbaar to purchase.`);
     
     const accountMessage = `Your Account
 
+User ID: ${userId}
 Username: @${userInfo.username}
 Plan: ${userInfo.plan}
 Credits Today: ${userInfo.credits_today}
@@ -68,6 +72,24 @@ Expiry Date: ${userInfo.expires_at}
 Contact @strafbaar for plan upgrades or renewals.`;
     
     bot.sendMessage(chatId, accountMessage);
+  }
+
+  handleMyId(bot, msg) {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    const username = msg.from.username || 'No username';
+    const firstName = msg.from.first_name || '';
+    const lastName = msg.from.last_name || '';
+    
+    const message = `Your Information
+
+User ID: ${userId}
+Username: @${username}
+Name: ${firstName} ${lastName}
+
+Share this User ID with @strafbaar to purchase a subscription.`;
+    
+    bot.sendMessage(chatId, message);
   }
 
   handleGrant(bot, msg, match) {

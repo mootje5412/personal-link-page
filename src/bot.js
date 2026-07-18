@@ -22,6 +22,7 @@ class FindNowBot {
     this.bot.onText(/\/start/, (msg) => commandHandler.handleStart(this.bot, msg));
     this.bot.onText(/\/prices/, (msg) => commandHandler.handlePrices(this.bot, msg));
     this.bot.onText(/\/account/, (msg) => commandHandler.handleAccount(this.bot, msg));
+    this.bot.onText(/\/myid/, (msg) => commandHandler.handleMyId(this.bot, msg));
     this.bot.onText(/\/machine (.+)/, (msg, match) => commandHandler.handleMachine(this.bot, msg, match));
     this.bot.onText(/\/download_(.+)/, (msg, match) => commandHandler.handleDownload(this.bot, msg, match));
     
