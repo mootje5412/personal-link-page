@@ -18,12 +18,6 @@ class MessageHandler {
       results = await osintService.emailSearch(query);
     } else if (this.isIP(query)) {
       results = await osintService.ipSearch(query);
-      
-      // Also search for machines with this IP
-      const machineResults = await osintService.machineSearch(query);
-      if (machineResults && machineResults.length > 0) {
-        results = results.concat(machineResults);
-      }
     } else if (this.isPhone(query)) {
       results = await osintService.phoneSearch(query);
     } else if (this.isUsername(query)) {

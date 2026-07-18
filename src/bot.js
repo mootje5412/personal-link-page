@@ -18,6 +18,7 @@ class FindNowBot {
     // Register command handlers
     this.bot.onText(/\/start/, (msg) => commandHandler.handleStart(this.bot, msg));
     this.bot.onText(/\/prices/, (msg) => commandHandler.handlePrices(this.bot, msg));
+    this.bot.onText(/\/machine (.+)/, (msg, match) => commandHandler.handleMachine(this.bot, msg, match));
     this.bot.onText(/\/download_(.+)/, (msg, match) => commandHandler.handleDownload(this.bot, msg, match));
     
     // Handle callback queries for pagination and pricing
@@ -29,6 +30,8 @@ class FindNowBot {
       } else if (query.data === 'back_to_prices') {
         commandHandler.handlePrices(this.bot, query.message);
         this.bot.answerCallbackQuery(query.id);
+      } else if (query.data.startsWith('download_machine_')) {
+        commandHandler.handleMachineDownloadCallback(this.bot, query);
       }
     });
     

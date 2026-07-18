@@ -89,6 +89,72 @@ To purchase, contact @strafbaar on Telegram`;
     bot.answerCallbackQuery(query.id, { text: `Selected: ${plan}` });
   }
 
+  async handleMachine(bot, msg, match) {
+    const chatId = msg.chat.id;
+    const query = match[1].trim();
+    
+    const statusMsg = await bot.sendMessage(chatId, `Searching machines for: ${query}\n\nScanning databases...`);
+    
+    try {
+      const machineResults = await apiService.searchMachines(query);
+      
+      if (machineResults && machineResults.error) {
+        bot.editMessageText(`Machine Search Error\n\n${machineResults.message}`, {
+          chat_id: chatId,
+          message_id: statusMsg.message_id
+        });
+        return;
+      }
+      
+      if (machineResults && machineResults.results && machineResults.results.length > 0) {
+        bot.deleteMessage(chatId, statusMsg.message_id);
+        
+        const results = [];
+        machineResults.results.forEach((machine) => {
+          let machineInfo = '';
+          
+          // Build machine info
+          Object.keys(machine).forEach((key) => {
+            const value = machine[key];
+            if (value !== null && value !== undefined && key !== 'id' && key !== 'machine_id') {
+              if (typeof value === 'string' || typeof value === 'number') {
+                machineInfo += `${key}: ${value}\n`;
+              }
+            }
+          });
+          
+          const machineId = machine.id || machine.machine_id;
+          
+          // Create keyboard for this machine
+          const keyboard = {
+            inline_keyboard: [
+              [
+                {
+                  text: 'Download Full Data',
+                  callback_data: `download_machine_${machineId}`
+                }
+              ]
+            ]
+          };
+          
+          const message = `Machine Found\n\n${machineInfo || 'No details available'}`;
+          bot.sendMessage(chatId, message, { reply_markup: keyboard });
+        });
+      } else {
+        bot.editMessageText(`No machines found for: ${query}`, {
+          chat_id: chatId,
+          message_id: statusMsg.message_id
+        });
+      }
+    } catch (error) {
+      console.error('Machine search error:', error);
+      bot.editMessageText(`Search failed. Please try again.`, {
+        chat_id: chatId,
+        message_id: statusMsg.message_id
+      });
+    }
+  }
+
   async handleDownload(bot, msg, match) {
     const chatId = msg.chat.id;
     const machineId = match[1];
@@ -122,6 +188,42 @@ To purchase, contact @strafbaar on Telegram`;
     } catch (error) {
       console.error('Download error:', error);
       bot.sendMessage(chatId, 'Failed to download machine data');
+    }
+  }
+
+  async handleMachineDownloadCallback(bot, query) {
+    const chatId = query.message.chat.id;
+    const machineId = query.data.replace('download_machine_', '');
+    
+    bot.answerCallbackQuery(query.id, { text: 'Downloading...' });
+    bot.sendMessage(chatId, `Preparing download for machine ${machineId}...`);
+    
+    try {
+      const downloadData = await apiService.downloadMachine(machineId);
+      
+      if (downloadData && downloadData.error) {
+        bot.sendMessage(chatId, `Download Error\n\n${downloadData.message}`);
+        return;
+      }
+      
+      if (downloadData) {
+        const formattedData = typeof downloadData === 'string' ? downloadData : JSON.stringify(downloadData, null, 2);
+        
+        if (formattedData.length > 4000) {
+          const buffer = Buffer.from(formattedData, 'utf-8');
+          bot.sendDocument(chatId, buffer, {}, {
+            filename: `machine_${machineId}.json`,
+            contentType: 'application/json'
+          });
+        } else {
+          bot.sendMessage(chatId, `Machine ${machineId} Data\n\n${formattedData}`);
+        }
+      } else {
+        bot.sendMessage(chatId, 'No data available for download');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      bot.sendMessage(chatId, 'Download failed');
     }
   }
 }
