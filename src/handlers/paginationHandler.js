@@ -20,7 +20,12 @@ class PaginationHandler {
     const end = start + this.ITEMS_PER_PAGE;
     const pageResults = results.slice(start, end);
 
-    this.sessions.set(chatId, { query, results, page });
+    this.sessions.set(chatId, { 
+      query, 
+      results, 
+      page,
+      timestamp: Date.now()
+    });
 
     let message = `Results for: ${query}\n`;
     message += `Page ${page + 1} of ${totalPages}\n`;
@@ -80,34 +85,41 @@ class PaginationHandler {
       const page = parseInt(data.split('_')[1]);
       const session = this.sessions.get(chatId);
 
-      if (session) {
-        const totalPages = Math.ceil(session.results.length / this.ITEMS_PER_PAGE);
-        const start = page * this.ITEMS_PER_PAGE;
-        const end = start + this.ITEMS_PER_PAGE;
-        const pageResults = session.results.slice(start, end);
-
-        session.page = page;
-
-        let message = `Results for: ${session.query}\n`;
-        message += `Page ${page + 1} of ${totalPages}\n`;
-        message += `Total results: ${session.results.length}\n\n`;
-
-        pageResults.forEach((item, index) => {
-          const globalIndex = start + index + 1;
-          message += `${globalIndex}. ${item}\n\n`;
+      if (!session) {
+        bot.answerCallbackQuery(callbackQuery.id, { 
+          text: 'Session expired. Please search again.',
+          show_alert: true 
         });
-
-        const keyboard = this.createKeyboard(page, totalPages);
-
-        bot.editMessageText(message, {
-          chat_id: chatId,
-          message_id: messageId,
-          reply_markup: keyboard,
-          disable_web_page_preview: true
-        });
-
-        bot.answerCallbackQuery(callbackQuery.id);
+        return;
       }
+
+      const totalPages = Math.ceil(session.results.length / this.ITEMS_PER_PAGE);
+      const start = page * this.ITEMS_PER_PAGE;
+      const end = start + this.ITEMS_PER_PAGE;
+      const pageResults = session.results.slice(start, end);
+
+      session.page = page;
+      session.timestamp = Date.now(); // Update timestamp on interaction
+
+      let message = `Results for: ${session.query}\n`;
+      message += `Page ${page + 1} of ${totalPages}\n`;
+      message += `Total results: ${session.results.length}\n\n`;
+
+      pageResults.forEach((item, index) => {
+        const globalIndex = start + index + 1;
+        message += `${globalIndex}. ${item}\n\n`;
+      });
+
+      const keyboard = this.createKeyboard(page, totalPages);
+
+      bot.editMessageText(message, {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: keyboard,
+        disable_web_page_preview: true
+      });
+
+      bot.answerCallbackQuery(callbackQuery.id);
     }
   }
 }
