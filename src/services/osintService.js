@@ -38,10 +38,36 @@ class OSINTService {
   async generalSearch(query) {
     const results = [];
     
+    // Try Snusbase with last4 type for general searches
+    try {
+      const snusbaseData = await apiService.snusbaseSearch(query, 'lastip');
+      console.log('Snusbase data received:', JSON.stringify(snusbaseData).substring(0, 500));
+      
+      if (snusbaseData && !snusbaseData.error) {
+        if (snusbaseData.results && typeof snusbaseData.results === 'object') {
+          const dbNames = Object.keys(snusbaseData.results);
+          console.log(`Snusbase returned ${dbNames.length} databases:`, dbNames.join(', '));
+          
+          dbNames.forEach((dbName) => {
+            const dbResults = snusbaseData.results[dbName];
+            if (dbResults && Array.isArray(dbResults) && dbResults.length > 0) {
+              console.log(`Database ${dbName} has ${dbResults.length} results`);
+              dbResults.forEach((item, index) => {
+                results.push(this.formatItem(item, index));
+              });
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Snusbase general search failed:', error.message);
+    }
+    
+    // Try OSINT Cat
     try {
       const dbResults = await apiService.searchDatabase(query);
       
-      if (dbResults && dbResults.error) {
+      if (dbResults && dbResults.error && results.length === 0) {
         results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
         return results;
       }
@@ -50,12 +76,13 @@ class OSINTService {
         dbResults.results.forEach((item, index) => {
           results.push(this.formatItem(item, index));
         });
-      } else if (!dbResults || !dbResults.results) {
-        results.push('No results found from API');
       }
     } catch (error) {
       console.error('General search failed:', error.message);
-      results.push('Search failed. Please try again.');
+    }
+    
+    if (results.length === 0) {
+      results.push('No results found from any API');
     }
     
     return results;
@@ -64,7 +91,7 @@ class OSINTService {
   async usernameSearch(username) {
     const results = [];
     
-    // Try Snusbase
+    // Try Snusbase - merge all results
     try {
       const snusbaseData = await apiService.snusbaseSearch(username, 'username');
       console.log('Snusbase data received:', JSON.stringify(snusbaseData).substring(0, 500));
@@ -79,7 +106,7 @@ class OSINTService {
             if (dbResults && Array.isArray(dbResults) && dbResults.length > 0) {
               console.log(`Database ${dbName} has ${dbResults.length} results`);
               dbResults.forEach((item, index) => {
-                results.push(`Source: ${dbName}\n${this.formatItem(item, index)}`);
+                results.push(this.formatItem(item, index));
               });
             }
           });
@@ -121,13 +148,12 @@ class OSINTService {
   async emailSearch(email) {
     const results = [];
     
-    // Try Snusbase first
+    // Try Snusbase first - merge all results without source labels
     try {
       const snusbaseData = await apiService.snusbaseSearch(email, 'email');
       console.log('Snusbase data received:', JSON.stringify(snusbaseData).substring(0, 500));
       
       if (snusbaseData && !snusbaseData.error) {
-        // Check if results exist and have data
         if (snusbaseData.results && typeof snusbaseData.results === 'object') {
           const dbNames = Object.keys(snusbaseData.results);
           console.log(`Snusbase returned ${dbNames.length} databases:`, dbNames.join(', '));
@@ -137,7 +163,7 @@ class OSINTService {
             if (dbResults && Array.isArray(dbResults) && dbResults.length > 0) {
               console.log(`Database ${dbName} has ${dbResults.length} results`);
               dbResults.forEach((item, index) => {
-                results.push(`Source: ${dbName}\n${this.formatItem(item, index)}`);
+                results.push(this.formatItem(item, index));
               });
             }
           });
@@ -193,10 +219,36 @@ class OSINTService {
   async phoneSearch(phone) {
     const results = [];
     
+    // Try Snusbase first
+    try {
+      const snusbaseData = await apiService.snusbaseSearch(phone, 'phone');
+      console.log('Snusbase data received:', JSON.stringify(snusbaseData).substring(0, 500));
+      
+      if (snusbaseData && !snusbaseData.error) {
+        if (snusbaseData.results && typeof snusbaseData.results === 'object') {
+          const dbNames = Object.keys(snusbaseData.results);
+          console.log(`Snusbase returned ${dbNames.length} databases:`, dbNames.join(', '));
+          
+          dbNames.forEach((dbName) => {
+            const dbResults = snusbaseData.results[dbName];
+            if (dbResults && Array.isArray(dbResults) && dbResults.length > 0) {
+              console.log(`Database ${dbName} has ${dbResults.length} results`);
+              dbResults.forEach((item, index) => {
+                results.push(this.formatItem(item, index));
+              });
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Snusbase phone search failed:', error.message);
+    }
+    
+    // Try OSINT Cat
     try {
       const dbResults = await apiService.searchDatabase(phone);
       
-      if (dbResults && dbResults.error) {
+      if (dbResults && dbResults.error && results.length === 0) {
         results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
         return results;
       }
@@ -205,12 +257,13 @@ class OSINTService {
         dbResults.results.forEach((item, index) => {
           results.push(this.formatItem(item, index));
         });
-      } else {
-        results.push('No results found from API');
       }
     } catch (error) {
       console.error('Phone search failed:', error.message);
-      results.push('Search failed. Please try again.');
+    }
+    
+    if (results.length === 0) {
+      results.push('No results found from any API');
     }
     
     return results;
