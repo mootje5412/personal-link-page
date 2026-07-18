@@ -18,6 +18,7 @@ class FindNowBot {
     // Register command handlers
     this.bot.onText(/\/start/, (msg) => commandHandler.handleStart(this.bot, msg));
     this.bot.onText(/\/prices/, (msg) => commandHandler.handlePrices(this.bot, msg));
+    this.bot.onText(/\/download_(.+)/, (msg, match) => commandHandler.handleDownload(this.bot, msg, match));
     
     // Handle callback queries for pagination and pricing
     this.bot.on('callback_query', (query) => {

@@ -1,3 +1,5 @@
+const apiService = require('../services/apiService');
+
 class CommandHandler {
   handleStart(bot, msg) {
     const chatId = msg.chat.id;
@@ -28,36 +30,28 @@ This bot only uses publicly available information.`;
   handlePrices(bot, msg) {
     const chatId = msg.chat.id;
     
-    const priceMessage = `FindNow OSINT Bot - Premium Plans
+    const priceMessage = `Pricing Plans
 
-Unlock unlimited searches with our premium subscription plans.
-
-Choose the plan that fits your needs:`;
+Choose your plan:`;
     
     const keyboard = {
       inline_keyboard: [
         [
           {
-            text: '⚡ STARTER - 50 Credits/Day',
+            text: '50 Credits/Day - 5 EUR',
             callback_data: 'price_50'
           }
         ],
         [
           {
-            text: '🔥 PROFESSIONAL - 150 Credits/Day',
+            text: '150 Credits/Day - 10 EUR',
             callback_data: 'price_150'
           }
         ],
         [
           {
-            text: '💎 PREMIUM - 500 Credits/Day',
+            text: '500 Credits/Day - 25 EUR',
             callback_data: 'price_500'
-          }
-        ],
-        [
-          {
-            text: '📞 Contact Support',
-            url: 'https://t.me/strafbaar'
           }
         ]
       ]
@@ -70,67 +64,63 @@ Choose the plan that fits your needs:`;
     const chatId = query.message.chat.id;
     const data = query.data;
     
-    let planName = '';
-    let planEmoji = '';
-    let credits = '';
+    let plan = '';
     let price = '';
-    let features = '';
     
     if (data === 'price_50') {
-      planName = 'STARTER';
-      planEmoji = '⚡';
-      credits = '50 credits per day';
-      price = '5 EUR/month';
-      features = 'Perfect for casual users\nBasic OSINT searches\nEmail & username lookups';
+      plan = '50 Credits/Day';
+      price = '5 EUR';
     } else if (data === 'price_150') {
-      planName = 'PROFESSIONAL';
-      planEmoji = '🔥';
-      credits = '150 credits per day';
-      price = '10 EUR/month';
-      features = 'Ideal for professionals\nAdvanced searches\nMultiple API sources\nPriority support';
+      plan = '150 Credits/Day';
+      price = '10 EUR';
     } else if (data === 'price_500') {
-      planName = 'PREMIUM';
-      planEmoji = '💎';
-      credits = '500 credits per day';
-      price = '25 EUR/month';
-      features = 'Best for power users\nUnlimited daily searches\nAll API sources\nPriority support\nFastest results';
+      plan = '500 Credits/Day';
+      price = '25 EUR';
     }
     
-    const contactMessage = `${planEmoji} ${planName} PLAN
-
-Credits: ${credits}
+    const contactMessage = `Plan: ${plan}
 Price: ${price}
 
-Features:
-${features}
-
-To activate this plan:
-1. Contact @strafbaar on Telegram
-2. Mention the ${planName} plan
-3. Complete payment
-4. Get instant activation
-
-Ready to upgrade? Message @strafbaar now!`;
+To purchase, contact @strafbaar on Telegram`;
     
-    const keyboard = {
-      inline_keyboard: [
-        [
-          {
-            text: '📞 Contact @strafbaar',
-            url: 'https://t.me/strafbaar'
-          }
-        ],
-        [
-          {
-            text: '◀️ Back to Plans',
-            callback_data: 'back_to_prices'
-          }
-        ]
-      ]
-    };
+    bot.sendMessage(chatId, contactMessage);
+    bot.answerCallbackQuery(query.id, { text: `Selected: ${plan}` });
+  }
+
+  async handleDownload(bot, msg, match) {
+    const chatId = msg.chat.id;
+    const machineId = match[1];
     
-    bot.sendMessage(chatId, contactMessage, { reply_markup: keyboard });
-    bot.answerCallbackQuery(query.id, { text: `${planEmoji} ${planName} Plan Selected` });
+    bot.sendMessage(chatId, `Downloading machine data...`);
+    
+    try {
+      const downloadData = await apiService.downloadMachine(machineId);
+      
+      if (downloadData && downloadData.error) {
+        bot.sendMessage(chatId, `Error: ${downloadData.message}`);
+        return;
+      }
+      
+      if (downloadData) {
+        const formattedData = typeof downloadData === 'string' ? downloadData : JSON.stringify(downloadData, null, 2);
+        
+        if (formattedData.length > 4000) {
+          // Send as file if too long
+          const buffer = Buffer.from(formattedData, 'utf-8');
+          bot.sendDocument(chatId, buffer, {}, {
+            filename: `machine_${machineId}.json`,
+            contentType: 'application/json'
+          });
+        } else {
+          bot.sendMessage(chatId, `Machine Data:\n\n${formattedData}`);
+        }
+      } else {
+        bot.sendMessage(chatId, 'No data available for this machine');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      bot.sendMessage(chatId, 'Failed to download machine data');
+    }
   }
 }
 

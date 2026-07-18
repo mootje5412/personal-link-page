@@ -129,6 +129,46 @@ class APIService {
       return { error: true, message: error.message };
     }
   }
+
+  async searchMachines(query) {
+    try {
+      const url = `${config.osintCatBaseUrl}/machine_viewer/search?query=${encodeURIComponent(query)}`;
+      const headers = {
+        'X-API-KEY': config.osintCatApiKey
+      };
+      
+      console.log(`Calling machine viewer API: ${url}`);
+      const data = await this.makeRequest(url, headers);
+      console.log('Machine viewer API response:', JSON.stringify(data).substring(0, 500));
+      
+      if (data && data.error) {
+        console.error('API Error:', data.error, data.message);
+        return { error: true, message: data.message };
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Machine search error:', error.message);
+      return { error: true, message: error.message };
+    }
+  }
+
+  async downloadMachine(machineId) {
+    try {
+      const url = `${config.osintCatBaseUrl}/machine_viewer/download/${machineId}`;
+      const headers = {
+        'X-API-KEY': config.osintCatApiKey
+      };
+      
+      console.log(`Downloading machine: ${machineId}`);
+      const data = await this.makeRequest(url, headers);
+      
+      return data;
+    } catch (error) {
+      console.error('Machine download error:', error.message);
+      return { error: true, message: error.message };
+    }
+  }
 }
 
 module.exports = new APIService();
