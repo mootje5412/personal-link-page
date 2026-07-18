@@ -28,28 +28,36 @@ This bot only uses publicly available information.`;
   handlePrices(bot, msg) {
     const chatId = msg.chat.id;
     
-    const priceMessage = `Pricing Plans
+    const priceMessage = `FindNow OSINT Bot - Premium Plans
 
-Choose your plan and contact @strafbaar to purchase:`;
+Unlock unlimited searches with our premium subscription plans.
+
+Choose the plan that fits your needs:`;
     
     const keyboard = {
       inline_keyboard: [
         [
           {
-            text: '50 Credits/Day - 5 EUR',
+            text: '⚡ STARTER - 50 Credits/Day',
             callback_data: 'price_50'
           }
         ],
         [
           {
-            text: '150 Credits/Day - 10 EUR',
+            text: '🔥 PROFESSIONAL - 150 Credits/Day',
             callback_data: 'price_150'
           }
         ],
         [
           {
-            text: '500 Credits/Day - 25 EUR',
+            text: '💎 PREMIUM - 500 Credits/Day',
             callback_data: 'price_500'
+          }
+        ],
+        [
+          {
+            text: '📞 Contact Support',
+            url: 'https://t.me/strafbaar'
           }
         ]
       ]
@@ -62,30 +70,67 @@ Choose your plan and contact @strafbaar to purchase:`;
     const chatId = query.message.chat.id;
     const data = query.data;
     
-    let plan = '';
+    let planName = '';
+    let planEmoji = '';
+    let credits = '';
     let price = '';
+    let features = '';
     
     if (data === 'price_50') {
-      plan = '50 Credits/Day';
-      price = '5 EUR';
+      planName = 'STARTER';
+      planEmoji = '⚡';
+      credits = '50 credits per day';
+      price = '5 EUR/month';
+      features = 'Perfect for casual users\nBasic OSINT searches\nEmail & username lookups';
     } else if (data === 'price_150') {
-      plan = '150 Credits/Day';
-      price = '10 EUR';
+      planName = 'PROFESSIONAL';
+      planEmoji = '🔥';
+      credits = '150 credits per day';
+      price = '10 EUR/month';
+      features = 'Ideal for professionals\nAdvanced searches\nMultiple API sources\nPriority support';
     } else if (data === 'price_500') {
-      plan = '500 Credits/Day';
-      price = '25 EUR';
+      planName = 'PREMIUM';
+      planEmoji = '💎';
+      credits = '500 credits per day';
+      price = '25 EUR/month';
+      features = 'Best for power users\nUnlimited daily searches\nAll API sources\nPriority support\nFastest results';
     }
     
-    const contactMessage = `Selected Plan: ${plan}
+    const contactMessage = `${planEmoji} ${planName} PLAN
+
+Credits: ${credits}
 Price: ${price}
 
-To purchase this plan, please contact:
-@strafbaar
+Features:
+${features}
 
-Send them a message mentioning this plan and they will assist you with the payment and activation.`;
+To activate this plan:
+1. Contact @strafbaar on Telegram
+2. Mention the ${planName} plan
+3. Complete payment
+4. Get instant activation
+
+Ready to upgrade? Message @strafbaar now!`;
     
-    bot.sendMessage(chatId, contactMessage);
-    bot.answerCallbackQuery(query.id, { text: `Selected: ${plan}` });
+    const keyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: '📞 Contact @strafbaar',
+            url: 'https://t.me/strafbaar'
+          }
+        ],
+        [
+          {
+            text: '◀️ Back to Plans',
+            callback_data: 'back_to_prices'
+          }
+        ]
+      ]
+    };
+    
+    bot.sendMessage(chatId, contactMessage, { reply_markup: keyboard });
+    bot.answerCallbackQuery(query.id, { text: `${planEmoji} ${planName} Plan Selected` });
   }
 }
 
