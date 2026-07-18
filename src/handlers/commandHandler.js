@@ -93,13 +93,14 @@ To purchase, contact @strafbaar on Telegram`;
     const chatId = msg.chat.id;
     const query = match[1].trim();
     
-    const statusMsg = await bot.sendMessage(chatId, `Searching machines for: ${query}\n\nScanning databases...`);
+    const statusMsg = await bot.sendMessage(chatId, `Machine Search\n\nSearching for: ${query}\nPlease wait...`);
     
     try {
       const machineResults = await apiService.searchMachines(query);
       
       if (machineResults && machineResults.error) {
-        bot.editMessageText(`Machine Search Error\n\n${machineResults.message}`, {
+        const errorMsg = `Machine Search\n\nQuery: ${query}\nStatus: Error\n\n${machineResults.message}\n\nNote: Make sure your server IP (109.71.252.128) is whitelisted in OSINT Cat dashboard for machine viewer access.`;
+        bot.editMessageText(errorMsg, {
           chat_id: chatId,
           message_id: statusMsg.message_id
         });
@@ -109,23 +110,31 @@ To purchase, contact @strafbaar on Telegram`;
       if (machineResults && machineResults.results && machineResults.results.length > 0) {
         bot.deleteMessage(chatId, statusMsg.message_id);
         
-        const results = [];
-        machineResults.results.forEach((machine) => {
-          let machineInfo = '';
+        const totalResults = machineResults.results.length;
+        bot.sendMessage(chatId, `Machine Search Results\n\nFound ${totalResults} machine(s) for: ${query}`);
+        
+        machineResults.results.forEach((machine, index) => {
+          let machineInfo = `Machine ${index + 1} of ${totalResults}\n\n`;
           
-          // Build machine info
+          // Build machine info with better formatting
           Object.keys(machine).forEach((key) => {
             const value = machine[key];
-            if (value !== null && value !== undefined && key !== 'id' && key !== 'machine_id') {
-              if (typeof value === 'string' || typeof value === 'number') {
+            if (value !== null && value !== undefined) {
+              if (key === 'id' || key === 'machine_id') {
+                machineInfo += `ID: ${value}\n`;
+              } else if (typeof value === 'string') {
                 machineInfo += `${key}: ${value}\n`;
+              } else if (typeof value === 'number') {
+                machineInfo += `${key}: ${value}\n`;
+              } else if (Array.isArray(value)) {
+                machineInfo += `${key}: ${value.join(', ')}\n`;
               }
             }
           });
           
-          const machineId = machine.id || machine.machine_id;
+          const machineId = machine.id || machine.machine_id || index;
           
-          // Create keyboard for this machine
+          // Create keyboard with download button
           const keyboard = {
             inline_keyboard: [
               [
@@ -137,18 +146,17 @@ To purchase, contact @strafbaar on Telegram`;
             ]
           };
           
-          const message = `Machine Found\n\n${machineInfo || 'No details available'}`;
-          bot.sendMessage(chatId, message, { reply_markup: keyboard });
+          bot.sendMessage(chatId, machineInfo || 'No details available', { reply_markup: keyboard });
         });
       } else {
-        bot.editMessageText(`No machines found for: ${query}`, {
+        bot.editMessageText(`Machine Search\n\nQuery: ${query}\nStatus: No Results\n\nNo machines found matching your query.`, {
           chat_id: chatId,
           message_id: statusMsg.message_id
         });
       }
     } catch (error) {
       console.error('Machine search error:', error);
-      bot.editMessageText(`Search failed. Please try again.`, {
+      bot.editMessageText(`Machine Search\n\nQuery: ${query}\nStatus: Failed\n\nAn error occurred. Please try again.`, {
         chat_id: chatId,
         message_id: statusMsg.message_id
       });
