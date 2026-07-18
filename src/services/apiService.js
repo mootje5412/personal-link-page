@@ -85,6 +85,7 @@ class APIService {
       });
       
       console.log(`Calling Snusbase API for ${searchType}: ${query}`);
+      console.log('Snusbase request payload:', postData);
       
       return new Promise((resolve, reject) => {
         const urlObj = new URL(url);
@@ -101,6 +102,8 @@ class APIService {
         const req = https.request(options, (res) => {
           let data = '';
           
+          console.log(`Snusbase API status code: ${res.statusCode}`);
+          
           res.on('data', (chunk) => {
             data += chunk;
           });
@@ -108,17 +111,24 @@ class APIService {
           res.on('end', () => {
             try {
               const parsed = JSON.parse(data);
-              console.log('Snusbase API response:', JSON.stringify(parsed).substring(0, 500));
-              resolve(parsed);
+              console.log('Snusbase API response:', JSON.stringify(parsed).substring(0, 1000));
+              
+              if (res.statusCode !== 200) {
+                console.error('Snusbase API error:', parsed);
+                resolve({ error: true, message: parsed.message || `HTTP ${res.statusCode}`, data: parsed });
+              } else {
+                resolve(parsed);
+              }
             } catch (error) {
-              resolve(data);
+              console.error('Failed to parse Snusbase response:', data.substring(0, 500));
+              resolve({ error: true, message: 'Invalid JSON response', data });
             }
           });
         });
         
         req.on('error', (error) => {
           console.error('Snusbase request error:', error);
-          reject(error);
+          resolve({ error: true, message: error.message });
         });
         
         req.write(postData);

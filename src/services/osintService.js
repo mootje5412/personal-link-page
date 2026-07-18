@@ -67,15 +67,27 @@ class OSINTService {
     // Try Snusbase
     try {
       const snusbaseData = await apiService.snusbaseSearch(username, 'username');
-      if (snusbaseData && !snusbaseData.error && snusbaseData.results) {
-        Object.keys(snusbaseData.results).forEach((dbName) => {
-          const dbResults = snusbaseData.results[dbName];
-          if (dbResults && dbResults.length > 0) {
-            dbResults.forEach((item, index) => {
-              results.push(`Source: ${dbName}\n${this.formatItem(item, index)}`);
-            });
-          }
-        });
+      console.log('Snusbase data received:', JSON.stringify(snusbaseData).substring(0, 500));
+      
+      if (snusbaseData && !snusbaseData.error) {
+        if (snusbaseData.results && typeof snusbaseData.results === 'object') {
+          const dbNames = Object.keys(snusbaseData.results);
+          console.log(`Snusbase returned ${dbNames.length} databases:`, dbNames.join(', '));
+          
+          dbNames.forEach((dbName) => {
+            const dbResults = snusbaseData.results[dbName];
+            if (dbResults && Array.isArray(dbResults) && dbResults.length > 0) {
+              console.log(`Database ${dbName} has ${dbResults.length} results`);
+              dbResults.forEach((item, index) => {
+                results.push(`Source: ${dbName}\n${this.formatItem(item, index)}`);
+              });
+            }
+          });
+        } else {
+          console.log('Snusbase returned no results or invalid format');
+        }
+      } else if (snusbaseData && snusbaseData.error) {
+        console.error('Snusbase API error:', snusbaseData.message);
       }
     } catch (error) {
       console.error('Snusbase username search failed:', error.message);
@@ -112,15 +124,28 @@ class OSINTService {
     // Try Snusbase first
     try {
       const snusbaseData = await apiService.snusbaseSearch(email, 'email');
-      if (snusbaseData && !snusbaseData.error && snusbaseData.results) {
-        Object.keys(snusbaseData.results).forEach((dbName) => {
-          const dbResults = snusbaseData.results[dbName];
-          if (dbResults && dbResults.length > 0) {
-            dbResults.forEach((item, index) => {
-              results.push(`Source: ${dbName}\n${this.formatItem(item, index)}`);
-            });
-          }
-        });
+      console.log('Snusbase data received:', JSON.stringify(snusbaseData).substring(0, 500));
+      
+      if (snusbaseData && !snusbaseData.error) {
+        // Check if results exist and have data
+        if (snusbaseData.results && typeof snusbaseData.results === 'object') {
+          const dbNames = Object.keys(snusbaseData.results);
+          console.log(`Snusbase returned ${dbNames.length} databases:`, dbNames.join(', '));
+          
+          dbNames.forEach((dbName) => {
+            const dbResults = snusbaseData.results[dbName];
+            if (dbResults && Array.isArray(dbResults) && dbResults.length > 0) {
+              console.log(`Database ${dbName} has ${dbResults.length} results`);
+              dbResults.forEach((item, index) => {
+                results.push(`Source: ${dbName}\n${this.formatItem(item, index)}`);
+              });
+            }
+          });
+        } else {
+          console.log('Snusbase returned no results or invalid format');
+        }
+      } else if (snusbaseData && snusbaseData.error) {
+        console.error('Snusbase API error:', snusbaseData.message);
       }
     } catch (error) {
       console.error('Snusbase email search failed:', error.message);
