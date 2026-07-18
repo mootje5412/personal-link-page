@@ -11,6 +11,9 @@ class MessageHandler {
 
     console.log(`New search from ${msg.from.first_name} (${msg.from.id}): ${messageText}`);
 
+    // Register user in directory
+    userService.registerUser(userId, msg.from.username, msg.from.first_name, msg.from.last_name);
+
     // Owner has unlimited access
     const isOwner = userId === config.ownerId;
     

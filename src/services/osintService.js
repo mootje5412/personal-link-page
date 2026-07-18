@@ -284,13 +284,12 @@ class OSINTService {
   async emailSearch(email) {
     const results = [];
     
-    // Try SeekAF Universal Search (Fast) first
+    // SeekAF API (disabled - domain not resolving)
+    // Uncomment when domain is accessible
+    /*
     try {
       const seekafData = await apiService.seekafSearch(email, 'email', 100);
-      console.log('SeekAF search data received:', JSON.stringify(seekafData).substring(0, 500));
-      
       if (seekafData && seekafData.success && seekafData.results) {
-        console.log(`SeekAF returned ${seekafData.total} results`);
         seekafData.results.forEach((item, index) => {
           results.push(this.formatItem(item, index));
         });
@@ -299,13 +298,9 @@ class OSINTService {
       console.error('SeekAF search failed:', error.message);
     }
     
-    // Try SeekAF Stealer Logs
     try {
       const seekafStealerData = await apiService.seekafStealerSearch(email, false, 100);
-      console.log('SeekAF Stealer data received:', JSON.stringify(seekafStealerData).substring(0, 500));
-      
       if (seekafStealerData && seekafStealerData.success && seekafStealerData.results) {
-        console.log(`SeekAF Stealer returned ${seekafStealerData.total} results`);
         seekafStealerData.results.forEach((item, index) => {
           results.push(this.formatItem(item, index));
         });
@@ -313,6 +308,7 @@ class OSINTService {
     } catch (error) {
       console.error('SeekAF Stealer search failed:', error.message);
     }
+    */
     
     // Try Snusbase - merge all results without source labels
     try {

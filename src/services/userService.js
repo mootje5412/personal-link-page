@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const USERS_FILE = path.join(__dirname, '../../data/users.json');
+const USER_DIRECTORY_FILE = path.join(__dirname, '../../data/user_directory.json');
 
 // Plan definitions
 const PLANS = {
@@ -13,6 +14,7 @@ const PLANS = {
 class UserService {
   constructor() {
     this.users = this.loadUsers();
+    this.userDirectory = this.loadUserDirectory();
     this.usageTracking = new Map();
   }
 
@@ -34,6 +36,24 @@ class UserService {
     }
   }
 
+  loadUserDirectory() {
+    try {
+      const dataDir = path.join(__dirname, '../../data');
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+
+      if (fs.existsSync(USER_DIRECTORY_FILE)) {
+        const data = fs.readFileSync(USER_DIRECTORY_FILE, 'utf8');
+        return JSON.parse(data);
+      }
+      return {};
+    } catch (error) {
+      console.error('Error loading user directory:', error);
+      return {};
+    }
+  }
+
   saveUsers() {
     try {
       const dataDir = path.join(__dirname, '../../data');
@@ -44,6 +64,39 @@ class UserService {
     } catch (error) {
       console.error('Error saving users:', error);
     }
+  }
+
+  saveUserDirectory() {
+    try {
+      const dataDir = path.join(__dirname, '../../data');
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+      fs.writeFileSync(USER_DIRECTORY_FILE, JSON.stringify(this.userDirectory, null, 2));
+    } catch (error) {
+      console.error('Error saving user directory:', error);
+    }
+  }
+
+  registerUser(userId, username, firstName, lastName) {
+    // Track all users who interact with the bot
+    this.userDirectory[userId] = {
+      username: username || null,
+      first_name: firstName || null,
+      last_name: lastName || null,
+      last_seen: new Date().toISOString()
+    };
+    this.saveUserDirectory();
+  }
+
+  findUserIdByUsername(username) {
+    // Find user ID by username
+    for (const [userId, userData] of Object.entries(this.userDirectory)) {
+      if (userData.username && userData.username.toLowerCase() === username.toLowerCase()) {
+        return userId;
+      }
+    }
+    return null;
   }
 
   grantAccess(userId, username, plan, days) {

@@ -10,9 +10,10 @@ module.exports = {
   snusbaseApiKey: 'sbmeovhou6ecsn9fd9wcwnwwvvwnc',
   snusbaseBaseUrl: 'https://api.snusbase.com',
   
-  // SeekAF API
+  // SeekAF API (currently unavailable - domain not resolving)
   seekafApiKey: 'seek-af3d7d',
   seekafBaseUrl: 'https://see-know.icu/api/v1',
+  seekafEnabled: false, // Set to true when domain is accessible
   
   // Bot settings
   botName: 'FindNow OSINT Bot',

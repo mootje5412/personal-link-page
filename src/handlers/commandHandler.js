@@ -8,6 +8,9 @@ class CommandHandler {
     const userId = msg.from.id;
     const firstName = msg.from.first_name || 'there';
     
+    // Register user in directory
+    userService.registerUser(userId, msg.from.username, msg.from.first_name, msg.from.last_name);
+    
     // Check if user has access
     const accessCheck = userService.checkAccess(userId);
     const userInfo = userService.getUserInfo(userId);
@@ -81,13 +84,16 @@ Contact @strafbaar for plan upgrades or renewals.`;
     const firstName = msg.from.first_name || '';
     const lastName = msg.from.last_name || '';
     
+    // Register user in directory
+    userService.registerUser(userId, msg.from.username, msg.from.first_name, msg.from.last_name);
+    
     const message = `Your Information
 
 User ID: ${userId}
 Username: @${username}
 Name: ${firstName} ${lastName}
 
-Share this User ID with @strafbaar to purchase a subscription.`;
+To purchase a subscription, contact @strafbaar`;
     
     bot.sendMessage(chatId, message);
   }
@@ -112,22 +118,36 @@ Share this User ID with @strafbaar to purchase a subscription.`;
       
       bot.sendMessage(chatId, `Grant Access
 
-Usage: /grant <username> <plan> <days>
+Usage: /grant @username <plan> <days>
 
 ${planList}
-Example: /grant john123 standard 30`);
+Example: /grant @john123 premium 30
+
+The user must have messaged the bot at least once.`);
       return;
     }
     
-    const [username, plan, days] = args;
+    let [username, plan, days] = args;
     
-    // Get user ID from username (this is a simplified version)
-    // In production, you'd need to find the user ID by username
-    bot.sendMessage(chatId, `Please forward a message from @${username} or have them start the bot first, then use:
+    // Remove @ symbol if present
+    username = username.replace('@', '');
+    
+    // Look up user ID by username
+    const userId = userService.findUserIdByUsername(username);
+    
+    if (!userId) {
+      bot.sendMessage(chatId, `User @${username} not found.
 
-/grantid <user_id> ${plan} ${days}
+The user must message the bot at least once before you can grant them access.
 
-To find their user ID, have them message the bot first.`);
+Once they do, try again:
+/grant @${username} ${plan} ${days}`);
+      return;
+    }
+    
+    // Grant access
+    const result = userService.grantAccess(userId, username, plan, days);
+    bot.sendMessage(chatId, result.message);
   }
 
   handleGrantId(bot, msg, match) {
