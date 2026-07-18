@@ -96,10 +96,7 @@ Share this User ID with @strafbaar to purchase a subscription.`;
     const chatId = msg.chat.id;
     const adminId = msg.from.id;
     
-    // Check if user is owner (add your Telegram user ID here)
-    const OWNER_ID = 8073205490; // Replace with your user ID
-    
-    if (adminId !== OWNER_ID) {
+    if (adminId !== config.ownerId) {
       bot.sendMessage(chatId, 'Unauthorized. Owner only command.');
       return;
     }
@@ -137,9 +134,7 @@ To find their user ID, have them message the bot first.`);
     const chatId = msg.chat.id;
     const adminId = msg.from.id;
     
-    const OWNER_ID = 8073205490;
-    
-    if (adminId !== OWNER_ID) {
+    if (adminId !== config.ownerId) {
       bot.sendMessage(chatId, 'Unauthorized. Owner only command.');
       return;
     }
@@ -162,9 +157,7 @@ To find their user ID, have them message the bot first.`);
     const chatId = msg.chat.id;
     const adminId = msg.from.id;
     
-    const OWNER_ID = 8073205490;
-    
-    if (adminId !== OWNER_ID) {
+    if (adminId !== config.ownerId) {
       bot.sendMessage(chatId, 'Unauthorized. Owner only command.');
       return;
     }
@@ -178,9 +171,7 @@ To find their user ID, have them message the bot first.`);
     const chatId = msg.chat.id;
     const adminId = msg.from.id;
     
-    const OWNER_ID = 8073205490;
-    
-    if (adminId !== OWNER_ID) {
+    if (adminId !== config.ownerId) {
       bot.sendMessage(chatId, 'Unauthorized. Owner only command.');
       return;
     }

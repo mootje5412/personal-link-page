@@ -14,6 +14,9 @@ module.exports = {
   botName: 'FindNow OSINT Bot',
   version: '1.0.0',
   
+  // Owner settings
+  ownerId: 8073205490,
+  
   // Polling settings
   polling: {
     interval: 300,
