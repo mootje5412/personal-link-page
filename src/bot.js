@@ -15,6 +15,9 @@ class FindNowBot {
   init() {
     console.log(`${config.botName} v${config.version} is starting...`);
     
+    // Clear all sessions on startup
+    paginationHandler.clearAllSessions();
+    
     // Register command handlers
     this.bot.onText(/\/start/, (msg) => commandHandler.handleStart(this.bot, msg));
     this.bot.onText(/\/prices/, (msg) => commandHandler.handlePrices(this.bot, msg));
@@ -48,6 +51,7 @@ class FindNowBot {
     });
 
     console.log('Bot is running and ready!');
+    console.log('All previous sessions have been cleared');
   }
 
   start() {

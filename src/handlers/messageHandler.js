@@ -6,30 +6,46 @@ class MessageHandler {
     const chatId = msg.chat.id;
     const messageText = msg.text;
 
-    console.log(`Message from ${msg.from.first_name} (${msg.from.id}): ${messageText}`);
+    console.log(`New search from ${msg.from.first_name} (${msg.from.id}): ${messageText}`);
+
+    // Clear any existing session for this chat
+    paginationHandler.clearSession(chatId);
 
     const query = messageText.trim();
     
-    bot.sendMessage(chatId, `Searching...`);
+    const searchMsg = await bot.sendMessage(chatId, `Searching for: ${query}\n\nPlease wait...`);
 
     let results;
     
-    if (this.isEmail(query)) {
-      results = await osintService.emailSearch(query);
-    } else if (this.isIP(query)) {
-      results = await osintService.ipSearch(query);
-    } else if (this.isPhone(query)) {
-      results = await osintService.phoneSearch(query);
-    } else if (this.isUsername(query)) {
-      results = await osintService.usernameSearch(query);
-    } else {
-      results = await osintService.generalSearch(query);
-    }
-    
-    if (results && results.length > 0) {
-      paginationHandler.sendPaginatedResults(bot, chatId, query, results, 0);
-    } else {
-      bot.sendMessage(chatId, 'No results found');
+    try {
+      if (this.isEmail(query)) {
+        results = await osintService.emailSearch(query);
+      } else if (this.isIP(query)) {
+        results = await osintService.ipSearch(query);
+      } else if (this.isPhone(query)) {
+        results = await osintService.phoneSearch(query);
+      } else if (this.isUsername(query)) {
+        results = await osintService.usernameSearch(query);
+      } else {
+        results = await osintService.generalSearch(query);
+      }
+      
+      // Delete the searching message
+      bot.deleteMessage(chatId, searchMsg.message_id).catch(() => {});
+      
+      if (results && results.length > 0) {
+        paginationHandler.sendPaginatedResults(bot, chatId, query, results, 0);
+      } else {
+        bot.sendMessage(chatId, `No results found for: ${query}`);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      bot.editMessageText(`Search failed for: ${query}\n\nPlease try again.`, {
+        chat_id: chatId,
+        message_id: searchMsg.message_id
+      }).catch(() => {
+        bot.sendMessage(chatId, `Search failed for: ${query}\n\nPlease try again.`);
+      });
     }
   }
 
