@@ -17,10 +17,15 @@ class FindNowBot {
     
     // Register command handlers
     this.bot.onText(/\/start/, (msg) => commandHandler.handleStart(this.bot, msg));
+    this.bot.onText(/\/prices/, (msg) => commandHandler.handlePrices(this.bot, msg));
     
-    // Handle callback queries for pagination
+    // Handle callback queries for pagination and pricing
     this.bot.on('callback_query', (query) => {
-      paginationHandler.handleCallback(this.bot, query);
+      if (query.data.startsWith('page_') || query.data === 'current') {
+        paginationHandler.handleCallback(this.bot, query);
+      } else if (query.data.startsWith('price_')) {
+        commandHandler.handlePriceCallback(this.bot, query);
+      }
     });
     
     // Handle regular messages
