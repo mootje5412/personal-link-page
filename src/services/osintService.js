@@ -38,19 +38,24 @@ class OSINTService {
   async generalSearch(query) {
     const results = [];
     
-    const dbResults = await apiService.searchDatabase(query);
-    
-    if (dbResults && dbResults.error) {
-      results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
-      return results;
-    }
-    
-    if (dbResults && dbResults.results && dbResults.results.length > 0) {
-      dbResults.results.forEach((item, index) => {
-        results.push(this.formatItem(item, index));
-      });
-    } else if (!dbResults || !dbResults.results) {
-      results.push('No results found from API');
+    try {
+      const dbResults = await apiService.searchDatabase(query);
+      
+      if (dbResults && dbResults.error) {
+        results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
+        return results;
+      }
+      
+      if (dbResults && dbResults.results && dbResults.results.length > 0) {
+        dbResults.results.forEach((item, index) => {
+          results.push(this.formatItem(item, index));
+        });
+      } else if (!dbResults || !dbResults.results) {
+        results.push('No results found from API');
+      }
+    } catch (error) {
+      console.error('General search failed:', error.message);
+      results.push('Search failed. Please try again.');
     }
     
     return results;
@@ -60,30 +65,38 @@ class OSINTService {
     const results = [];
     
     // Try Snusbase
-    const snusbaseData = await apiService.snusbaseSearch(username, 'username');
-    if (snusbaseData && !snusbaseData.error && snusbaseData.results) {
-      Object.keys(snusbaseData.results).forEach((dbName) => {
-        const dbResults = snusbaseData.results[dbName];
-        if (dbResults && dbResults.length > 0) {
-          dbResults.forEach((item, index) => {
-            results.push(`Source: ${dbName}\n${this.formatItem(item, index)}`);
-          });
-        }
-      });
+    try {
+      const snusbaseData = await apiService.snusbaseSearch(username, 'username');
+      if (snusbaseData && !snusbaseData.error && snusbaseData.results) {
+        Object.keys(snusbaseData.results).forEach((dbName) => {
+          const dbResults = snusbaseData.results[dbName];
+          if (dbResults && dbResults.length > 0) {
+            dbResults.forEach((item, index) => {
+              results.push(`Source: ${dbName}\n${this.formatItem(item, index)}`);
+            });
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Snusbase username search failed:', error.message);
     }
     
     // Try OSINT Cat
-    const dbResults = await apiService.searchDatabase(username);
-    
-    if (dbResults && dbResults.error && results.length === 0) {
-      results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
-      return results;
-    }
-    
-    if (dbResults && dbResults.results && dbResults.results.length > 0) {
-      dbResults.results.forEach((item, index) => {
-        results.push(this.formatItem(item, index));
-      });
+    try {
+      const dbResults = await apiService.searchDatabase(username);
+      
+      if (dbResults && dbResults.error && results.length === 0) {
+        results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
+        return results;
+      }
+      
+      if (dbResults && dbResults.results && dbResults.results.length > 0) {
+        dbResults.results.forEach((item, index) => {
+          results.push(this.formatItem(item, index));
+        });
+      }
+    } catch (error) {
+      console.error('Database search failed:', error.message);
     }
     
     if (results.length === 0) {
@@ -97,40 +110,52 @@ class OSINTService {
     const results = [];
     
     // Try Snusbase first
-    const snusbaseData = await apiService.snusbaseSearch(email, 'email');
-    if (snusbaseData && !snusbaseData.error && snusbaseData.results) {
-      Object.keys(snusbaseData.results).forEach((dbName) => {
-        const dbResults = snusbaseData.results[dbName];
-        if (dbResults && dbResults.length > 0) {
-          dbResults.forEach((item, index) => {
-            results.push(`Source: ${dbName}\n${this.formatItem(item, index)}`);
-          });
-        }
-      });
+    try {
+      const snusbaseData = await apiService.snusbaseSearch(email, 'email');
+      if (snusbaseData && !snusbaseData.error && snusbaseData.results) {
+        Object.keys(snusbaseData.results).forEach((dbName) => {
+          const dbResults = snusbaseData.results[dbName];
+          if (dbResults && dbResults.length > 0) {
+            dbResults.forEach((item, index) => {
+              results.push(`Source: ${dbName}\n${this.formatItem(item, index)}`);
+            });
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Snusbase email search failed:', error.message);
     }
     
     // Try OSINT Cat breach API
-    const breachData = await apiService.searchBreach(email);
-    
-    if (breachData && breachData.error && results.length === 0) {
-      results.push(`API Error: ${breachData.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
-      return results;
-    }
-    
-    if (breachData) {
-      if (breachData.breaches && breachData.breaches.length > 0) {
-        breachData.breaches.forEach((breach, index) => {
-          results.push(this.formatItem(breach, index));
-        });
+    try {
+      const breachData = await apiService.searchBreach(email);
+      
+      if (breachData && breachData.error && results.length === 0) {
+        results.push(`API Error: ${breachData.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
+        return results;
       }
+      
+      if (breachData) {
+        if (breachData.breach_data && breachData.breach_data.length > 0) {
+          breachData.breach_data.forEach((breach, index) => {
+            results.push(this.formatItem(breach, index));
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Breach search failed:', error.message);
     }
     
     // Try OSINT Cat database search
-    const dbResults = await apiService.searchDatabase(email);
-    if (dbResults && !dbResults.error && dbResults.results && dbResults.results.length > 0) {
-      dbResults.results.forEach((item, index) => {
-        results.push(this.formatItem(item, index + (breachData?.breaches?.length || 0)));
-      });
+    try {
+      const dbResults = await apiService.searchDatabase(email);
+      if (dbResults && !dbResults.error && dbResults.results && dbResults.results.length > 0) {
+        dbResults.results.forEach((item, index) => {
+          results.push(this.formatItem(item, index));
+        });
+      }
+    } catch (error) {
+      console.error('Database search failed:', error.message);
     }
     
     if (results.length === 0) {
@@ -143,19 +168,24 @@ class OSINTService {
   async phoneSearch(phone) {
     const results = [];
     
-    const dbResults = await apiService.searchDatabase(phone);
-    
-    if (dbResults && dbResults.error) {
-      results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
-      return results;
-    }
-    
-    if (dbResults && dbResults.results && dbResults.results.length > 0) {
-      dbResults.results.forEach((item, index) => {
-        results.push(this.formatItem(item, index));
-      });
-    } else {
-      results.push('No results found from API');
+    try {
+      const dbResults = await apiService.searchDatabase(phone);
+      
+      if (dbResults && dbResults.error) {
+        results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
+        return results;
+      }
+      
+      if (dbResults && dbResults.results && dbResults.results.length > 0) {
+        dbResults.results.forEach((item, index) => {
+          results.push(this.formatItem(item, index));
+        });
+      } else {
+        results.push('No results found from API');
+      }
+    } catch (error) {
+      console.error('Phone search failed:', error.message);
+      results.push('Search failed. Please try again.');
     }
     
     return results;
@@ -164,19 +194,24 @@ class OSINTService {
   async ipSearch(ip) {
     const results = [];
     
-    const dbResults = await apiService.searchDatabase(ip);
-    
-    if (dbResults && dbResults.error) {
-      results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
-      return results;
-    }
-    
-    if (dbResults && dbResults.results && dbResults.results.length > 0) {
-      dbResults.results.forEach((item, index) => {
-        results.push(this.formatItem(item, index));
-      });
-    } else {
-      results.push('No results found from API');
+    try {
+      const dbResults = await apiService.searchDatabase(ip);
+      
+      if (dbResults && dbResults.error) {
+        results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
+        return results;
+      }
+      
+      if (dbResults && dbResults.results && dbResults.results.length > 0) {
+        dbResults.results.forEach((item, index) => {
+          results.push(this.formatItem(item, index));
+        });
+      } else {
+        results.push('No results found from API');
+      }
+    } catch (error) {
+      console.error('IP search failed:', error.message);
+      results.push('Search failed. Please try again.');
     }
     
     return results;
