@@ -11,7 +11,7 @@ module.exports = {
   snusbaseBaseUrl: 'https://api.snusbase.com',
   
   // SeekAF API
-  seekafApiKey: 'seek-af3d7d',
+  seekafApiKey: 'seek-bde9d731a0cdaedf4ff93f71e321f24a52',
   seekafBaseUrl: 'https://see-know.xyz/api/v1',
   seekafEnabled: true,
   
