@@ -33,7 +33,7 @@ class APIService {
       
       console.log(`Calling breach API: ${url}`);
       const data = await this.makeRequest(url, headers);
-      console.log('Breach API response:', JSON.stringify(data));
+      console.log('Breach API response:', JSON.stringify(data).substring(0, 1000));
       
       if (data && data.error) {
         console.error('API Error:', data.error, data.message);
@@ -56,7 +56,7 @@ class APIService {
       
       console.log(`Calling database API: ${url}`);
       const data = await this.makeRequest(url, headers);
-      console.log('Database API response:', JSON.stringify(data));
+      console.log('Database API response:', JSON.stringify(data).substring(0, 1000));
       
       if (data && data.error) {
         console.error('API Error:', data.error, data.message);

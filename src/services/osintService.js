@@ -12,14 +12,22 @@ class OSINTService {
     }
     
     if (dbResults && dbResults.results && dbResults.results.length > 0) {
-      dbResults.results.forEach((item) => {
-        let itemText = item.name || item.title || 'Result';
-        if (item.description) {
-          itemText += `\n${item.description}`;
+      dbResults.results.forEach((item, index) => {
+        // Log first item to see structure
+        if (index === 0) {
+          console.log('Sample item structure:', JSON.stringify(item));
         }
-        if (item.url) {
-          itemText += `\n${item.url}`;
-        }
+        
+        // Try all possible field combinations
+        let itemText = item.name || item.title || item.username || item.email || item.value || item.data || JSON.stringify(item);
+        
+        // Add all available fields
+        Object.keys(item).forEach((key) => {
+          if (key !== 'name' && key !== 'title' && item[key] && typeof item[key] === 'string' && item[key].length < 200) {
+            itemText += `\n${key}: ${item[key]}`;
+          }
+        });
+        
         results.push(itemText);
       });
     } else if (!dbResults || !dbResults.results) {
@@ -72,17 +80,20 @@ class OSINTService {
     
     if (breachData) {
       if (breachData.breaches && breachData.breaches.length > 0) {
-        breachData.breaches.forEach((breach) => {
-          let itemText = breach.name || breach.title || 'Breach';
-          if (breach.date) {
-            itemText += `\nDate: ${breach.date}`;
+        breachData.breaches.forEach((breach, index) => {
+          if (index === 0) {
+            console.log('Sample breach structure:', JSON.stringify(breach));
           }
-          if (breach.description) {
-            itemText += `\n${breach.description}`;
-          }
-          if (breach.compromised) {
-            itemText += `\nCompromised: ${breach.compromised}`;
-          }
+          
+          let itemText = breach.name || breach.title || breach.source || 'Breach';
+          
+          // Add all breach fields
+          Object.keys(breach).forEach((key) => {
+            if (key !== 'name' && key !== 'title' && breach[key] && typeof breach[key] === 'string' && breach[key].length < 200) {
+              itemText += `\n${key}: ${breach[key]}`;
+            }
+          });
+          
           results.push(itemText);
         });
       }
@@ -90,14 +101,20 @@ class OSINTService {
     
     const dbResults = await apiService.searchDatabase(email);
     if (dbResults && !dbResults.error && dbResults.results && dbResults.results.length > 0) {
-      dbResults.results.forEach((item) => {
-        let itemText = item.name || item.title || 'Result';
-        if (item.description) {
-          itemText += `\n${item.description}`;
+      dbResults.results.forEach((item, index) => {
+        if (index === 0 && results.length === 0) {
+          console.log('Sample email result structure:', JSON.stringify(item));
         }
-        if (item.url) {
-          itemText += `\n${item.url}`;
-        }
+        
+        let itemText = item.name || item.title || item.username || item.email || item.value || item.data || JSON.stringify(item);
+        
+        // Add all available fields
+        Object.keys(item).forEach((key) => {
+          if (key !== 'name' && key !== 'title' && item[key] && typeof item[key] === 'string' && item[key].length < 200) {
+            itemText += `\n${key}: ${item[key]}`;
+          }
+        });
+        
         results.push(itemText);
       });
     }
