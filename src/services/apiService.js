@@ -69,6 +69,66 @@ class APIService {
       return { error: true, message: error.message };
     }
   }
+
+  async snusbaseSearch(query, searchType = 'email') {
+    try {
+      const url = `${config.snusbaseBaseUrl}/data/search`;
+      const headers = {
+        'Auth': config.snusbaseApiKey,
+        'Content-Type': 'application/json'
+      };
+      
+      const postData = JSON.stringify({
+        terms: [query],
+        types: [searchType],
+        wildcard: false
+      });
+      
+      console.log(`Calling Snusbase API for ${searchType}: ${query}`);
+      
+      return new Promise((resolve, reject) => {
+        const urlObj = new URL(url);
+        const options = {
+          hostname: urlObj.hostname,
+          path: urlObj.pathname,
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Content-Length': Buffer.byteLength(postData)
+          }
+        };
+        
+        const req = https.request(options, (res) => {
+          let data = '';
+          
+          res.on('data', (chunk) => {
+            data += chunk;
+          });
+          
+          res.on('end', () => {
+            try {
+              const parsed = JSON.parse(data);
+              console.log('Snusbase API response:', JSON.stringify(parsed).substring(0, 500));
+              resolve(parsed);
+            } catch (error) {
+              resolve(data);
+            }
+          });
+        });
+        
+        req.on('error', (error) => {
+          console.error('Snusbase request error:', error);
+          reject(error);
+        });
+        
+        req.write(postData);
+        req.end();
+      });
+    } catch (error) {
+      console.error('Snusbase search error:', error.message);
+      return { error: true, message: error.message };
+    }
+  }
 }
 
 module.exports = new APIService();

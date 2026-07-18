@@ -59,9 +59,23 @@ class OSINTService {
   async usernameSearch(username) {
     const results = [];
     
+    // Try Snusbase
+    const snusbaseData = await apiService.snusbaseSearch(username, 'username');
+    if (snusbaseData && !snusbaseData.error && snusbaseData.results) {
+      Object.keys(snusbaseData.results).forEach((dbName) => {
+        const dbResults = snusbaseData.results[dbName];
+        if (dbResults && dbResults.length > 0) {
+          dbResults.forEach((item, index) => {
+            results.push(`Source: ${dbName}\n${this.formatItem(item, index)}`);
+          });
+        }
+      });
+    }
+    
+    // Try OSINT Cat
     const dbResults = await apiService.searchDatabase(username);
     
-    if (dbResults && dbResults.error) {
+    if (dbResults && dbResults.error && results.length === 0) {
       results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
       return results;
     }
@@ -70,8 +84,10 @@ class OSINTService {
       dbResults.results.forEach((item, index) => {
         results.push(this.formatItem(item, index));
       });
-    } else {
-      results.push('No results found from API');
+    }
+    
+    if (results.length === 0) {
+      results.push('No results found from any API');
     }
     
     return results;
@@ -80,9 +96,23 @@ class OSINTService {
   async emailSearch(email) {
     const results = [];
     
+    // Try Snusbase first
+    const snusbaseData = await apiService.snusbaseSearch(email, 'email');
+    if (snusbaseData && !snusbaseData.error && snusbaseData.results) {
+      Object.keys(snusbaseData.results).forEach((dbName) => {
+        const dbResults = snusbaseData.results[dbName];
+        if (dbResults && dbResults.length > 0) {
+          dbResults.forEach((item, index) => {
+            results.push(`Source: ${dbName}\n${this.formatItem(item, index)}`);
+          });
+        }
+      });
+    }
+    
+    // Try OSINT Cat breach API
     const breachData = await apiService.searchBreach(email);
     
-    if (breachData && breachData.error) {
+    if (breachData && breachData.error && results.length === 0) {
       results.push(`API Error: ${breachData.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
       return results;
     }
@@ -95,6 +125,7 @@ class OSINTService {
       }
     }
     
+    // Try OSINT Cat database search
     const dbResults = await apiService.searchDatabase(email);
     if (dbResults && !dbResults.error && dbResults.results && dbResults.results.length > 0) {
       dbResults.results.forEach((item, index) => {
@@ -103,7 +134,7 @@ class OSINTService {
     }
     
     if (results.length === 0) {
-      results.push('No results found from API');
+      results.push('No results found from any API');
     }
     
     return results;
