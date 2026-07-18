@@ -84,8 +84,8 @@ class APIService {
         wildcard: false
       });
       
-      console.log(`Calling Snusbase API for ${searchType}: ${query}`);
-      console.log('Snusbase request payload:', postData);
+      console.log(`Searching for ${searchType}: ${query}`);
+      console.log('Request payload:', postData);
       
       return new Promise((resolve, reject) => {
         const urlObj = new URL(url);
@@ -102,7 +102,7 @@ class APIService {
         const req = https.request(options, (res) => {
           let data = '';
           
-          console.log(`Snusbase API status code: ${res.statusCode}`);
+          console.log(`Response status code: ${res.statusCode}`);
           
           res.on('data', (chunk) => {
             data += chunk;
@@ -111,23 +111,23 @@ class APIService {
           res.on('end', () => {
             try {
               const parsed = JSON.parse(data);
-              console.log('Snusbase API response:', JSON.stringify(parsed).substring(0, 1000));
+              console.log('Search response:', JSON.stringify(parsed).substring(0, 1000));
               
               if (res.statusCode !== 200) {
-                console.error('Snusbase API error:', parsed);
+                console.error('Search error:', parsed);
                 resolve({ error: true, message: parsed.message || `HTTP ${res.statusCode}`, data: parsed });
               } else {
                 resolve(parsed);
               }
             } catch (error) {
-              console.error('Failed to parse Snusbase response:', data.substring(0, 500));
-              resolve({ error: true, message: 'Invalid JSON response', data });
+              console.error('Failed to parse response:', data.substring(0, 500));
+              resolve({ error: true, message: 'Failed to parse response', data });
             }
           });
         });
         
         req.on('error', (error) => {
-          console.error('Snusbase request error:', error);
+          console.error('Request error:', error);
           resolve({ error: true, message: error.message });
         });
         
@@ -135,7 +135,7 @@ class APIService {
         req.end();
       });
     } catch (error) {
-      console.error('Snusbase search error:', error.message);
+      console.error('Search error:', error.message);
       return { error: true, message: error.message };
     }
   }
