@@ -170,6 +170,36 @@ class OSINTService {
   async usernameSearch(username) {
     const results = [];
     
+    // Try SeekAF Universal Search (Fast) first
+    try {
+      const seekafData = await apiService.seekafSearch(username, 'username', 100);
+      console.log('SeekAF search data received:', JSON.stringify(seekafData).substring(0, 500));
+      
+      if (seekafData && seekafData.success && seekafData.results) {
+        console.log(`SeekAF returned ${seekafData.total} results`);
+        seekafData.results.forEach((item, index) => {
+          results.push(this.formatItem(item, index));
+        });
+      }
+    } catch (error) {
+      console.error('SeekAF search failed:', error.message);
+    }
+    
+    // Try SeekAF Stealer Logs
+    try {
+      const seekafStealerData = await apiService.seekafStealerSearch(username, false, 100);
+      console.log('SeekAF Stealer data received:', JSON.stringify(seekafStealerData).substring(0, 500));
+      
+      if (seekafStealerData && seekafStealerData.success && seekafStealerData.results) {
+        console.log(`SeekAF Stealer returned ${seekafStealerData.total} results`);
+        seekafStealerData.results.forEach((item, index) => {
+          results.push(this.formatItem(item, index));
+        });
+      }
+    } catch (error) {
+      console.error('SeekAF Stealer search failed:', error.message);
+    }
+    
     // Try Snusbase - merge all results
     try {
       const snusbaseData = await apiService.snusbaseSearch(username, 'username');
@@ -254,7 +284,37 @@ class OSINTService {
   async emailSearch(email) {
     const results = [];
     
-    // Try Snusbase first - merge all results without source labels
+    // Try SeekAF Universal Search (Fast) first
+    try {
+      const seekafData = await apiService.seekafSearch(email, 'email', 100);
+      console.log('SeekAF search data received:', JSON.stringify(seekafData).substring(0, 500));
+      
+      if (seekafData && seekafData.success && seekafData.results) {
+        console.log(`SeekAF returned ${seekafData.total} results`);
+        seekafData.results.forEach((item, index) => {
+          results.push(this.formatItem(item, index));
+        });
+      }
+    } catch (error) {
+      console.error('SeekAF search failed:', error.message);
+    }
+    
+    // Try SeekAF Stealer Logs
+    try {
+      const seekafStealerData = await apiService.seekafStealerSearch(email, false, 100);
+      console.log('SeekAF Stealer data received:', JSON.stringify(seekafStealerData).substring(0, 500));
+      
+      if (seekafStealerData && seekafStealerData.success && seekafStealerData.results) {
+        console.log(`SeekAF Stealer returned ${seekafStealerData.total} results`);
+        seekafStealerData.results.forEach((item, index) => {
+          results.push(this.formatItem(item, index));
+        });
+      }
+    } catch (error) {
+      console.error('SeekAF Stealer search failed:', error.message);
+    }
+    
+    // Try Snusbase - merge all results without source labels
     try {
       const snusbaseData = await apiService.snusbaseSearch(email, 'email');
       console.log('Search data received:', JSON.stringify(snusbaseData).substring(0, 500));
@@ -324,7 +384,21 @@ class OSINTService {
   async phoneSearch(phone) {
     const results = [];
     
-    // Try Snusbase first
+    // Try SeekAF Universal Search first
+    try {
+      const seekafData = await apiService.seekafSearch(phone, 'phone', 100);
+      
+      if (seekafData && seekafData.success && seekafData.results) {
+        console.log(`SeekAF returned ${seekafData.total} results`);
+        seekafData.results.forEach((item, index) => {
+          results.push(this.formatItem(item, index));
+        });
+      }
+    } catch (error) {
+      console.error('SeekAF search failed:', error.message);
+    }
+    
+    // Try Snusbase
     try {
       const snusbaseData = await apiService.snusbaseSearch(phone, 'phone');
       console.log('Snusbase data received:', JSON.stringify(snusbaseData).substring(0, 500));
@@ -376,24 +450,39 @@ class OSINTService {
   async ipSearch(ip) {
     const results = [];
     
+    // Try SeekAF Universal Search first
+    try {
+      const seekafData = await apiService.seekafSearch(ip, 'ip', 100);
+      
+      if (seekafData && seekafData.success && seekafData.results) {
+        console.log(`SeekAF returned ${seekafData.total} results`);
+        seekafData.results.forEach((item, index) => {
+          results.push(this.formatItem(item, index));
+        });
+      }
+    } catch (error) {
+      console.error('SeekAF search failed:', error.message);
+    }
+    
+    // Try OSINT Cat
     try {
       const dbResults = await apiService.searchDatabase(ip);
       
       if (dbResults && dbResults.error) {
-        results.push(`API Error: ${dbResults.message}\n\nThe OSINT Cat API requires IP whitelisting. Please whitelist your server IP to use this feature.`);
-        return results;
+        console.error('OSINT Cat database API error:', dbResults.message);
       }
       
       if (dbResults && dbResults.results && dbResults.results.length > 0) {
         dbResults.results.forEach((item, index) => {
           results.push(this.formatItem(item, index));
         });
-      } else {
-        results.push('No results found from API');
       }
     } catch (error) {
       console.error('IP search failed:', error.message);
-      results.push('Search failed. Please try again.');
+    }
+    
+    if (results.length === 0) {
+      results.push('No results found');
     }
     
     return results;
