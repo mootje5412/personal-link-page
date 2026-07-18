@@ -15,12 +15,14 @@ What I can search:
 - Phone numbers
 - IP addresses
 - General queries
-
-Just type what you want to search and I'll provide you with links to multiple sources.
+- Machines and devices
 
 Commands:
 /start - Show this message
+/machine <query> - Search for machines and devices
 /prices - View pricing plans
+
+Just type what you want to search and I'll provide you with comprehensive results.
 
 This bot only uses publicly available information.`;
     

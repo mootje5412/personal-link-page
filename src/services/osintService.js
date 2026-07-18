@@ -182,6 +182,32 @@ class OSINTService {
     return results;
   }
 
+  async machineSearch(query) {
+    const results = [];
+    
+    const machineResults = await apiService.searchMachines(query);
+    
+    if (machineResults && machineResults.error) {
+      console.log('Machine search error:', machineResults.message);
+      return results;
+    }
+    
+    if (machineResults && machineResults.results && machineResults.results.length > 0) {
+      machineResults.results.forEach((machine, index) => {
+        let machineInfo = `Machine Found\n${this.formatItem(machine, index)}`;
+        
+        if (machine.id || machine.machine_id) {
+          const machineId = machine.id || machine.machine_id;
+          machineInfo += `\n\nDownload: /download_${machineId}`;
+        }
+        
+        results.push(machineInfo);
+      });
+    }
+    
+    return results;
+  }
+
 }
 
 module.exports = new OSINTService();
