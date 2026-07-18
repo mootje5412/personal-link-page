@@ -1,11 +1,18 @@
 const apiService = require('../services/apiService');
+const userService = require('../services/userService');
+const config = require('../../config/config');
 
 class CommandHandler {
   handleStart(bot, msg) {
     const chatId = msg.chat.id;
+    const userId = msg.from.id;
     const firstName = msg.from.first_name || 'there';
     
-    const welcomeMessage = `Welcome to FindNow OSINT Bot
+    // Check if user has access
+    const accessCheck = userService.checkAccess(userId);
+    const userInfo = userService.getUserInfo(userId);
+    
+    let welcomeMessage = `Welcome to FindNow OSINT Bot
 
 Hello ${firstName}. Send me anything and I will search for information from public sources.
 
@@ -20,13 +27,161 @@ What I can search:
 Commands:
 /start - Show this message
 /machine <query> - Search for machines and devices
-/prices - View pricing plans
+/prices - View pricing plans`;
 
-Just type what you want to search and I'll provide you with comprehensive results.
+    if (userInfo) {
+      welcomeMessage += `\n/account - View your subscription`;
+    }
 
-This bot only uses publicly available information.`;
+    welcomeMessage += `\n\nJust type what you want to search and I'll provide you with comprehensive results.`;
+
+    if (userInfo) {
+      welcomeMessage += `\n\nYour Account:\nPlan: ${userInfo.plan}\nCredits: ${userInfo.credits_today}\nExpires: ${userInfo.expires_at}`;
+    }
     
     bot.sendMessage(chatId, welcomeMessage);
+  }
+
+  handleAccount(bot, msg) {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    
+    const userInfo = userService.getUserInfo(userId);
+    
+    if (!userInfo) {
+      bot.sendMessage(chatId, `No Active Subscription
+
+You don't have an active subscription.
+
+Use /prices to view available plans and contact @strafbaar to purchase.`);
+      return;
+    }
+    
+    const accountMessage = `Your Account
+
+Username: @${userInfo.username}
+Plan: ${userInfo.plan}
+Credits Today: ${userInfo.credits_today}
+Expires In: ${userInfo.expires_in}
+Expiry Date: ${userInfo.expires_at}
+
+Contact @strafbaar for plan upgrades or renewals.`;
+    
+    bot.sendMessage(chatId, accountMessage);
+  }
+
+  handleGrant(bot, msg, match) {
+    const chatId = msg.chat.id;
+    const adminId = msg.from.id;
+    
+    // Check if user is owner (add your Telegram user ID here)
+    const OWNER_ID = 8073205490; // Replace with your user ID
+    
+    if (adminId !== OWNER_ID) {
+      bot.sendMessage(chatId, 'Unauthorized. Owner only command.');
+      return;
+    }
+    
+    const args = match[1].trim().split(' ');
+    
+    if (args.length !== 3) {
+      const plans = userService.getPlans();
+      let planList = 'Available Plans:\n\n';
+      Object.keys(plans).forEach(key => {
+        planList += `${key} - ${plans[key].name} (${plans[key].credits_per_day} credits/day) - ${plans[key].price}\n`;
+      });
+      
+      bot.sendMessage(chatId, `Grant Access
+
+Usage: /grant <username> <plan> <days>
+
+${planList}
+Example: /grant john123 standard 30`);
+      return;
+    }
+    
+    const [username, plan, days] = args;
+    
+    // Get user ID from username (this is a simplified version)
+    // In production, you'd need to find the user ID by username
+    bot.sendMessage(chatId, `Please forward a message from @${username} or have them start the bot first, then use:
+
+/grantid <user_id> ${plan} ${days}
+
+To find their user ID, have them message the bot first.`);
+  }
+
+  handleGrantId(bot, msg, match) {
+    const chatId = msg.chat.id;
+    const adminId = msg.from.id;
+    
+    const OWNER_ID = 8073205490;
+    
+    if (adminId !== OWNER_ID) {
+      bot.sendMessage(chatId, 'Unauthorized. Owner only command.');
+      return;
+    }
+    
+    const args = match[1].trim().split(' ');
+    
+    if (args.length !== 3) {
+      bot.sendMessage(chatId, 'Usage: /grantid <user_id> <plan> <days>');
+      return;
+    }
+    
+    const [userId, plan, days] = args;
+    const username = 'user_' + userId; // Placeholder username
+    
+    const result = userService.grantAccess(userId, username, plan, days);
+    bot.sendMessage(chatId, result.message);
+  }
+
+  handleRevoke(bot, msg, match) {
+    const chatId = msg.chat.id;
+    const adminId = msg.from.id;
+    
+    const OWNER_ID = 8073205490;
+    
+    if (adminId !== OWNER_ID) {
+      bot.sendMessage(chatId, 'Unauthorized. Owner only command.');
+      return;
+    }
+    
+    const userId = match[1].trim();
+    const result = userService.revokeAccess(userId);
+    bot.sendMessage(chatId, result.message);
+  }
+
+  handleListUsers(bot, msg) {
+    const chatId = msg.chat.id;
+    const adminId = msg.from.id;
+    
+    const OWNER_ID = 8073205490;
+    
+    if (adminId !== OWNER_ID) {
+      bot.sendMessage(chatId, 'Unauthorized. Owner only command.');
+      return;
+    }
+    
+    const users = userService.listAllUsers();
+    
+    if (users.length === 0) {
+      bot.sendMessage(chatId, 'No users found.');
+      return;
+    }
+    
+    let message = `Active Users (${users.length})\n\n`;
+    users.forEach((user, index) => {
+      const status = user.expired ? '❌ EXPIRED' : '✅ Active';
+      message += `${index + 1}. ID: ${user.userId}\n`;
+      message += `   @${user.username}\n`;
+      message += `   Plan: ${user.plan}\n`;
+      message += `   Credits: ${user.credits}\n`;
+      message += `   Expires: ${user.expires_in}\n`;
+      message += `   ${status}\n\n`;
+    });
+    
+    bot.sendMessage(chatId, message);
   }
 
   handlePrices(bot, msg) {

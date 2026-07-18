@@ -1,12 +1,26 @@
 const osintService = require('../services/osintService');
 const paginationHandler = require('./paginationHandler');
+const userService = require('../services/userService');
 
 class MessageHandler {
   async handleMessage(bot, msg) {
     const chatId = msg.chat.id;
+    const userId = msg.from.id;
     const messageText = msg.text;
 
     console.log(`New search from ${msg.from.first_name} (${msg.from.id}): ${messageText}`);
+
+    // Check user access
+    const accessCheck = userService.checkAccess(userId);
+    
+    if (!accessCheck.hasAccess) {
+      bot.sendMessage(chatId, `Access Denied
+
+${accessCheck.message}
+
+Use /prices to view available plans and contact @strafbaar to purchase a subscription.`);
+      return;
+    }
 
     // Clear any existing session for this chat
     paginationHandler.clearSession(chatId);
@@ -34,7 +48,14 @@ class MessageHandler {
       bot.deleteMessage(chatId, searchMsg.message_id).catch(() => {});
       
       if (results && results.length > 0) {
+        // Use a credit for successful search
+        const creditInfo = userService.useCredit(userId);
+        
         paginationHandler.sendPaginatedResults(bot, chatId, query, results, 0);
+        
+        if (creditInfo) {
+          console.log(`User ${userId} used credit: ${creditInfo.used}/${creditInfo.used + creditInfo.remaining}`);
+        }
       } else {
         bot.sendMessage(chatId, `No results found for: ${query}`);
       }
