@@ -44,6 +44,8 @@ Use /prices to view available plans and contact @strafbaar to purchase a subscri
         results = await osintService.ipSearch(query);
       } else if (this.isPhone(query)) {
         results = await osintService.phoneSearch(query);
+      } else if (this.isName(query)) {
+        results = await osintService.nameSearch(query);
       } else if (this.isUsername(query)) {
         results = await osintService.usernameSearch(query);
       } else {
@@ -95,6 +97,12 @@ Use /prices to view available plans and contact @strafbaar to purchase a subscri
   isUsername(text) {
     const usernameRegex = /^[a-zA-Z0-9._-]{3,30}$/;
     return usernameRegex.test(text) && !text.includes(' ');
+  }
+
+  isName(text) {
+    // Check if it's a name (1-2 words, letters only, 2+ chars each)
+    const nameRegex = /^[a-zA-Z]{2,}(\s[a-zA-Z]{2,})?$/;
+    return nameRegex.test(text) && !this.isUsername(text);
   }
 }
 

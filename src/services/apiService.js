@@ -179,6 +179,29 @@ class APIService {
       return { error: true, message: error.message };
     }
   }
+
+  async searchStealerLogs(query, type = 'email') {
+    try {
+      const url = `${config.osintCatBaseUrl}/database-search?query=${encodeURIComponent(query)}&type=${type}`;
+      const headers = {
+        'X-API-KEY': config.osintCatApiKey
+      };
+      
+      console.log(`Calling stealer logs API: ${url}`);
+      const data = await this.makeRequest(url, headers);
+      console.log('Stealer logs API response:', JSON.stringify(data).substring(0, 1000));
+      
+      if (data && data.error) {
+        console.error('API Error:', data.error, data.message);
+        return { error: true, message: data.message };
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Stealer logs search error:', error.message);
+      return { error: true, message: error.message };
+    }
+  }
 }
 
 module.exports = new APIService();

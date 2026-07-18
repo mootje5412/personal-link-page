@@ -87,6 +87,86 @@ class OSINTService {
     return results;
   }
 
+  async nameSearch(name) {
+    const results = [];
+    
+    // Split name into parts for Snusbase
+    const nameParts = name.trim().split(' ');
+    const searchTypes = nameParts.length === 2 ? ['name'] : ['name'];
+    
+    // Try Snusbase with name search
+    try {
+      const snusbaseData = await apiService.snusbaseSearch(name, 'name');
+      console.log('Snusbase name search data received:', JSON.stringify(snusbaseData).substring(0, 500));
+      
+      if (snusbaseData && !snusbaseData.error) {
+        if (snusbaseData.results && typeof snusbaseData.results === 'object') {
+          const dbNames = Object.keys(snusbaseData.results);
+          console.log(`Snusbase returned ${dbNames.length} databases:`, dbNames.join(', '));
+          
+          dbNames.forEach((dbName) => {
+            const dbResults = snusbaseData.results[dbName];
+            if (dbResults && Array.isArray(dbResults) && dbResults.length > 0) {
+              console.log(`Database ${dbName} has ${dbResults.length} results`);
+              dbResults.forEach((item, index) => {
+                results.push(this.formatItem(item, index));
+              });
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Snusbase name search failed:', error.message);
+    }
+    
+    // Try OSINT Cat Breach API
+    try {
+      const breachData = await apiService.searchBreach(name);
+      
+      if (breachData && !breachData.error) {
+        if (breachData.breach_data && breachData.breach_data.length > 0) {
+          breachData.breach_data.forEach((breach, index) => {
+            results.push(this.formatItem(breach, index));
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Breach search failed:', error.message);
+    }
+    
+    // Try OSINT Cat Database Search
+    try {
+      const dbResults = await apiService.searchDatabase(name);
+      
+      if (dbResults && !dbResults.error && dbResults.results && dbResults.results.length > 0) {
+        dbResults.results.forEach((item, index) => {
+          results.push(this.formatItem(item, index));
+        });
+      }
+    } catch (error) {
+      console.error('Database search failed:', error.message);
+    }
+    
+    // Try OSINT Cat Stealer Logs
+    try {
+      const stealerResults = await apiService.searchStealerLogs(name, 'domain');
+      
+      if (stealerResults && !stealerResults.error && stealerResults.results && stealerResults.results.length > 0) {
+        stealerResults.results.forEach((item, index) => {
+          results.push(this.formatItem(item, index));
+        });
+      }
+    } catch (error) {
+      console.error('Stealer logs search failed:', error.message);
+    }
+    
+    if (results.length === 0) {
+      results.push('No results found');
+    }
+    
+    return results;
+  }
+
   async usernameSearch(username) {
     const results = [];
     
@@ -119,7 +199,22 @@ class OSINTService {
       console.error('Snusbase username search failed:', error.message);
     }
     
-    // Try OSINT Cat
+    // Try OSINT Cat Breach API for username
+    try {
+      const breachData = await apiService.searchBreach(username);
+      
+      if (breachData && !breachData.error) {
+        if (breachData.breach_data && breachData.breach_data.length > 0) {
+          breachData.breach_data.forEach((breach, index) => {
+            results.push(this.formatItem(breach, index));
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Breach search failed:', error.message);
+    }
+    
+    // Try OSINT Cat Database Search
     try {
       const dbResults = await apiService.searchDatabase(username);
       
@@ -134,6 +229,19 @@ class OSINTService {
       }
     } catch (error) {
       console.error('Database search failed:', error.message);
+    }
+    
+    // Try OSINT Cat Stealer Logs
+    try {
+      const stealerResults = await apiService.searchStealerLogs(username, 'domain');
+      
+      if (stealerResults && !stealerResults.error && stealerResults.results && stealerResults.results.length > 0) {
+        stealerResults.results.forEach((item, index) => {
+          results.push(this.formatItem(item, index));
+        });
+      }
+    } catch (error) {
+      console.error('Stealer logs search failed:', error.message);
     }
     
     if (results.length === 0) {
