@@ -203,35 +203,49 @@ To purchase, contact @strafbaar on Telegram`;
     const chatId = query.message.chat.id;
     const machineId = query.data.replace('download_machine_', '');
     
-    bot.answerCallbackQuery(query.id, { text: 'Downloading...' });
-    bot.sendMessage(chatId, `Preparing download for machine ${machineId}...`);
+    bot.answerCallbackQuery(query.id, { text: 'Preparing download...' });
+    
+    const downloadMsg = await bot.sendMessage(chatId, `Machine Download\n\nMachine ID: ${machineId}\nStatus: Downloading...\n\nPlease wait...`);
     
     try {
       const downloadData = await apiService.downloadMachine(machineId);
       
       if (downloadData && downloadData.error) {
-        bot.sendMessage(chatId, `Download Error\n\n${downloadData.message}`);
+        bot.editMessageText(`Machine Download\n\nMachine ID: ${machineId}\nStatus: Error\n\n${downloadData.message}`, {
+          chat_id: chatId,
+          message_id: downloadMsg.message_id
+        });
         return;
       }
       
       if (downloadData) {
         const formattedData = typeof downloadData === 'string' ? downloadData : JSON.stringify(downloadData, null, 2);
         
+        bot.deleteMessage(chatId, downloadMsg.message_id);
+        
         if (formattedData.length > 4000) {
+          bot.sendMessage(chatId, `Machine Download\n\nMachine ID: ${machineId}\nSize: ${formattedData.length} bytes\n\nDownloading as file...`);
+          
           const buffer = Buffer.from(formattedData, 'utf-8');
           bot.sendDocument(chatId, buffer, {}, {
             filename: `machine_${machineId}.json`,
             contentType: 'application/json'
           });
         } else {
-          bot.sendMessage(chatId, `Machine ${machineId} Data\n\n${formattedData}`);
+          bot.sendMessage(chatId, `Machine Download\n\nMachine ID: ${machineId}\n\n${formattedData}`);
         }
       } else {
-        bot.sendMessage(chatId, 'No data available for download');
+        bot.editMessageText(`Machine Download\n\nMachine ID: ${machineId}\nStatus: No Data\n\nNo data available for this machine.`, {
+          chat_id: chatId,
+          message_id: downloadMsg.message_id
+        });
       }
     } catch (error) {
       console.error('Download error:', error);
-      bot.sendMessage(chatId, 'Download failed');
+      bot.editMessageText(`Machine Download\n\nMachine ID: ${machineId}\nStatus: Failed\n\nDownload failed. Please try again.`, {
+        chat_id: chatId,
+        message_id: downloadMsg.message_id
+      });
     }
   }
 }

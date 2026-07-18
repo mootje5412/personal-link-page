@@ -2,6 +2,16 @@ class PaginationHandler {
   constructor() {
     this.sessions = new Map();
     this.ITEMS_PER_PAGE = 10;
+    
+    // Clear sessions after 5 minutes of inactivity
+    setInterval(() => {
+      const now = Date.now();
+      for (const [chatId, session] of this.sessions.entries()) {
+        if (now - session.timestamp > 5 * 60 * 1000) {
+          this.sessions.delete(chatId);
+        }
+      }
+    }, 60000); // Check every minute
   }
 
   sendPaginatedResults(bot, chatId, query, results, page = 0) {
