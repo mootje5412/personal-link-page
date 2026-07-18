@@ -25,6 +25,9 @@ class FindNowBot {
         paginationHandler.handleCallback(this.bot, query);
       } else if (query.data.startsWith('price_')) {
         commandHandler.handlePriceCallback(this.bot, query);
+      } else if (query.data === 'back_to_prices') {
+        commandHandler.handlePrices(this.bot, query.message);
+        this.bot.answerCallbackQuery(query.id);
       }
     });
     
