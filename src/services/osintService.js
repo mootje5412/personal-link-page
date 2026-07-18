@@ -1,6 +1,40 @@
 const apiService = require('./apiService');
 
 class OSINTService {
+  formatItem(item, index = 0) {
+    if (index === 0) {
+      console.log('Sample item structure:', JSON.stringify(item));
+    }
+    
+    // If item is a string, return it directly
+    if (typeof item === 'string') {
+      return item;
+    }
+    
+    // Build formatted output
+    let lines = [];
+    
+    Object.keys(item).forEach((key) => {
+      const value = item[key];
+      
+      if (value === null || value === undefined) return;
+      
+      if (typeof value === 'string') {
+        lines.push(`${key}: ${value}`);
+      } else if (typeof value === 'number') {
+        lines.push(`${key}: ${value}`);
+      } else if (typeof value === 'boolean') {
+        lines.push(`${key}: ${value}`);
+      } else if (Array.isArray(value)) {
+        lines.push(`${key}: ${value.join(', ')}`);
+      } else if (typeof value === 'object') {
+        lines.push(`${key}: ${JSON.stringify(value)}`);
+      }
+    });
+    
+    return lines.length > 0 ? lines.join('\n') : JSON.stringify(item);
+  }
+
   async generalSearch(query) {
     const results = [];
     
@@ -13,22 +47,7 @@ class OSINTService {
     
     if (dbResults && dbResults.results && dbResults.results.length > 0) {
       dbResults.results.forEach((item, index) => {
-        // Log first item to see structure
-        if (index === 0) {
-          console.log('Sample item structure:', JSON.stringify(item));
-        }
-        
-        // Try all possible field combinations
-        let itemText = item.name || item.title || item.username || item.email || item.value || item.data || JSON.stringify(item);
-        
-        // Add all available fields
-        Object.keys(item).forEach((key) => {
-          if (key !== 'name' && key !== 'title' && item[key] && typeof item[key] === 'string' && item[key].length < 200) {
-            itemText += `\n${key}: ${item[key]}`;
-          }
-        });
-        
-        results.push(itemText);
+        results.push(this.formatItem(item, index));
       });
     } else if (!dbResults || !dbResults.results) {
       results.push('No results found from API');
@@ -48,18 +67,8 @@ class OSINTService {
     }
     
     if (dbResults && dbResults.results && dbResults.results.length > 0) {
-      dbResults.results.forEach((item) => {
-        let itemText = item.name || item.username || item.title || 'Found';
-        if (item.platform) {
-          itemText += `\nPlatform: ${item.platform}`;
-        }
-        if (item.description) {
-          itemText += `\n${item.description}`;
-        }
-        if (item.url) {
-          itemText += `\n${item.url}`;
-        }
-        results.push(itemText);
+      dbResults.results.forEach((item, index) => {
+        results.push(this.formatItem(item, index));
       });
     } else {
       results.push('No results found from API');
@@ -81,20 +90,7 @@ class OSINTService {
     if (breachData) {
       if (breachData.breaches && breachData.breaches.length > 0) {
         breachData.breaches.forEach((breach, index) => {
-          if (index === 0) {
-            console.log('Sample breach structure:', JSON.stringify(breach));
-          }
-          
-          let itemText = breach.name || breach.title || breach.source || 'Breach';
-          
-          // Add all breach fields
-          Object.keys(breach).forEach((key) => {
-            if (key !== 'name' && key !== 'title' && breach[key] && typeof breach[key] === 'string' && breach[key].length < 200) {
-              itemText += `\n${key}: ${breach[key]}`;
-            }
-          });
-          
-          results.push(itemText);
+          results.push(this.formatItem(breach, index));
         });
       }
     }
@@ -102,20 +98,7 @@ class OSINTService {
     const dbResults = await apiService.searchDatabase(email);
     if (dbResults && !dbResults.error && dbResults.results && dbResults.results.length > 0) {
       dbResults.results.forEach((item, index) => {
-        if (index === 0 && results.length === 0) {
-          console.log('Sample email result structure:', JSON.stringify(item));
-        }
-        
-        let itemText = item.name || item.title || item.username || item.email || item.value || item.data || JSON.stringify(item);
-        
-        // Add all available fields
-        Object.keys(item).forEach((key) => {
-          if (key !== 'name' && key !== 'title' && item[key] && typeof item[key] === 'string' && item[key].length < 200) {
-            itemText += `\n${key}: ${item[key]}`;
-          }
-        });
-        
-        results.push(itemText);
+        results.push(this.formatItem(item, index + (breachData?.breaches?.length || 0)));
       });
     }
     
@@ -137,15 +120,8 @@ class OSINTService {
     }
     
     if (dbResults && dbResults.results && dbResults.results.length > 0) {
-      dbResults.results.forEach((item) => {
-        let itemText = item.name || item.title || 'Result';
-        if (item.description) {
-          itemText += `\n${item.description}`;
-        }
-        if (item.url) {
-          itemText += `\n${item.url}`;
-        }
-        results.push(itemText);
+      dbResults.results.forEach((item, index) => {
+        results.push(this.formatItem(item, index));
       });
     } else {
       results.push('No results found from API');
@@ -165,15 +141,8 @@ class OSINTService {
     }
     
     if (dbResults && dbResults.results && dbResults.results.length > 0) {
-      dbResults.results.forEach((item) => {
-        let itemText = item.name || item.title || 'Result';
-        if (item.description) {
-          itemText += `\n${item.description}`;
-        }
-        if (item.url) {
-          itemText += `\n${item.url}`;
-        }
-        results.push(itemText);
+      dbResults.results.forEach((item, index) => {
+        results.push(this.formatItem(item, index));
       });
     } else {
       results.push('No results found from API');
