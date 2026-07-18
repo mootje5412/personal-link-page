@@ -42,19 +42,19 @@ Tested: Saturday, Jul 18, 2026, 11:37 PM (UTC)
 ### 4. SeekAF Universal Search
 - **URL**: `https://see-know.xyz/api/v1/search`
 - **Status**: 403 Forbidden
-- **Error**: Cloudflare protection page
-- **API Key**: `seek-af3d7d`
+- **Error**: Cloudflare protection page (blocking cloud IPs)
+- **API Key**: `seek-bde9d731a0cdaedf4ff93f71e321f24a52` ✅ Updated
 - **Action**: 
-  - Contact SeekAF support to whitelist server IP
-  - Verify API key is active
-  - May require specific user-agent or headers
+  - API key is valid but Cloudflare blocks cloud environment IPs
+  - Will work when deployed on static IP server (109.71.252.128)
+  - Contact SeekAF support to whitelist server IP if needed
 
 ### 5. SeekAF Stealer Logs
 - **URL**: `https://see-know.xyz/api/v1/stealer`
 - **Status**: 403 Forbidden
-- **Error**: Cloudflare protection page
-- **API Key**: `seek-af3d7d`
-- **Action**: Same as SeekAF Universal Search
+- **Error**: Cloudflare protection page (blocking cloud IPs)
+- **API Key**: `seek-bde9d731a0cdaedf4ff93f71e321f24a52` ✅ Updated
+- **Action**: Same as SeekAF Universal Search - will work on static IP server
 
 ### 6. OSINT Cat Machine Viewer
 - **URL**: `https://www.osintcat.net/api/machine_viewer/search`
