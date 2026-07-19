@@ -1,3 +1,5 @@
+const { METADATA_KEYS } = require('./responseParser');
+
 const CATEGORY_LABELS = {
   breach: 'BREACH',
   database: 'STEALER',
@@ -94,19 +96,24 @@ function formatRecordFields(item) {
 
   const normalized = normalizeRecord(item);
   const skipKeys = new Set([
-    '_meta', 'api', 'elapsed_ms', 'timestamp', 'results_count',
-    'execution_time', 'query', 'total', 'success', 'message', 'mode',
-    'Count', 'Message', 'SearchCriteria', 'count', 'id', 'user_id',
+    ...METADATA_KEYS,
+    'id', 'user_id',
     'avatar', 'banner', 'badges', 'premium_type', 'public_flags', 'profile_url',
     'roblox_name', 'discord_id', 'discord_username', 'discord_avatar', 'discriminator',
-    'display_name', 'global_name', 'created_at', 'bio', 'nick'
+    'display_name', 'global_name', 'created_at', 'bio', 'nick', '_key'
   ]);
 
   const priority = [
     ['email', 'Email'],
     ['username', 'Username'],
     ['password', 'Password'],
+    ['lastip', 'Last IP'],
+    ['last_ip', 'Last IP'],
     ['hash', 'Hash'],
+    ['registered', 'Registered'],
+    ['created', 'Created'],
+    ['updated', 'Updated'],
+    ['registrar', 'Registrar'],
     ['phone', 'Phone'],
     ['name', 'Name'],
     ['ip', 'IP'],
@@ -146,7 +153,7 @@ function formatRecordFields(item) {
 
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
       lines.push(`${key}: ${value}`);
-    } else if (Array.isArray(value)) {
+    } else if (Array.isArray(value) && value.length > 0) {
       lines.push(`${key}: ${value.join(', ')}`);
     }
   });

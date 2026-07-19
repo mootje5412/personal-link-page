@@ -1,10 +1,17 @@
 const apiService = require('./apiService');
 const { getMachineId } = require('../utils/machineUtils');
 const {
-  formatCategoryBlock,
   formatRecordFields,
   formatBytes
 } = require('../utils/resultFormatter');
+const {
+  extractAllRecords,
+  extractIpSections,
+  extractSnusbaseRecords,
+  extractSnusbaseWhois,
+  hasOnlyMetadata,
+  isUsefulRecord
+} = require('../utils/responseParser');
 
 class OSINTService {
   detectQueryTypes(query) {
@@ -56,29 +63,36 @@ class OSINTService {
 
   buildSearchTasks(query, types) {
     const tasks = [];
-    const stealerType = query.includes('@') ? 'email' : 'domain';
-
-    tasks.push({ name: 'breach', run: () => apiService.searchBreach(query) });
-    tasks.push({ name: 'stealer', run: () => apiService.searchStealerLogs(query, stealerType) });
-    tasks.push({ name: 'database', run: () => apiService.searchStealerLogs(query) });
 
     if (types.includes('discord')) {
+      tasks.push({ name: 'breach', run: () => apiService.searchBreach(query) });
       tasks.push({ name: 'discord', run: () => apiService.searchDiscord(query) });
       tasks.push({ name: 'discord-to-roblox', run: () => apiService.searchDiscordToRoblox(query) });
       return tasks;
     }
 
     if (types.includes('vin')) {
+      tasks.push({ name: 'breach', run: () => apiService.searchBreach(query) });
       tasks.push({ name: 'vin', run: () => apiService.searchVIN(query) });
       return tasks;
     }
 
     if (types.includes('ip')) {
+      tasks.push({ name: 'breach', run: () => apiService.searchBreach(query) });
       tasks.push({ name: 'ip', run: () => apiService.searchIP(query) });
+      tasks.push({ name: 'snusbase', run: () => apiService.snusbaseSearch(query, 'lastip') });
+      tasks.push({ name: 'snusbase-whois', run: () => apiService.snusbaseIpWhois(query) });
+      return tasks;
     }
 
+    const stealerType = query.includes('@') ? 'email' : 'domain';
+
+    tasks.push({ name: 'breach', run: () => apiService.searchBreach(query) });
+    tasks.push({ name: 'stealer', run: () => apiService.searchStealerLogs(query, stealerType) });
+    tasks.push({ name: 'database', run: () => apiService.searchStealerLogs(query) });
+
     if (types.includes('phone')) {
-      tasks.push({ name: 'snusbase', run: () => apiService.snusbaseSearch(query, 'phone') });
+      tasks.push({ name: 'snusbase', run: () => apiService.snusbaseSearch(query, 'name') });
       tasks.push({ name: 'phone-osint', run: () => apiService.searchPhoneOSINT(query) });
     } else if (types.includes('email')) {
       tasks.push({ name: 'snusbase', run: () => apiService.snusbaseSearch(query, 'email') });
@@ -248,30 +262,112 @@ class OSINTService {
     return lines.join('\n');
   }
 
-  extractResultArrays(response) {
-    const arrays = [];
-    const knownKeys = new Set([
-      'breach_data', 'results', 'data', 'machines', 'records',
-      'hits', 'items', 'leaks', 'entries', 'logs', 'rows'
-    ]);
+  appendRecordList(results, seen, category, records) {
+    records.forEach(({ item, source, index }) => {
+      let text;
+      let resultCategory = category;
 
-    knownKeys.forEach((key) => {
-      if (Array.isArray(response[key]) && response[key].length > 0) {
-        arrays.push({ items: response[key], label: key });
+      if (source === 'machines' || (item.name && getMachineId(item))) {
+        text = this.formatMachineText(item);
+        resultCategory = 'machine';
+      } else {
+        text = formatRecordFields(item);
       }
-    });
 
-    Object.keys(response).forEach((key) => {
-      if (knownKeys.has(key)) {
+      if (!text) {
         return;
       }
-      const value = response[key];
-      if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
-        arrays.push({ items: value, label: key });
+
+      const result = this.makeResult(resultCategory, text, {
+        key: this.getRecordKey(`${resultCategory}:${source}`, item, index)
+      });
+
+      const machineId = getMachineId(item);
+      if (machineId) {
+        result.machineId = machineId;
       }
+
+      this.addUniqueResult(results, seen, result);
+    });
+  }
+
+  appendIpResults(results, response, seen) {
+    if (!response || response.error === true) return;
+    if (response.error && typeof response.error === 'string') return;
+
+    extractIpSections(response).forEach(({ text, key }) => {
+      this.addUniqueResult(results, seen, this.makeResult('ip', text, { key: `ip-section:${key}` }));
     });
 
-    return arrays;
+    this.appendRecordList(results, seen, 'stealer', extractAllRecords(response));
+  }
+
+  appendOsintCatResponse(results, response, seen, category) {
+    if (!response || response.error === true) return;
+    if (response.error && typeof response.error === 'string') return;
+
+    const vinText = this.formatVinResults(response);
+    if (vinText) {
+      this.addUniqueResult(results, seen, this.makeResult('vin', vinText, {
+        key: `vin:${response.SearchCriteria || 'decode'}`
+      }));
+      return;
+    }
+
+    if (category === 'ip') {
+      this.appendIpResults(results, response, seen);
+      return;
+    }
+
+    const records = extractAllRecords(response);
+    if (records.length > 0) {
+      this.appendRecordList(results, seen, category, records);
+    }
+
+    if (response.user_info) {
+      const text = this.formatDiscordProfile(response.user_info);
+      if (text) {
+        this.addUniqueResult(results, seen, this.makeResult('discord', text, {
+          key: `profile:${response.user_info.id || response.user_info.user_id}`
+        }));
+      }
+    }
+
+    if (Array.isArray(response.Results) && response.Results[0] && response.Results[0].Variable) {
+      return;
+    }
+
+    if (records.length === 0 && !hasOnlyMetadata(response) && isUsefulRecord(response)) {
+      const text = formatRecordFields(response);
+      if (text) {
+        this.addUniqueResult(results, seen, this.makeResult(category, text, {
+          key: `flat:${category}:${response.query || text.substring(0, 80)}`
+        }));
+      }
+    }
+  }
+
+  appendSnusbaseResults(results, response, seen) {
+    if (!response || response.error) return;
+
+    extractSnusbaseRecords(response).forEach(({ item, source, index }) => {
+      const text = formatRecordFields(item);
+      if (text) {
+        this.addUniqueResult(results, seen, this.makeResult('snusbase', text, {
+          key: this.getRecordKey(source, item, index)
+        }));
+      }
+    });
+  }
+
+  appendSnusbaseWhoisResults(results, response, seen, query) {
+    if (!response || response.error) return;
+
+    extractSnusbaseWhois(response, query).forEach(({ text, key }) => {
+      this.addUniqueResult(results, seen, this.makeResult('ip', text, {
+        key: `snusbase-whois:${key}`
+      }));
+    });
   }
 
   appendDiscordResults(results, response, seen) {
@@ -287,25 +383,23 @@ class OSINTService {
       }
     }
 
-    this.extractResultArrays(response).forEach(({ items }) => {
-      items.forEach((item, index) => {
-        if (item && item.username && (item.id || item.user_id) && !item.email && !item.password && !item.pass) {
-          const profile = this.formatDiscordProfile(item);
-          if (profile) {
-            this.addUniqueResult(results, seen, this.makeResult('discord', profile, {
-              key: `discord-profile-item:${item.id || item.user_id || index}`
-            }));
-            return;
-          }
-        }
-
-        const text = formatRecordFields(item) || this.formatDiscordProfile(item);
-        if (text) {
-          this.addUniqueResult(results, seen, this.makeResult('discord', text, {
-            key: this.getRecordKey('discord', item, index)
+    extractAllRecords(response).forEach(({ item, source, index }) => {
+      if (item && item.username && (item.id || item.user_id) && !item.email && !item.password && !item.pass) {
+        const profile = this.formatDiscordProfile(item);
+        if (profile) {
+          this.addUniqueResult(results, seen, this.makeResult('discord', profile, {
+            key: `discord-profile-item:${item.id || item.user_id || index}`
           }));
+          return;
         }
-      });
+      }
+
+      const text = formatRecordFields(item) || this.formatDiscordProfile(item);
+      if (text) {
+        this.addUniqueResult(results, seen, this.makeResult('discord', text, {
+          key: this.getRecordKey(`discord:${source}`, item, index)
+        }));
+      }
     });
 
     const rootProfile = this.formatDiscordProfile(response);
@@ -349,87 +443,14 @@ class OSINTService {
     }
   }
 
-  appendOsintCatResponse(results, response, seen, category) {
-    if (!response || response.error === true) return;
-    if (response.error && typeof response.error === 'string') return;
-
-    const vinText = this.formatVinResults(response);
-    if (vinText) {
-      this.addUniqueResult(results, seen, this.makeResult('vin', vinText, {
-        key: `vin:${response.SearchCriteria || 'decode'}`
-      }));
-      return;
-    }
-
-    this.extractResultArrays(response).forEach(({ items, label }) => {
-      items.forEach((item, index) => {
-        let text;
-        let resultCategory = category;
-
-        if (label === 'machines') {
-          text = this.formatMachineText(item);
-          resultCategory = 'machine';
-        } else {
-          text = formatRecordFields(item);
-        }
-
-        if (text) {
-          const result = this.makeResult(resultCategory, text, {
-            key: this.getRecordKey(`${resultCategory}:${label}`, item, index)
-          });
-
-          const machineId = getMachineId(item);
-          if (machineId) {
-            result.machineId = machineId;
-          }
-
-          this.addUniqueResult(results, seen, result);
-        }
-      });
-    });
-
-    if (response.user_info) {
-      const text = this.formatDiscordProfile(response.user_info);
-      if (text) {
-        this.addUniqueResult(results, seen, this.makeResult('discord', text, {
-          key: `profile:${response.user_info.id || response.user_info.user_id}`
-        }));
-      }
-    }
-
-    if (Array.isArray(response.Results) && response.Results[0] && response.Results[0].Variable) {
-      return;
-    }
-
-    const flatText = formatRecordFields(response);
-    if (flatText) {
-      this.addUniqueResult(results, seen, this.makeResult(category, flatText, {
-        key: `flat:${category}:${response.query || flatText.substring(0, 80)}`
-      }));
-    }
-  }
-
-  appendSnusbaseResults(results, response, seen) {
-    if (!response || response.error || !response.results) return;
-
-    Object.keys(response.results).forEach((dbName) => {
-      const dbResults = response.results[dbName];
-      if (!Array.isArray(dbResults)) return;
-
-      dbResults.forEach((item, index) => {
-        const text = formatRecordFields({ ...item, source: dbName });
-        if (text) {
-          this.addUniqueResult(results, seen, this.makeResult('snusbase', text, {
-            key: this.getRecordKey(`snusbase:${dbName}`, item, index)
-          }));
-        }
-      });
-    });
-  }
-
-  processTaskResult(name, data, results, seen) {
+  processTaskResult(name, data, results, seen, query) {
     if (name === 'snusbase') {
       this.appendSnusbaseResults(results, data, seen);
+      return;
+    }
+
+    if (name === 'snusbase-whois') {
+      this.appendSnusbaseWhoisResults(results, data, seen, query);
       return;
     }
 
@@ -469,7 +490,7 @@ class OSINTService {
     await Promise.all(tasks.map(async ({ name, run }) => {
       try {
         const data = await run();
-        this.processTaskResult(name, data, results, seen);
+        this.processTaskResult(name, data, results, seen, query);
         notify();
       } catch (error) {
         console.error(`Search task ${name} failed:`, error.message);

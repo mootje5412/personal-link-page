@@ -161,19 +161,14 @@ class APIService {
     return this.osintCatGet('/vin', query, { type: 'decode' });
   }
 
-  async snusbaseSearch(query, searchType = 'email') {
+  async snusbasePost(path, payload) {
     try {
-      const url = `${config.snusbaseBaseUrl}/data/search`;
+      const url = `${config.snusbaseBaseUrl}${path}`;
       const headers = {
-        'Auth': config.snusbaseApiKey,
+        Auth: config.snusbaseApiKey,
         'Content-Type': 'application/json'
       };
-
-      const postData = JSON.stringify({
-        terms: [query],
-        types: [searchType],
-        wildcard: false
-      });
+      const postData = JSON.stringify(payload);
 
       return new Promise((resolve) => {
         const urlObj = new URL(url);
@@ -200,12 +195,12 @@ class APIService {
               const parsed = JSON.parse(data);
 
               if (res.statusCode !== 200) {
-                resolve({ error: true, message: parsed.message || `HTTP ${res.statusCode}`, data: parsed });
+                resolve({ error: true, message: parsed.message || parsed.error || `HTTP ${res.statusCode}`, data: parsed });
               } else {
                 resolve(parsed);
               }
             } catch (error) {
-              resolve({ error: true, message: 'Failed to parse response', data });
+              resolve({ error: true, message: 'Failed to parse Snusbase response', data });
             }
           });
         });
@@ -225,6 +220,21 @@ class APIService {
     } catch (error) {
       return { error: true, message: error.message };
     }
+  }
+
+  async snusbaseSearch(query, searchType = 'email') {
+    return this.snusbasePost('/data/search', {
+      terms: [query],
+      types: [searchType],
+      wildcard: false,
+      group_by: false
+    });
+  }
+
+  async snusbaseIpWhois(query) {
+    return this.snusbasePost('/tools/ip-whois', {
+      terms: [query]
+    });
   }
 }
 
