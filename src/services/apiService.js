@@ -202,6 +202,121 @@ class APIService {
       return { error: true, message: error.message };
     }
   }
+
+  async searchDiscord(query) {
+    try {
+      const url = `${config.osintCatBaseUrl}/discord?query=${encodeURIComponent(query)}`;
+      const headers = {
+        'X-API-KEY': config.osintCatApiKey
+      };
+      
+      console.log(`Calling Discord API: ${url}`);
+      const data = await this.makeRequest(url, headers);
+      console.log('Discord API response:', JSON.stringify(data).substring(0, 1000));
+      
+      if (data && data.error) {
+        console.error('API Error:', data.error, data.message);
+        return { error: true, message: data.message };
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Discord search error:', error.message);
+      return { error: true, message: error.message };
+    }
+  }
+
+  async searchRoblox(query) {
+    try {
+      const url = `${config.osintCatBaseUrl}/roblox?query=${encodeURIComponent(query)}`;
+      const headers = {
+        'X-API-KEY': config.osintCatApiKey
+      };
+      
+      console.log(`Calling Roblox API: ${url}`);
+      const data = await this.makeRequest(url, headers);
+      console.log('Roblox API response:', JSON.stringify(data).substring(0, 1000));
+      
+      if (data && data.error) {
+        console.error('API Error:', data.error, data.message);
+        return { error: true, message: data.message };
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Roblox search error:', error.message);
+      return { error: true, message: error.message };
+    }
+  }
+
+  async searchDiscordToRoblox(query) {
+    try {
+      const url = `${config.osintCatBaseUrl}/discord-to-roblox?query=${encodeURIComponent(query)}`;
+      const headers = {
+        'X-API-KEY': config.osintCatApiKey
+      };
+      
+      console.log(`Calling Discord-to-Roblox API: ${url}`);
+      const data = await this.makeRequest(url, headers);
+      console.log('Discord-to-Roblox API response:', JSON.stringify(data).substring(0, 1000));
+      
+      if (data && data.error) {
+        console.error('API Error:', data.error, data.message);
+        return { error: true, message: data.message };
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Discord-to-Roblox search error:', error.message);
+      return { error: true, message: error.message };
+    }
+  }
+
+  async searchPhoneOSINT(query) {
+    try {
+      const url = `${config.osintCatBaseUrl}/phone-osint?query=${encodeURIComponent(query)}`;
+      const headers = {
+        'X-API-KEY': config.osintCatApiKey
+      };
+      
+      console.log(`Calling Phone OSINT API: ${url}`);
+      const data = await this.makeRequest(url, headers);
+      console.log('Phone OSINT API response:', JSON.stringify(data).substring(0, 1000));
+      
+      if (data && data.error) {
+        console.error('API Error:', data.error, data.message);
+        return { error: true, message: data.message };
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Phone OSINT search error:', error.message);
+      return { error: true, message: error.message };
+    }
+  }
+
+  async searchVIN(query) {
+    try {
+      const url = `${config.osintCatBaseUrl}/vin?query=${encodeURIComponent(query)}`;
+      const headers = {
+        'X-API-KEY': config.osintCatApiKey
+      };
+      
+      console.log(`Calling VIN API: ${url}`);
+      const data = await this.makeRequest(url, headers);
+      console.log('VIN API response:', JSON.stringify(data).substring(0, 1000));
+      
+      if (data && data.error) {
+        console.error('API Error:', data.error, data.message);
+        return { error: true, message: data.message };
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('VIN search error:', error.message);
+      return { error: true, message: error.message };
+    }
+  }
 }
 
 module.exports = new APIService();

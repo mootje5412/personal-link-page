@@ -38,7 +38,55 @@ class OSINTService {
   async generalSearch(query) {
     const results = [];
     
-    // Try Snusbase with last4 type for general searches
+    // Check if it might be a Discord ID (numeric, 17-19 digits)
+    const isDiscordId = /^\d{17,19}$/.test(query);
+    
+    // Check if it might be a VIN (17 alphanumeric characters)
+    const isVIN = /^[A-HJ-NPR-Z0-9]{17}$/i.test(query);
+    
+    // Try Discord ID search
+    if (isDiscordId) {
+      try {
+        const discordData = await apiService.searchDiscord(query);
+        if (discordData && !discordData.error && discordData.data) {
+          results.push(this.formatItem(discordData.data, 0));
+        }
+        
+        // Also try Discord-to-Roblox
+        const d2rData = await apiService.searchDiscordToRoblox(query);
+        if (d2rData && !d2rData.error && d2rData.data) {
+          results.push(this.formatItem(d2rData.data, 0));
+        }
+      } catch (error) {
+        console.error('Discord search failed:', error.message);
+      }
+    }
+    
+    // Try VIN search
+    if (isVIN) {
+      try {
+        const vinData = await apiService.searchVIN(query);
+        if (vinData && !vinData.error && vinData.data) {
+          results.push(this.formatItem(vinData.data, 0));
+        }
+      } catch (error) {
+        console.error('VIN search failed:', error.message);
+      }
+    }
+    
+    // Try Roblox username search (if not numeric)
+    if (!isDiscordId && query.length >= 3) {
+      try {
+        const robloxData = await apiService.searchRoblox(query);
+        if (robloxData && !robloxData.error && robloxData.data) {
+          results.push(this.formatItem(robloxData.data, 0));
+        }
+      } catch (error) {
+        console.error('Roblox search failed:', error.message);
+      }
+    }
+    
+    // Try Snusbase with lastip type for general searches
     try {
       const snusbaseData = await apiService.snusbaseSearch(query, 'lastip');
       console.log('Snusbase data received:', JSON.stringify(snusbaseData).substring(0, 500));
@@ -63,7 +111,7 @@ class OSINTService {
       console.error('Snusbase general search failed:', error.message);
     }
     
-    // Try OSINT Cat
+    // Try OSINT Cat Database
     try {
       const dbResults = await apiService.searchDatabase(query);
       
