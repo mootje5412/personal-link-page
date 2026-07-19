@@ -3,6 +3,7 @@ const config = require('../config/config');
 const commandHandler = require('./handlers/commandHandler');
 const messageHandler = require('./handlers/messageHandler');
 const paginationHandler = require('./handlers/paginationHandler');
+const machinePaginationHandler = require('./handlers/machinePaginationHandler');
 
 class FindNowBot {
   constructor() {
@@ -24,7 +25,7 @@ class FindNowBot {
     this.bot.onText(/\/account/, (msg) => commandHandler.handleAccount(this.bot, msg));
     this.bot.onText(/\/myid/, (msg) => commandHandler.handleMyId(this.bot, msg));
     this.bot.onText(/\/machine (.+)/, (msg, match) => commandHandler.handleMachine(this.bot, msg, match));
-    this.bot.onText(/\/download(?:_\s|\s+)(.+)/, (msg, match) => commandHandler.handleDownload(this.bot, msg, match));
+    this.bot.onText(/\/download(?:\s+|_)(.+)/, (msg, match) => commandHandler.handleDownload(this.bot, msg, match));
     
     // Admin commands
     this.bot.onText(/\/grant (.+)/, (msg, match) => commandHandler.handleGrant(this.bot, msg, match));
@@ -36,6 +37,8 @@ class FindNowBot {
     this.bot.on('callback_query', (query) => {
       if (query.data.startsWith('page_') || query.data === 'current') {
         paginationHandler.handleCallback(this.bot, query);
+      } else if (query.data.startsWith('mpage_') || query.data === 'mcurrent') {
+        machinePaginationHandler.handleCallback(this.bot, query);
       } else if (query.data.startsWith('price_')) {
         commandHandler.handlePriceCallback(this.bot, query);
       } else if (query.data === 'back_to_prices') {

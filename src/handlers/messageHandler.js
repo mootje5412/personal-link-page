@@ -29,7 +29,7 @@ Use /prices to view plans or contact @strafbaar to purchase.`);
     paginationHandler.clearSession(chatId);
 
     const query = messageText.trim();
-    const searchMsg = await bot.sendMessage(chatId, `Searching: ${query}\n\nRunning OSINT lookups...`);
+    const searchMsg = await bot.sendMessage(chatId, `FindNow OSINT\n\nSearching: ${query}\nChecking breach, stealer, and OSINT sources...`);
 
     let lastCount = 0;
     let lastEdit = 0;
@@ -41,13 +41,13 @@ Use /prices to view plans or contact @strafbaar to purchase.`);
 
       lastCount = results.length;
       const now = Date.now();
-      if (now - lastEdit < 800) {
+      if (now - lastEdit < 700) {
         return;
       }
 
       lastEdit = now;
       await bot.editMessageText(
-        `Searching: ${query}\n\nFound ${results.length} result${results.length === 1 ? '' : 's'} so far...`,
+        `FindNow OSINT\n\nSearching: ${query}\nFound ${results.length} result${results.length === 1 ? '' : 's'} so far...`,
         { chat_id: chatId, message_id: searchMsg.message_id }
       ).catch(() => {});
     };
@@ -64,7 +64,7 @@ Use /prices to view plans or contact @strafbaar to purchase.`);
 
         await paginationHandler.sendPaginatedResults(bot, chatId, query, results, 0);
       } else {
-        bot.sendMessage(chatId, `No results found for: ${query}\n\nTry a different query or use /machine <name> for stealer machines.`);
+        bot.sendMessage(chatId, `FindNow OSINT\n\nNo results for: ${query}\n\nTry another query or use /machine <name> for stealer machines.`);
       }
     } catch (error) {
       console.error('Search error:', error);

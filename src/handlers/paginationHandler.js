@@ -1,9 +1,11 @@
+const { buildHeader, formatCategoryBlock, CATEGORY_LABELS } = require('../utils/resultFormatter');
+
 class PaginationHandler {
   constructor() {
     this.sessions = new Map();
-    this.ITEMS_PER_PAGE = 5;
+    this.ITEMS_PER_PAGE = 8;
     this.MAX_MESSAGE_LENGTH = 3900;
-    this.MAX_ITEM_LENGTH = 700;
+    this.MAX_ITEM_LENGTH = 500;
 
     setInterval(() => {
       const now = Date.now();
@@ -23,28 +25,34 @@ class PaginationHandler {
     this.sessions.clear();
   }
 
-  truncateItem(item) {
-    if (typeof item !== 'string') {
-      return String(item);
+  normalizeResult(item) {
+    if (typeof item === 'string') {
+      return { category: 'result', text: item };
     }
-    if (item.length <= this.MAX_ITEM_LENGTH) {
-      return item;
+    return item;
+  }
+
+  truncateText(text) {
+    if (text.length <= this.MAX_ITEM_LENGTH) {
+      return text;
     }
-    return `${item.substring(0, this.MAX_ITEM_LENGTH)}\n...(truncated)`;
+    return `${text.substring(0, this.MAX_ITEM_LENGTH)}\n...(truncated)`;
+  }
+
+  formatResultBlock(index, result) {
+    const entry = this.normalizeResult(result);
+    const text = this.truncateText(entry.text || '');
+    return formatCategoryBlock(index, entry.category, text);
   }
 
   buildPageMessage(query, pageResults, page, totalPages, totalResults, startIndex) {
-    let message = `Results for: ${query}\n`;
-    message += `Page ${page + 1} of ${totalPages} | Total: ${totalResults}\n`;
-    message += `${'─'.repeat(28)}\n\n`;
+    let message = `${buildHeader(query, page, totalPages, totalResults)}\n\n`;
 
     for (let index = 0; index < pageResults.length; index += 1) {
-      const item = pageResults[index];
-      const globalIndex = startIndex + index + 1;
-      const block = `[${globalIndex}]\n${this.truncateItem(item)}\n\n`;
+      const block = `${this.formatResultBlock(startIndex + index + 1, pageResults[index])}\n\n`;
 
       if (message.length + block.length > this.MAX_MESSAGE_LENGTH) {
-        message += '\n...message limit reached. Use Next for more results.';
+        message += 'More results on the next page.';
         break;
       }
 
@@ -52,6 +60,51 @@ class PaginationHandler {
     }
 
     return message.trim();
+  }
+
+  buildDownloadRow(pageResults, startIndex) {
+    const row = [];
+
+    pageResults.forEach((result, index) => {
+      const entry = this.normalizeResult(result);
+      if (!entry.machineId) {
+        return;
+      }
+
+      const label = CATEGORY_LABELS[entry.category] || 'DL';
+      row.push({
+        text: `Download #${startIndex + index + 1}`,
+        callback_data: `download_machine_${entry.machineId}`
+      });
+    });
+
+    if (row.length === 0) {
+      return null;
+    }
+
+    return row.slice(0, 3);
+  }
+
+  createKeyboard(page, totalPages, pageResults = [], startIndex = 0) {
+    const keyboard = [];
+    const downloadRow = this.buildDownloadRow(pageResults, startIndex);
+
+    if (downloadRow) {
+      keyboard.push(downloadRow);
+    }
+
+    const nav = [];
+    if (page > 0) {
+      nav.push({ text: '◀ Prev', callback_data: `page_${page - 1}` });
+    }
+    nav.push({ text: `${page + 1}/${totalPages}`, callback_data: 'current' });
+    if (page < totalPages - 1) {
+      nav.push({ text: 'Next ▶', callback_data: `page_${page + 1}` });
+    }
+
+    keyboard.push(nav);
+
+    return { inline_keyboard: keyboard };
   }
 
   sendPaginatedResults(bot, chatId, query, results, page = 0) {
@@ -68,39 +121,12 @@ class PaginationHandler {
     });
 
     const message = this.buildPageMessage(query, pageResults, safePage, totalPages, results.length, start);
-    const keyboard = this.createKeyboard(safePage, totalPages);
+    const keyboard = this.createKeyboard(safePage, totalPages, pageResults, start);
 
     return bot.sendMessage(chatId, message, {
       reply_markup: keyboard,
       disable_web_page_preview: true
     });
-  }
-
-  createKeyboard(page, totalPages) {
-    const buttons = [];
-
-    if (page > 0) {
-      buttons.push({
-        text: '◀ Back',
-        callback_data: `page_${page - 1}`
-      });
-    }
-
-    buttons.push({
-      text: `${page + 1}/${totalPages}`,
-      callback_data: 'current'
-    });
-
-    if (page < totalPages - 1) {
-      buttons.push({
-        text: 'Next ▶',
-        callback_data: `page_${page + 1}`
-      });
-    }
-
-    return {
-      inline_keyboard: [buttons]
-    };
   }
 
   handleCallback(bot, callbackQuery) {
@@ -145,7 +171,7 @@ class PaginationHandler {
       session.results.length,
       start
     );
-    const keyboard = this.createKeyboard(safePage, totalPages);
+    const keyboard = this.createKeyboard(safePage, totalPages, pageResults, start);
 
     bot.editMessageText(message, {
       chat_id: chatId,

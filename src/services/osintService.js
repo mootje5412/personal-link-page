@@ -1,5 +1,10 @@
 const apiService = require('./apiService');
-const { getMachineId, getDownloadCommand } = require('../utils/machineUtils');
+const { getMachineId } = require('../utils/machineUtils');
+const {
+  formatCategoryBlock,
+  formatRecordFields,
+  formatBytes
+} = require('../utils/resultFormatter');
 
 class OSINTService {
   detectQueryTypes(query) {
@@ -55,6 +60,7 @@ class OSINTService {
 
     tasks.push({ name: 'breach', run: () => apiService.searchBreach(query) });
     tasks.push({ name: 'stealer', run: () => apiService.searchStealerLogs(query, stealerType) });
+    tasks.push({ name: 'database', run: () => apiService.searchStealerLogs(query) });
 
     if (types.includes('discord')) {
       tasks.push({ name: 'discord', run: () => apiService.searchDiscord(query) });
@@ -93,13 +99,25 @@ class OSINTService {
     return tasks;
   }
 
-  addUniqueResult(results, seen, formatted, key) {
-    const dedupeKey = key || formatted;
-    if (!dedupeKey || seen.has(dedupeKey)) {
+  makeResult(category, text, extra = {}) {
+    return { category, text, ...extra };
+  }
+
+  getRecordKey(category, item, index) {
+    try {
+      return `${category}:${JSON.stringify(item)}`;
+    } catch (error) {
+      return `${category}:${index}`;
+    }
+  }
+
+  addUniqueResult(results, seen, result) {
+    const key = result.key || `${result.category}:${result.text}`;
+    if (!key || seen.has(key)) {
       return false;
     }
-    seen.add(dedupeKey);
-    results.push(formatted);
+    seen.add(key);
+    results.push(result);
     return true;
   }
 
@@ -132,30 +150,18 @@ class OSINTService {
       return null;
     }
 
-    const lines = ['Discord Profile'];
+    const lines = [];
     const username = this.formatDiscordUsername(info);
     const displayName = info.display_name || info.global_name || info.nick;
 
-    if (displayName) {
-      lines.push(`Display Name: ${displayName}`);
-    }
-    if (username) {
-      lines.push(`Username: ${username}`);
-    }
-    if (info.id || info.user_id) {
-      lines.push(`User ID: ${info.id || info.user_id}`);
-    }
+    if (displayName) lines.push(`Display Name: ${displayName}`);
+    if (username) lines.push(`Username: ${username}`);
+    if (info.id || info.user_id) lines.push(`User ID: ${info.id || info.user_id}`);
 
     const avatar = this.formatDiscordAvatar(info);
-    if (avatar) {
-      lines.push(`Avatar: ${avatar}`);
-    }
-    if (info.banner) {
-      lines.push(`Banner: ${info.banner}`);
-    }
-    if (info.bio) {
-      lines.push(`Bio: ${info.bio}`);
-    }
+    if (avatar) lines.push(`Avatar: ${avatar}`);
+    if (info.banner) lines.push(`Banner: ${info.banner}`);
+    if (info.bio) lines.push(`Bio: ${info.bio}`);
     if (info.premium_type) {
       const nitro = info.premium_type === 2 ? 'Nitro' : info.premium_type === 1 ? 'Nitro Classic' : 'None';
       lines.push(`Nitro: ${nitro}`);
@@ -163,17 +169,10 @@ class OSINTService {
     if (info.badges && info.badges.length) {
       lines.push(`Badges: ${Array.isArray(info.badges) ? info.badges.join(', ') : info.badges}`);
     }
-    if (info.created_at) {
-      lines.push(`Created: ${info.created_at}`);
-    }
-    if (info.profile_url) {
-      lines.push(`Profile: ${info.profile_url}`);
-    }
-    if (info.public_flags !== undefined && info.public_flags !== null) {
-      lines.push(`Public Flags: ${info.public_flags}`);
-    }
+    if (info.created_at) lines.push(`Created: ${info.created_at}`);
+    if (info.profile_url) lines.push(`Profile: ${info.profile_url}`);
 
-    return lines.length > 1 ? lines.join('\n') : null;
+    return lines.length > 0 ? lines.join('\n') : null;
   }
 
   formatRobloxProfile(item) {
@@ -181,32 +180,24 @@ class OSINTService {
       return null;
     }
 
-    const lines = ['Roblox Profile'];
+    const lines = [];
     const robloxName = item.roblox_name || item.roblox_username || item.username || item.name;
-    const robloxId = item.roblox_id || item.user_id || item.id;
+    const robloxId = item.roblox_id || item.user_id;
 
-    if (robloxName) {
-      lines.push(`Roblox Username: ${robloxName}`);
-    }
-    if (robloxId && !String(robloxId).match(/^\d{17,19}$/)) {
-      lines.push(`Roblox ID: ${robloxId}`);
-    }
+    if (robloxName) lines.push(`Roblox Username: ${robloxName}`);
+    if (robloxId && !String(robloxId).match(/^\d{17,19}$/)) lines.push(`Roblox ID: ${robloxId}`);
 
     if (item.discord_id) {
       lines.push(`Linked Discord ID: ${item.discord_id}`);
-      if (item.discord_username) {
-        lines.push(`Discord Username: @${item.discord_username}`);
-      }
-      if (item.discord_avatar) {
-        lines.push(`Discord Avatar: ${item.discord_avatar}`);
-      }
+      if (item.discord_username) lines.push(`Discord Username: @${item.discord_username}`);
+      if (item.discord_avatar) lines.push(`Discord Avatar: ${item.discord_avatar}`);
     } else if (item.discord_username) {
       lines.push(`Discord Username: @${item.discord_username}`);
     } else if (robloxName) {
       lines.push('Linked Discord: Not found');
     }
 
-    return lines.length > 1 ? lines.join('\n') : null;
+    return lines.length > 0 ? lines.join('\n') : null;
   }
 
   formatDiscordToRobloxProfile(response) {
@@ -214,101 +205,17 @@ class OSINTService {
       return null;
     }
 
-    const lines = ['Discord to Roblox Link'];
+    const lines = [];
     const robloxName = response.roblox_username || response.roblox_name || response.username;
     const robloxId = response.roblox_id || response.user_id;
     const discordId = response.discord_id || response.query;
 
-    if (robloxName) {
-      lines.push(`Roblox Username: ${robloxName}`);
-    }
-    if (robloxId) {
-      lines.push(`Roblox ID: ${robloxId}`);
-    }
-    if (discordId) {
-      lines.push(`Discord ID: ${discordId}`);
-    }
-    if (response.profile_url) {
-      lines.push(`Profile: ${response.profile_url}`);
-    }
+    if (robloxName) lines.push(`Roblox Username: ${robloxName}`);
+    if (robloxId) lines.push(`Roblox ID: ${robloxId}`);
+    if (discordId) lines.push(`Discord ID: ${discordId}`);
+    if (response.profile_url) lines.push(`Profile: ${response.profile_url}`);
 
-    return lines.length > 1 ? lines.join('\n') : null;
-  }
-
-  formatBreachRecord(item, sourceLabel) {
-    if (!item || typeof item !== 'object') {
-      return typeof item === 'string' ? item : null;
-    }
-
-    const lines = [];
-    if (sourceLabel) {
-      lines.push(`Source: ${sourceLabel}`);
-    }
-    if (item.source) {
-      lines.push(`Database: ${item.source}`);
-    }
-    if (item.email) {
-      lines.push(`Email: ${item.email}`);
-    }
-    if (item.username) {
-      lines.push(`Username: ${item.username}`);
-    }
-    if (item.password) {
-      lines.push(`Password: ${item.password}`);
-    }
-    if (item.phone) {
-      lines.push(`Phone: ${item.phone}`);
-    }
-    if (item.ip) {
-      lines.push(`IP: ${item.ip}`);
-    }
-    if (item.name && !item.roblox_name) {
-      lines.push(`Name: ${item.name}`);
-    }
-    if (item.breach_date) {
-      lines.push(`Breach Date: ${item.breach_date}`);
-    }
-    if (item.url) {
-      lines.push(`URL: ${item.url}`);
-    }
-
-    if (lines.length === 0) {
-      return this.formatGenericRecord(item);
-    }
-
-    return lines.join('\n');
-  }
-
-  formatGenericRecord(item) {
-    if (typeof item === 'string') {
-      return item;
-    }
-
-    const skipKeys = new Set([
-      '_meta', 'api', 'elapsed_ms', 'timestamp', 'results_count',
-      'execution_time', 'query', 'total', 'success', 'message', 'mode',
-      'Count', 'Message', 'SearchCriteria', 'count'
-    ]);
-
-    const lines = [];
-    Object.keys(item).forEach((key) => {
-      if (skipKeys.has(key)) {
-        return;
-      }
-
-      const value = item[key];
-      if (value === null || value === undefined || value === '') {
-        return;
-      }
-
-      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-        lines.push(`${key}: ${value}`);
-      } else if (Array.isArray(value)) {
-        lines.push(`${key}: ${value.join(', ')}`);
-      }
-    });
-
-    return lines.length > 0 ? lines.join('\n') : JSON.stringify(item);
+    return lines.length > 0 ? lines.join('\n') : null;
   }
 
   formatVinResults(response) {
@@ -316,10 +223,8 @@ class OSINTService {
       return null;
     }
 
-    const lines = ['VIN Decode'];
-    if (response.SearchCriteria) {
-      lines.push(`VIN: ${response.SearchCriteria}`);
-    }
+    const lines = [];
+    if (response.SearchCriteria) lines.push(`VIN: ${response.SearchCriteria}`);
 
     response.Results.forEach((row) => {
       if (row && row.Variable && row.Value && row.Value !== 'Not Applicable' && row.Value !== '') {
@@ -327,165 +232,168 @@ class OSINTService {
       }
     });
 
-    return lines.length > 1 ? lines.join('\n') : null;
+    return lines.length > 0 ? lines.join('\n') : null;
   }
 
-  formatMachineRecord(machine) {
-    const lines = ['Machine Record'];
-    if (machine.name) {
-      lines.push(`Name: ${machine.name}`);
-    }
-    if (machine.id || machine.machine_id) {
-      lines.push(`ID: ${machine.id || machine.machine_id}`);
-    }
-    if (machine.file_count !== undefined) {
-      lines.push(`Files: ${machine.file_count}`);
-    }
-    if (machine.total_size !== undefined) {
-      lines.push(`Size: ${machine.total_size} bytes`);
-    }
-    if (machine.imported_at) {
-      lines.push(`Imported: ${machine.imported_at}`);
-    }
+  formatMachineText(machine) {
+    const lines = [];
+    if (machine.name) lines.push(`Name: ${machine.name}`);
+    if (machine.file_count !== undefined) lines.push(`Files: ${machine.file_count}`);
+    if (machine.total_size !== undefined) lines.push(`Size: ${formatBytes(machine.total_size)}`);
+    if (machine.imported_at) lines.push(`Imported: ${machine.imported_at}`);
 
     const machineId = getMachineId(machine);
-    if (machineId) {
-      lines.push(`Download: ${getDownloadCommand(machineId)}`);
-    }
+    if (machineId) lines.push(`ID: ${machineId}`);
 
     return lines.join('\n');
   }
 
-  appendDiscordResults(results, response, seen) {
-    if (!response || response.error === true) {
-      return;
-    }
-    if (response.error && typeof response.error === 'string') {
-      return;
-    }
+  extractResultArrays(response) {
+    const arrays = [];
+    const knownKeys = new Set([
+      'breach_data', 'results', 'data', 'machines', 'records',
+      'hits', 'items', 'leaks', 'entries', 'logs', 'rows'
+    ]);
 
-    if (response.user_info) {
-      const profile = this.formatDiscordProfile(response.user_info);
-      if (profile) {
-        const userId = response.user_info.id || response.user_info.user_id || 'profile';
-        this.addUniqueResult(results, seen, profile, `discord-profile:${userId}`);
+    knownKeys.forEach((key) => {
+      if (Array.isArray(response[key]) && response[key].length > 0) {
+        arrays.push({ items: response[key], label: key });
       }
-    }
+    });
 
-    const collections = [
-      response.breach_data,
-      response.results,
-      response.data,
-      response.leaks
-    ];
-
-    collections.forEach((collection) => {
-      if (!Array.isArray(collection)) {
+    Object.keys(response).forEach((key) => {
+      if (knownKeys.has(key)) {
         return;
       }
+      const value = response[key];
+      if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
+        arrays.push({ items: value, label: key });
+      }
+    });
 
-      collection.forEach((item, index) => {
-        if (item && item.username && (item.id || item.user_id) && !item.email && !item.password) {
+    return arrays;
+  }
+
+  appendDiscordResults(results, response, seen) {
+    if (!response || response.error === true) return;
+    if (response.error && typeof response.error === 'string') return;
+
+    if (response.user_info) {
+      const text = this.formatDiscordProfile(response.user_info);
+      if (text) {
+        this.addUniqueResult(results, seen, this.makeResult('discord', text, {
+          key: `discord-profile:${response.user_info.id || response.user_info.user_id}`
+        }));
+      }
+    }
+
+    this.extractResultArrays(response).forEach(({ items }) => {
+      items.forEach((item, index) => {
+        if (item && item.username && (item.id || item.user_id) && !item.email && !item.password && !item.pass) {
           const profile = this.formatDiscordProfile(item);
           if (profile) {
-            this.addUniqueResult(results, seen, profile, `discord-item-profile:${item.id || item.user_id || index}`);
+            this.addUniqueResult(results, seen, this.makeResult('discord', profile, {
+              key: `discord-profile-item:${item.id || item.user_id || index}`
+            }));
             return;
           }
         }
 
-        const formatted = this.formatBreachRecord(item, 'Discord Leak');
-        if (formatted) {
-          const key = `discord-leak:${item.email || ''}:${item.username || ''}:${item.password || ''}:${item.source || index}`;
-          this.addUniqueResult(results, seen, formatted, key);
+        const text = formatRecordFields(item) || this.formatDiscordProfile(item);
+        if (text) {
+          this.addUniqueResult(results, seen, this.makeResult('discord', text, {
+            key: this.getRecordKey('discord', item, index)
+          }));
         }
       });
     });
 
-    if (results.length === 0 || !response.user_info) {
-      const profile = this.formatDiscordProfile(response);
-      if (profile) {
-        this.addUniqueResult(results, seen, profile, `discord-root:${response.id || response.user_id || 'root'}`);
-      }
+    const rootProfile = this.formatDiscordProfile(response);
+    if (rootProfile && !response.user_info) {
+      this.addUniqueResult(results, seen, this.makeResult('discord', rootProfile, {
+        key: `discord-root:${response.id || response.user_id || 'root'}`
+      }));
     }
   }
 
   appendRobloxResults(results, response, seen, sourceName) {
-    if (!response || response.error === true) {
-      return;
-    }
-    if (response.error && typeof response.error === 'string') {
-      return;
-    }
+    if (!response || response.error === true) return;
+    if (response.error && typeof response.error === 'string') return;
 
     if (sourceName === 'discord-to-roblox') {
-      const linked = this.formatDiscordToRobloxProfile(response);
-      if (linked) {
-        this.addUniqueResult(results, seen, linked, `d2r:${response.roblox_id || response.roblox_username || response.query}`);
+      const text = this.formatDiscordToRobloxProfile(response);
+      if (text) {
+        this.addUniqueResult(results, seen, this.makeResult('discord-to-roblox', text, {
+          key: `d2r:${response.roblox_id || response.roblox_username || response.query}`
+        }));
       }
     }
 
     const matches = Array.isArray(response.results) ? response.results : [];
     matches.forEach((item, index) => {
-      const profile = this.formatRobloxProfile(item);
-      if (profile) {
-        const key = `roblox:${item.roblox_name || item.roblox_username || item.discord_id || index}`;
-        this.addUniqueResult(results, seen, profile, key);
+      const text = this.formatRobloxProfile(item);
+      if (text) {
+        this.addUniqueResult(results, seen, this.makeResult('roblox', text, {
+          key: this.getRecordKey('roblox', item, index)
+        }));
       }
     });
 
     if (matches.length === 0) {
-      const profile = this.formatRobloxProfile(response) || this.formatDiscordToRobloxProfile(response);
-      if (profile) {
-        this.addUniqueResult(results, seen, profile, `roblox-root:${response.roblox_name || response.query || 'root'}`);
+      const text = this.formatRobloxProfile(response) || this.formatDiscordToRobloxProfile(response);
+      if (text) {
+        this.addUniqueResult(results, seen, this.makeResult('roblox', text, {
+          key: `roblox-root:${response.roblox_name || response.query || 'root'}`
+        }));
       }
     }
   }
 
-  appendOsintCatResponse(results, response, seen, sourceName) {
-    if (!response || response.error === true) {
+  appendOsintCatResponse(results, response, seen, category) {
+    if (!response || response.error === true) return;
+    if (response.error && typeof response.error === 'string') return;
+
+    const vinText = this.formatVinResults(response);
+    if (vinText) {
+      this.addUniqueResult(results, seen, this.makeResult('vin', vinText, {
+        key: `vin:${response.SearchCriteria || 'decode'}`
+      }));
       return;
     }
-    if (response.error && typeof response.error === 'string') {
-      return;
-    }
 
-    const vinFormatted = this.formatVinResults(response);
-    if (vinFormatted) {
-      this.addUniqueResult(results, seen, vinFormatted, `vin:${response.SearchCriteria || 'decode'}`);
-      return;
-    }
-
-    const collections = [
-      { items: response.breach_data, label: 'Breach' },
-      { items: response.results, label: sourceName || 'Result' },
-      { items: response.data, label: sourceName || 'Data' },
-      { items: response.machines, label: 'Machine' }
-    ];
-
-    collections.forEach(({ items, label }) => {
-      if (!Array.isArray(items)) {
-        return;
-      }
-
+    this.extractResultArrays(response).forEach(({ items, label }) => {
       items.forEach((item, index) => {
-        let formatted;
-        if (label === 'Machine') {
-          formatted = this.formatMachineRecord(item);
+        let text;
+        let resultCategory = category;
+
+        if (label === 'machines') {
+          text = this.formatMachineText(item);
+          resultCategory = 'machine';
         } else {
-          formatted = this.formatBreachRecord(item, label);
+          text = formatRecordFields(item);
         }
 
-        if (formatted) {
-          const key = `${label}:${item.email || ''}:${item.username || ''}:${item.password || ''}:${item.id || item.name || index}`;
-          this.addUniqueResult(results, seen, formatted, key);
+        if (text) {
+          const result = this.makeResult(resultCategory, text, {
+            key: this.getRecordKey(`${resultCategory}:${label}`, item, index)
+          });
+
+          const machineId = getMachineId(item);
+          if (machineId) {
+            result.machineId = machineId;
+          }
+
+          this.addUniqueResult(results, seen, result);
         }
       });
     });
 
     if (response.user_info) {
-      const profile = this.formatDiscordProfile(response.user_info);
-      if (profile) {
-        this.addUniqueResult(results, seen, profile, `profile:${response.user_info.id || response.user_info.user_id}`);
+      const text = this.formatDiscordProfile(response.user_info);
+      if (text) {
+        this.addUniqueResult(results, seen, this.makeResult('discord', text, {
+          key: `profile:${response.user_info.id || response.user_info.user_id}`
+        }));
       }
     }
 
@@ -493,27 +401,28 @@ class OSINTService {
       return;
     }
 
-    const generic = this.formatGenericRecord(response);
-    if (generic && !generic.startsWith('{')) {
-      this.addUniqueResult(results, seen, generic, `generic:${sourceName}:${response.query || generic.substring(0, 80)}`);
+    const flatText = formatRecordFields(response);
+    if (flatText) {
+      this.addUniqueResult(results, seen, this.makeResult(category, flatText, {
+        key: `flat:${category}:${response.query || flatText.substring(0, 80)}`
+      }));
     }
   }
 
   appendSnusbaseResults(results, response, seen) {
-    if (!response || response.error || !response.results) {
-      return;
-    }
+    if (!response || response.error || !response.results) return;
 
     Object.keys(response.results).forEach((dbName) => {
       const dbResults = response.results[dbName];
-      if (!Array.isArray(dbResults)) {
-        return;
-      }
+      if (!Array.isArray(dbResults)) return;
 
       dbResults.forEach((item, index) => {
-        const formatted = this.formatBreachRecord({ ...item, source: dbName }, 'Snusbase');
-        const key = `snusbase:${dbName}:${item.email || ''}:${item.username || ''}:${item.password || ''}:${index}`;
-        this.addUniqueResult(results, seen, formatted, key);
+        const text = formatRecordFields({ ...item, source: dbName });
+        if (text) {
+          this.addUniqueResult(results, seen, this.makeResult('snusbase', text, {
+            key: this.getRecordKey(`snusbase:${dbName}`, item, index)
+          }));
+        }
       });
     });
   }
@@ -539,7 +448,8 @@ class OSINTService {
       return;
     }
 
-    this.appendOsintCatResponse(results, data, seen, name);
+    const category = name === 'database' ? 'stealer' : name;
+    this.appendOsintCatResponse(results, data, seen, category);
   }
 
   async search(query, onProgress) {
@@ -570,55 +480,14 @@ class OSINTService {
   }
 
   async machineSearch(query) {
-    const results = [];
-    const seen = new Set();
     const data = await apiService.searchMachines(query);
-
-    if (data && !data.error) {
-      const machines = data.machines || data.results || [];
-      machines.forEach((machine, index) => {
-        const formatted = this.formatMachineRecord(machine);
-        this.addUniqueResult(results, seen, formatted, `machine:${getMachineId(machine) || machine.name || index}`);
-      });
+    if (data && data.error) {
+      return { error: data.message, machines: [] };
     }
 
-    return results;
-  }
-
-  async emailSearch(query) {
-    return this.search(query);
-  }
-
-  async usernameSearch(query) {
-    return this.search(query);
-  }
-
-  async phoneSearch(query) {
-    return this.search(query);
-  }
-
-  async ipSearch(query) {
-    return this.search(query);
-  }
-
-  async nameSearch(query) {
-    return this.search(query);
-  }
-
-  async generalSearch(query) {
-    return this.search(query);
-  }
-
-  async discordSearch(query) {
-    return this.search(query);
-  }
-
-  async robloxSearch(query) {
-    return this.search(query);
-  }
-
-  async vinSearch(query) {
-    return this.search(query);
+    return {
+      machines: data.machines || data.results || []
+    };
   }
 }
 
