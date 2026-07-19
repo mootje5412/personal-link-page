@@ -1,15 +1,110 @@
 const apiService = require('./apiService');
 
 class OSINTService {
+  detectQueryTypes(query) {
+    const types = [];
+    const trimmed = query.trim();
+
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      types.push('email');
+    }
+
+    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(trimmed)) {
+      types.push('ip');
+    }
+
+    if (/^\d{17,19}$/.test(trimmed)) {
+      types.push('discord');
+    }
+
+    if (/^[A-HJ-NPR-Z0-9]{17}$/i.test(trimmed) && /[A-Z]/i.test(trimmed)) {
+      types.push('vin');
+    }
+
+    if (!/^\d{17,}$/.test(trimmed.replace(/\s/g, ''))) {
+      const phoneRegex = /^[\+]?[(]?[0-9]{1,3}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,4}[-\s\.]?[0-9]{1,9}$/;
+      if (phoneRegex.test(trimmed.replace(/\s/g, ''))) {
+        types.push('phone');
+      }
+    }
+
+    if (/^[a-zA-Z0-9_]{3,20}$/.test(trimmed) && !/^\d{17,19}$/.test(trimmed)) {
+      types.push('roblox');
+      types.push('username');
+    } else if (/^[a-zA-Z0-9._-]{3,30}$/.test(trimmed) && !trimmed.includes(' ')) {
+      types.push('username');
+    }
+
+    if (/^[a-zA-Z]{2,}(\s[a-zA-Z]{2,})?$/.test(trimmed)) {
+      types.push('name');
+    }
+
+    if (types.length === 0) {
+      types.push('general');
+    }
+
+    return types;
+  }
+
+  formatItem(item, index = 0) {
+    if (index === 0) {
+      console.log('Sample item structure:', JSON.stringify(item));
+    }
+
+    if (typeof item === 'string') {
+      return item;
+    }
+
+    const lines = [];
+
+    Object.keys(item).forEach((key) => {
+      const value = item[key];
+
+      if (value === null || value === undefined) return;
+
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        lines.push(`${key}: ${value}`);
+      } else if (Array.isArray(value)) {
+        lines.push(`${key}: ${value.join(', ')}`);
+      } else if (typeof value === 'object') {
+        lines.push(`${key}: ${JSON.stringify(value)}`);
+      }
+    });
+
+    return lines.length > 0 ? lines.join('\n') : JSON.stringify(item);
+  }
+
+  formatVinResults(response) {
+    if (!response || !Array.isArray(response.Results)) {
+      return null;
+    }
+
+    const lines = [];
+    if (response.SearchCriteria) lines.push(`SearchCriteria: ${response.SearchCriteria}`);
+
+    response.Results.forEach((row) => {
+      if (row && row.Variable && row.Value && row.Value !== 'Not Applicable' && row.Value !== '') {
+        lines.push(`${row.Variable}: ${row.Value}`);
+      }
+    });
+
+    return lines.length > 0 ? lines.join('\n') : null;
+  }
+
   extractOsintCatResults(response) {
-    if (!response || typeof response !== 'object' || response.error) {
+    if (!response || typeof response !== 'object') {
+      return [];
+    }
+
+    if (response.error && typeof response.error === 'string') {
       return [];
     }
 
     const items = [];
     const skipKeys = new Set([
       '_meta', 'api', 'elapsed_ms', 'timestamp', 'results_count',
-      'execution_time', 'query', 'total', 'success', 'error', 'message', 'mode'
+      'execution_time', 'query', 'total', 'success', 'message', 'mode',
+      'Count', 'Message', 'SearchCriteria'
     ]);
 
     const pushItem = (item) => {
@@ -18,11 +113,17 @@ class OSINTService {
       items.push(item);
     };
 
-    ['results', 'machines', 'breach_data', 'data', 'Results'].forEach((key) => {
+    const vinFormatted = this.formatVinResults(response);
+    if (vinFormatted) {
+      items.push(vinFormatted);
+      return items;
+    }
+
+    ['results', 'machines', 'breach_data', 'data'].forEach((key) => {
       const value = response[key];
       if (Array.isArray(value)) {
         value.forEach(pushItem);
-      } else if (value && typeof value === 'object' && key !== 'Results') {
+      } else if (value && typeof value === 'object') {
         pushItem(value);
       }
     });
@@ -31,12 +132,22 @@ class OSINTService {
       pushItem(response.user_info);
     }
 
+    if (Array.isArray(response.Results) && response.Results[0] && response.Results[0].Variable) {
+      response.Results.forEach((row) => {
+        if (row && row.Variable && row.Value) {
+          pushItem({ [row.Variable]: row.Value });
+        }
+      });
+      return items;
+    }
+
     if (items.length === 0) {
       const keys = Object.keys(response).filter((key) => !skipKeys.has(key));
       const looksLikeRecord = keys.some((key) => [
         'username', 'user_id', 'email', 'password', 'id', 'name', 'vin',
         'make', 'model', 'display_name', 'discriminator', 'created_at',
-        'file_count', 'total_size', 'imported_at', 'profile_url'
+        'file_count', 'total_size', 'imported_at', 'profile_url', 'bio',
+        'avatar', 'banner', 'premium_type', 'badges'
       ].includes(key));
 
       if (looksLikeRecord) {
@@ -47,463 +158,163 @@ class OSINTService {
     return items;
   }
 
-  appendOsintCatResponse(results, response) {
+  appendOsintCatResponse(results, response, seen) {
     const items = this.extractOsintCatResults(response);
-    items.forEach((item, index) => {
-      results.push(this.formatItem(item, results.length === 0 ? index : index));
+
+    items.forEach((item) => {
+      const formatted = typeof item === 'string' ? item : this.formatItem(item);
+      if (!seen.has(formatted)) {
+        seen.add(formatted);
+        results.push(formatted);
+      }
     });
+
     return items.length;
   }
 
-  formatItem(item, index = 0) {
-    if (index === 0) {
-      console.log('Sample item structure:', JSON.stringify(item));
+  appendSnusbaseResults(results, response, seen) {
+    if (!response || response.error || !response.results) {
+      return;
     }
-    
-    // If item is a string, return it directly
-    if (typeof item === 'string') {
-      return item;
-    }
-    
-    // Build formatted output
-    let lines = [];
-    
-    Object.keys(item).forEach((key) => {
-      const value = item[key];
-      
-      if (value === null || value === undefined) return;
-      
-      if (typeof value === 'string') {
-        lines.push(`${key}: ${value}`);
-      } else if (typeof value === 'number') {
-        lines.push(`${key}: ${value}`);
-      } else if (typeof value === 'boolean') {
-        lines.push(`${key}: ${value}`);
-      } else if (Array.isArray(value)) {
-        lines.push(`${key}: ${value.join(', ')}`);
-      } else if (typeof value === 'object') {
-        lines.push(`${key}: ${JSON.stringify(value)}`);
+
+    Object.keys(response.results).forEach((dbName) => {
+      const dbResults = response.results[dbName];
+      if (Array.isArray(dbResults)) {
+        dbResults.forEach((item) => {
+          const formatted = this.formatItem(item);
+          if (!seen.has(formatted)) {
+            seen.add(formatted);
+            results.push(formatted);
+          }
+        });
       }
     });
-    
-    return lines.length > 0 ? lines.join('\n') : JSON.stringify(item);
+  }
+
+  async search(query) {
+    const results = [];
+    const seen = new Set();
+    const types = this.detectQueryTypes(query);
+
+    console.log(`Unified search for: ${query}`);
+    console.log(`Detected types: ${types.join(', ')}`);
+
+    const tasks = [
+      apiService.searchBreach(query).then((data) => ({ name: 'breach', data })),
+      apiService.searchDatabase(query).then((data) => ({ name: 'database', data }))
+    ];
+
+    if (types.includes('email')) {
+      tasks.push(apiService.snusbaseSearch(query, 'email').then((data) => ({ name: 'snusbase', data })));
+    } else if (types.includes('phone')) {
+      tasks.push(apiService.snusbaseSearch(query, 'phone').then((data) => ({ name: 'snusbase', data })));
+      tasks.push(apiService.searchPhoneOSINT(query).then((data) => ({ name: 'phone-osint', data })));
+    } else if (types.includes('username')) {
+      tasks.push(apiService.snusbaseSearch(query, 'username').then((data) => ({ name: 'snusbase', data })));
+    } else if (types.includes('name')) {
+      tasks.push(apiService.snusbaseSearch(query, 'name').then((data) => ({ name: 'snusbase', data })));
+    } else {
+      tasks.push(apiService.snusbaseSearch(query, 'email').then((data) => ({ name: 'snusbase', data })));
+    }
+
+    if (types.includes('discord')) {
+      tasks.push(apiService.searchDiscord(query).then((data) => ({ name: 'discord', data })));
+      tasks.push(apiService.searchDiscordToRoblox(query).then((data) => ({ name: 'discord-to-roblox', data })));
+    }
+
+    if (types.includes('vin')) {
+      tasks.push(apiService.searchVIN(query).then((data) => ({ name: 'vin', data })));
+    }
+
+    if (types.includes('roblox')) {
+      tasks.push(apiService.searchRoblox(query).then((data) => ({ name: 'roblox', data })));
+    }
+
+    if (types.includes('username') && !types.includes('roblox')) {
+      tasks.push(apiService.searchRoblox(query).then((data) => ({ name: 'roblox', data })));
+    }
+
+    tasks.push(apiService.searchStealerLogs(query, types.includes('email') ? 'email' : 'domain').then((data) => ({ name: 'stealer', data })));
+    tasks.push(apiService.searchMachines(query).then((data) => ({ name: 'machine', data })));
+
+    const settled = await Promise.allSettled(tasks);
+
+    settled.forEach((result) => {
+      if (result.status !== 'fulfilled') {
+        console.error('Search task failed:', result.reason);
+        return;
+      }
+
+      const { name, data } = result.value;
+      console.log(`Processing ${name} response`);
+
+      if (name === 'snusbase') {
+        this.appendSnusbaseResults(results, data, seen);
+        return;
+      }
+
+      if (name === 'machine') {
+        if (data && !data.error) {
+          const machines = data.machines || data.results || [];
+          machines.forEach((machine) => {
+            let formatted = this.formatItem(machine);
+            if (machine.id || machine.machine_id) {
+              formatted += `\n\nDownload: /download_${machine.id || machine.machine_id}`;
+            }
+            if (!seen.has(formatted)) {
+              seen.add(formatted);
+              results.push(formatted);
+            }
+          });
+        }
+        return;
+      }
+
+      this.appendOsintCatResponse(results, data, seen);
+    });
+
+    return results;
+  }
+
+  async emailSearch(query) {
+    return this.search(query);
+  }
+
+  async usernameSearch(query) {
+    return this.search(query);
+  }
+
+  async phoneSearch(query) {
+    return this.search(query);
+  }
+
+  async ipSearch(query) {
+    return this.search(query);
+  }
+
+  async nameSearch(query) {
+    return this.search(query);
   }
 
   async generalSearch(query) {
-    const results = [];
-    
-    // Try Snusbase with lastip type for general searches
-    try {
-      const snusbaseData = await apiService.snusbaseSearch(query, 'lastip');
-      console.log('Snusbase data received:', JSON.stringify(snusbaseData).substring(0, 500));
-      
-      if (snusbaseData && !snusbaseData.error) {
-        if (snusbaseData.results && typeof snusbaseData.results === 'object') {
-          const dbNames = Object.keys(snusbaseData.results);
-          console.log(`Snusbase returned ${dbNames.length} databases:`, dbNames.join(', '));
-          
-          dbNames.forEach((dbName) => {
-            const dbResults = snusbaseData.results[dbName];
-            if (dbResults && Array.isArray(dbResults) && dbResults.length > 0) {
-              console.log(`Database ${dbName} has ${dbResults.length} results`);
-              dbResults.forEach((item, index) => {
-                results.push(this.formatItem(item, index));
-              });
-            }
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Snusbase general search failed:', error.message);
-    }
-    
-    // Try OSINT Cat Database
-    try {
-      const dbResults = await apiService.searchDatabase(query);
-      
-      if (dbResults && dbResults.error) {
-        console.error('OSINT Cat database API error:', dbResults.message);
-      }
-      
-      if (dbResults && dbResults.results && dbResults.results.length > 0) {
-        dbResults.results.forEach((item, index) => {
-          results.push(this.formatItem(item, index));
-        });
-      }
-    } catch (error) {
-      console.error('General search failed:', error.message);
-    }
-    
-    return results;
+    return this.search(query);
   }
 
-  async nameSearch(name) {
-    const results = [];
-    
-    // Split name into parts for Snusbase
-    const nameParts = name.trim().split(' ');
-    const searchTypes = nameParts.length === 2 ? ['name'] : ['name'];
-    
-    // Try Snusbase with name search
-    try {
-      const snusbaseData = await apiService.snusbaseSearch(name, 'name');
-      console.log('Snusbase name search data received:', JSON.stringify(snusbaseData).substring(0, 500));
-      
-      if (snusbaseData && !snusbaseData.error) {
-        if (snusbaseData.results && typeof snusbaseData.results === 'object') {
-          const dbNames = Object.keys(snusbaseData.results);
-          console.log(`Snusbase returned ${dbNames.length} databases:`, dbNames.join(', '));
-          
-          dbNames.forEach((dbName) => {
-            const dbResults = snusbaseData.results[dbName];
-            if (dbResults && Array.isArray(dbResults) && dbResults.length > 0) {
-              console.log(`Database ${dbName} has ${dbResults.length} results`);
-              dbResults.forEach((item, index) => {
-                results.push(this.formatItem(item, index));
-              });
-            }
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Snusbase name search failed:', error.message);
-    }
-    
-    // Try OSINT Cat Breach API
-    try {
-      const breachData = await apiService.searchBreach(name);
-      
-      if (breachData && !breachData.error) {
-        if (breachData.breach_data && breachData.breach_data.length > 0) {
-          breachData.breach_data.forEach((breach, index) => {
-            results.push(this.formatItem(breach, index));
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Breach search failed:', error.message);
-    }
-    
-    // Try OSINT Cat Database Search
-    try {
-      const dbResults = await apiService.searchDatabase(name);
-      
-      if (dbResults && !dbResults.error && dbResults.results && dbResults.results.length > 0) {
-        dbResults.results.forEach((item, index) => {
-          results.push(this.formatItem(item, index));
-        });
-      }
-    } catch (error) {
-      console.error('Database search failed:', error.message);
-    }
-    
-    // Try OSINT Cat Stealer Logs
-    try {
-      const stealerResults = await apiService.searchStealerLogs(name, 'domain');
-      
-      if (stealerResults && !stealerResults.error && stealerResults.results && stealerResults.results.length > 0) {
-        stealerResults.results.forEach((item, index) => {
-          results.push(this.formatItem(item, index));
-        });
-      }
-    } catch (error) {
-      console.error('Stealer logs search failed:', error.message);
-    }
-    
-    return results;
+  async discordSearch(query) {
+    return this.search(query);
   }
 
-  async usernameSearch(username) {
-    const results = [];
-    
-    // Try Snusbase
-    try {
-      const snusbaseData = await apiService.snusbaseSearch(username, 'username');
-      console.log('Snusbase data received:', JSON.stringify(snusbaseData).substring(0, 500));
-      
-      if (snusbaseData && !snusbaseData.error) {
-        if (snusbaseData.results && typeof snusbaseData.results === 'object') {
-          const dbNames = Object.keys(snusbaseData.results);
-          console.log(`Snusbase returned ${dbNames.length} databases:`, dbNames.join(', '));
-          
-          dbNames.forEach((dbName) => {
-            const dbResults = snusbaseData.results[dbName];
-            if (dbResults && Array.isArray(dbResults) && dbResults.length > 0) {
-              console.log(`Database ${dbName} has ${dbResults.length} results`);
-              dbResults.forEach((item, index) => {
-                results.push(this.formatItem(item, index));
-              });
-            }
-          });
-        }
-      } else if (snusbaseData && snusbaseData.error) {
-        console.error('Snusbase API error:', snusbaseData.message);
-      }
-    } catch (error) {
-      console.error('Snusbase username search failed:', error.message);
-    }
-    
-    // Try OSINT Cat Breach API for username
-    try {
-      const breachData = await apiService.searchBreach(username);
-      this.appendOsintCatResponse(results, breachData);
-    } catch (error) {
-      console.error('Breach search failed:', error.message);
-    }
-    
-    // Try OSINT Cat Database Search
-    try {
-      const dbResults = await apiService.searchDatabase(username);
-      this.appendOsintCatResponse(results, dbResults);
-    } catch (error) {
-      console.error('Database search failed:', error.message);
-    }
-    
-    // Try OSINT Cat Stealer Logs
-    try {
-      const stealerResults = await apiService.searchStealerLogs(username, 'domain');
-      this.appendOsintCatResponse(results, stealerResults);
-    } catch (error) {
-      console.error('Stealer logs search failed:', error.message);
-    }
-    
-    return results;
+  async robloxSearch(query) {
+    return this.search(query);
   }
 
-  async emailSearch(email) {
-    const results = [];
-    
-    // Try Snusbase - merge all results without source labels
-    try {
-      const snusbaseData = await apiService.snusbaseSearch(email, 'email');
-      console.log('Search data received:', JSON.stringify(snusbaseData).substring(0, 500));
-      
-      if (snusbaseData && !snusbaseData.error) {
-        if (snusbaseData.results && typeof snusbaseData.results === 'object') {
-          const dbNames = Object.keys(snusbaseData.results);
-          console.log(`Found ${dbNames.length} sources:`, dbNames.join(', '));
-          
-          dbNames.forEach((dbName) => {
-            const dbResults = snusbaseData.results[dbName];
-            if (dbResults && Array.isArray(dbResults) && dbResults.length > 0) {
-              console.log(`Source ${dbName} has ${dbResults.length} results`);
-              dbResults.forEach((item, index) => {
-                results.push(this.formatItem(item, index));
-              });
-            }
-          });
-        } else {
-          console.log('No results or invalid format');
-        }
-      } else if (snusbaseData && snusbaseData.error) {
-        console.error('Search error:', snusbaseData.message);
-      }
-    } catch (error) {
-      console.error('Email search failed:', error.message);
-    }
-    
-    // Try OSINT Cat breach API
-    try {
-      const breachData = await apiService.searchBreach(email);
-      
-      if (breachData && breachData.error && results.length === 0) {
-        console.error('OSINT Cat breach API error:', breachData.message);
-      }
-      
-      if (breachData) {
-        if (breachData.breach_data && breachData.breach_data.length > 0) {
-          breachData.breach_data.forEach((breach, index) => {
-            results.push(this.formatItem(breach, index));
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Breach search failed:', error.message);
-    }
-    
-    // Try OSINT Cat database search
-    try {
-      const dbResults = await apiService.searchDatabase(email);
-      if (dbResults && !dbResults.error && dbResults.results && dbResults.results.length > 0) {
-        dbResults.results.forEach((item, index) => {
-          results.push(this.formatItem(item, index));
-        });
-      }
-    } catch (error) {
-      console.error('Database search failed:', error.message);
-    }
-    
-    return results;
-  }
-
-  async phoneSearch(phone) {
-    const results = [];
-    
-    // Try Snusbase
-    try {
-      const snusbaseData = await apiService.snusbaseSearch(phone, 'phone');
-      console.log('Snusbase data received:', JSON.stringify(snusbaseData).substring(0, 500));
-      
-      if (snusbaseData && !snusbaseData.error && snusbaseData.results) {
-        Object.keys(snusbaseData.results).forEach((dbName) => {
-          const dbResults = snusbaseData.results[dbName];
-          if (dbResults && Array.isArray(dbResults) && dbResults.length > 0) {
-            dbResults.forEach((item, index) => {
-              results.push(this.formatItem(item, index));
-            });
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Snusbase phone search failed:', error.message);
-    }
-    
-    // Try OSINT Cat Phone OSINT
-    try {
-      const phoneOsintData = await apiService.searchPhoneOSINT(phone);
-      this.appendOsintCatResponse(results, phoneOsintData);
-    } catch (error) {
-      console.error('Phone OSINT search failed:', error.message);
-    }
-    
-    // Try OSINT Cat Database
-    try {
-      const dbResults = await apiService.searchDatabase(phone);
-      this.appendOsintCatResponse(results, dbResults);
-    } catch (error) {
-      console.error('Database search failed:', error.message);
-    }
-    
-    return results;
-  }
-
-  async ipSearch(ip) {
-    const results = [];
-    
-    // Try OSINT Cat
-    try {
-      const dbResults = await apiService.searchDatabase(ip);
-      
-      if (dbResults && dbResults.error) {
-        console.error('OSINT Cat database API error:', dbResults.message);
-      }
-      
-      if (dbResults && dbResults.results && dbResults.results.length > 0) {
-        dbResults.results.forEach((item, index) => {
-          results.push(this.formatItem(item, index));
-        });
-      }
-    } catch (error) {
-      console.error('IP search failed:', error.message);
-    }
-    
-    return results;
+  async vinSearch(query) {
+    return this.search(query);
   }
 
   async machineSearch(query) {
-    const results = [];
-    
-    const machineResults = await apiService.searchMachines(query);
-    
-    if (machineResults && machineResults.error) {
-      console.log('Machine search error:', machineResults.message);
-      return results;
-    }
-    
-    const machines = machineResults.machines || machineResults.results || [];
-    
-    if (machines.length > 0) {
-      machines.forEach((machine, index) => {
-        let machineInfo = this.formatItem(machine, index);
-        
-        if (machine.id || machine.machine_id) {
-          const machineId = machine.id || machine.machine_id;
-          machineInfo += `\n\nDownload: /download_${machineId}`;
-        }
-        
-        results.push(machineInfo);
-      });
-    }
-    
-    return results;
+    return this.search(query);
   }
-
-  async discordSearch(discordId) {
-    const results = [];
-    
-    console.log(`Discord ID detected: ${discordId}`);
-    
-    try {
-      const discordData = await apiService.searchDiscord(discordId);
-      this.appendOsintCatResponse(results, discordData);
-    } catch (error) {
-      console.error('Discord search failed:', error.message);
-    }
-    
-    try {
-      const d2rData = await apiService.searchDiscordToRoblox(discordId);
-      this.appendOsintCatResponse(results, d2rData);
-    } catch (error) {
-      console.error('Discord-to-Roblox search failed:', error.message);
-    }
-    
-    try {
-      const dbResults = await apiService.searchDatabase(discordId);
-      this.appendOsintCatResponse(results, dbResults);
-    } catch (error) {
-      console.error('Database search failed:', error.message);
-    }
-    
-    return results;
-  }
-
-  async robloxSearch(username) {
-    const results = [];
-    
-    console.log(`Roblox username detected: ${username}`);
-    
-    try {
-      const robloxData = await apiService.searchRoblox(username);
-      this.appendOsintCatResponse(results, robloxData);
-    } catch (error) {
-      console.error('Roblox search failed:', error.message);
-    }
-    
-    try {
-      const snusbaseData = await apiService.snusbaseSearch(username, 'username');
-      
-      if (snusbaseData && !snusbaseData.error && snusbaseData.results) {
-        Object.keys(snusbaseData.results).forEach((dbName) => {
-          const dbResults = snusbaseData.results[dbName];
-          if (dbResults && Array.isArray(dbResults) && dbResults.length > 0) {
-            dbResults.forEach((item, index) => {
-              results.push(this.formatItem(item, index));
-            });
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Snusbase search failed:', error.message);
-    }
-    
-    return results;
-  }
-
-  async vinSearch(vin) {
-    const results = [];
-    
-    console.log(`VIN detected: ${vin}`);
-    
-    try {
-      const vinData = await apiService.searchVIN(vin);
-      this.appendOsintCatResponse(results, vinData);
-    } catch (error) {
-      console.error('VIN search failed:', error.message);
-    }
-    
-    return results;
-  }
-
 }
 
 module.exports = new OSINTService();
