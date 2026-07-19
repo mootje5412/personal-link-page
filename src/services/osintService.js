@@ -1,4 +1,5 @@
 const apiService = require('./apiService');
+const { getMachineId, getDownloadCommand } = require('../utils/machineUtils');
 
 class OSINTService {
   detectQueryTypes(query) {
@@ -272,8 +273,9 @@ class OSINTService {
           const machines = data.machines || data.results || [];
           machines.forEach((machine) => {
             let formatted = this.formatItem(machine);
-            if (machine.id || machine.machine_id) {
-              formatted += `\n\nDownload: /download_${machine.id || machine.machine_id}`;
+            const machineId = getMachineId(machine);
+            if (machineId) {
+              formatted += `\n\nDownload: ${getDownloadCommand(machineId)}`;
             }
             if (!seen.has(formatted)) {
               seen.add(formatted);

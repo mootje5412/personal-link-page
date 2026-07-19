@@ -24,7 +24,7 @@ class FindNowBot {
     this.bot.onText(/\/account/, (msg) => commandHandler.handleAccount(this.bot, msg));
     this.bot.onText(/\/myid/, (msg) => commandHandler.handleMyId(this.bot, msg));
     this.bot.onText(/\/machine (.+)/, (msg, match) => commandHandler.handleMachine(this.bot, msg, match));
-    this.bot.onText(/\/download_(.+)/, (msg, match) => commandHandler.handleDownload(this.bot, msg, match));
+    this.bot.onText(/\/download(?:_\s|\s+)(.+)/, (msg, match) => commandHandler.handleDownload(this.bot, msg, match));
     
     // Admin commands
     this.bot.onText(/\/grant (.+)/, (msg, match) => commandHandler.handleGrant(this.bot, msg, match));

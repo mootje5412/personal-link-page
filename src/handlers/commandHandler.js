@@ -1,6 +1,7 @@
 const apiService = require('../services/apiService');
 const userService = require('../services/userService');
 const config = require('../../config/config');
+const { getMachineId, getDownloadCommand, extractMachineUuid, isValidMachineUuid } = require('../utils/machineUtils');
 
 class CommandHandler {
   handleStart(bot, msg) {
@@ -322,9 +323,13 @@ To purchase, contact @strafbaar on Telegram`;
             }
           });
           
-          const machineId = machine.id || machine.machine_id || index;
-          
-          // Create keyboard with download button
+          const machineId = getMachineId(machine);
+
+          if (!machineId) {
+            bot.sendMessage(chatId, machineInfo || 'No details available');
+            return;
+          }
+
           const keyboard = {
             inline_keyboard: [
               [
@@ -335,7 +340,7 @@ To purchase, contact @strafbaar on Telegram`;
               ]
             ]
           };
-          
+
           bot.sendMessage(chatId, machineInfo || 'No details available', { reply_markup: keyboard });
         });
       } else {
@@ -353,65 +358,129 @@ To purchase, contact @strafbaar on Telegram`;
     }
   }
 
+  async resolveMachineId(input) {
+    const trimmed = String(input || '').trim();
+    const uuid = extractMachineUuid(trimmed);
+
+    if (uuid && isValidMachineUuid(uuid)) {
+      return { machineId: uuid };
+    }
+
+    const searchResults = await apiService.searchMachines(trimmed);
+    if (searchResults && searchResults.error) {
+      return { error: searchResults.message };
+    }
+
+    const machines = searchResults.machines || searchResults.results || [];
+    const matches = machines
+      .map((machine) => ({ machine, machineId: getMachineId(machine) }))
+      .filter((entry) => entry.machineId);
+
+    if (matches.length === 1) {
+      return { machineId: matches[0].machineId };
+    }
+
+    if (matches.length > 1) {
+      return { multiple: matches };
+    }
+
+    return { error: 'No machine found. Use /machine <query> to search, then tap Download or send /download <uuid>.' };
+  }
+
+  async sendMachineDownload(bot, chatId, machineId, statusMessageId) {
+    const downloadData = await apiService.downloadMachine(machineId);
+
+    if (downloadData && downloadData.error) {
+      const errorText = `Machine Download\n\nMachine ID: ${machineId}\nStatus: Error\n\n${downloadData.message}`;
+      if (statusMessageId) {
+        bot.editMessageText(errorText, { chat_id: chatId, message_id: statusMessageId });
+      } else {
+        bot.sendMessage(chatId, errorText);
+      }
+      return;
+    }
+
+    if (downloadData && downloadData.buffer) {
+      if (statusMessageId) {
+        bot.deleteMessage(chatId, statusMessageId).catch(() => {});
+      }
+      bot.sendDocument(chatId, downloadData.buffer, {}, {
+        filename: downloadData.filename || `machine_${machineId}.zip`,
+        contentType: downloadData.contentType || 'application/zip'
+      });
+      return;
+    }
+
+    const noDataText = `Machine Download\n\nMachine ID: ${machineId}\nStatus: No Data\n\nNo data available for this machine.`;
+    if (statusMessageId) {
+      bot.editMessageText(noDataText, { chat_id: chatId, message_id: statusMessageId });
+    } else {
+      bot.sendMessage(chatId, noDataText);
+    }
+  }
+
   async handleDownload(bot, msg, match) {
     const chatId = msg.chat.id;
-    const machineId = match[1];
-    
-    bot.sendMessage(chatId, `Downloading machine data...`);
-    
+    const rawInput = match[1].trim();
+
+    const statusMsg = await bot.sendMessage(chatId, 'Downloading machine data...');
+
     try {
-      const downloadData = await apiService.downloadMachine(machineId);
-      
-      if (downloadData && downloadData.error) {
-        bot.sendMessage(chatId, `Error: ${downloadData.message}`);
+      const resolved = await this.resolveMachineId(rawInput);
+
+      if (resolved.error) {
+        bot.editMessageText(`Machine Download\n\nStatus: Error\n\n${resolved.error}`, {
+          chat_id: chatId,
+          message_id: statusMsg.message_id
+        });
         return;
       }
-      
-      if (downloadData && downloadData.buffer) {
-        bot.sendDocument(chatId, downloadData.buffer, {}, {
-          filename: downloadData.filename || `machine_${machineId}.zip`,
-          contentType: downloadData.contentType || 'application/zip'
+
+      if (resolved.multiple) {
+        bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+        bot.sendMessage(chatId, `Multiple machines found for "${rawInput}". Choose one to download:`);
+
+        resolved.multiple.forEach(({ machine, machineId }, index) => {
+          const name = machine.name || machine.hostname || `Machine ${index + 1}`;
+          bot.sendMessage(chatId, `${name}\nID: ${machineId}`, {
+            reply_markup: {
+              inline_keyboard: [[{ text: 'Download Full Data', callback_data: `download_machine_${machineId}` }]]
+            }
+          });
         });
-      } else {
-        bot.sendMessage(chatId, 'No data available for this machine');
+        return;
       }
+
+      await this.sendMachineDownload(bot, chatId, resolved.machineId, statusMsg.message_id);
     } catch (error) {
       console.error('Download error:', error);
-      bot.sendMessage(chatId, 'Failed to download machine data');
+      bot.editMessageText('Failed to download machine data. Please try again.', {
+        chat_id: chatId,
+        message_id: statusMsg.message_id
+      }).catch(() => {
+        bot.sendMessage(chatId, 'Failed to download machine data');
+      });
     }
   }
 
   async handleMachineDownloadCallback(bot, query) {
     const chatId = query.message.chat.id;
-    const machineId = query.data.replace('download_machine_', '');
-    
+    const machineId = extractMachineUuid(query.data.replace('download_machine_', ''));
+
     bot.answerCallbackQuery(query.id, { text: 'Preparing download...' });
-    
-    const downloadMsg = await bot.sendMessage(chatId, `Machine Download\n\nMachine ID: ${machineId}\nStatus: Downloading...\n\nPlease wait...`);
-    
+
+    if (!machineId || !isValidMachineUuid(machineId)) {
+      bot.sendMessage(chatId, 'Invalid machine ID. Run /machine <query> and use the Download button.');
+      return;
+    }
+
+    const downloadMsg = await bot.sendMessage(
+      chatId,
+      `Machine Download\n\nMachine ID: ${machineId}\nStatus: Downloading...\n\nPlease wait...`
+    );
+
     try {
-      const downloadData = await apiService.downloadMachine(machineId);
-      
-      if (downloadData && downloadData.error) {
-        bot.editMessageText(`Machine Download\n\nMachine ID: ${machineId}\nStatus: Error\n\n${downloadData.message}`, {
-          chat_id: chatId,
-          message_id: downloadMsg.message_id
-        });
-        return;
-      }
-      
-      if (downloadData && downloadData.buffer) {
-        bot.deleteMessage(chatId, downloadMsg.message_id);
-        bot.sendDocument(chatId, downloadData.buffer, {}, {
-          filename: downloadData.filename || `machine_${machineId}.zip`,
-          contentType: downloadData.contentType || 'application/zip'
-        });
-      } else {
-        bot.editMessageText(`Machine Download\n\nMachine ID: ${machineId}\nStatus: No Data\n\nNo data available for this machine.`, {
-          chat_id: chatId,
-          message_id: downloadMsg.message_id
-        });
-      }
+      await this.sendMachineDownload(bot, chatId, machineId, downloadMsg.message_id);
     } catch (error) {
       console.error('Download error:', error);
       bot.editMessageText(`Machine Download\n\nMachine ID: ${machineId}\nStatus: Failed\n\nDownload failed. Please try again.`, {
