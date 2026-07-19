@@ -15,10 +15,12 @@ class OSINTService {
 
     if (/^\d{17,19}$/.test(trimmed)) {
       types.push('discord');
+      return types;
     }
 
     if (/^[A-HJ-NPR-Z0-9]{17}$/i.test(trimmed) && /[A-Z]/i.test(trimmed)) {
       types.push('vin');
+      return types;
     }
 
     if (!/^\d{17,}$/.test(trimmed.replace(/\s/g, ''))) {
