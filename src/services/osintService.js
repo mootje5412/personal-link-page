@@ -10,6 +10,7 @@ const {
   extractIpSections,
   extractSnusbaseRecords,
   extractSnusbaseWhois,
+  extractSeekAfRecords,
   hasOnlyMetadata,
   isUsefulRecord
 } = require('../utils/responseParser');
@@ -66,6 +67,7 @@ class OSINTService {
     if (types.includes('email')) return 'email';
     if (types.includes('phone')) return 'phone';
     if (types.includes('ip')) return 'ip';
+    if (types.includes('discord')) return 'discord';
     if (types.includes('username')) return 'username';
     if (/^[a-f0-9]{32}$/i.test(query.trim())) return 'hash';
     return undefined;
@@ -400,20 +402,26 @@ class OSINTService {
   }
 
   appendSeekAfResults(results, response, seen, category) {
-    if (!response || response.error) {
+    if (!response) {
       return;
     }
 
-    if (response.success === false) {
+    if (response.error) {
+      console.error(`SeekAF ${category} skipped: ${response.message || 'request failed'}`);
       return;
     }
 
-    const items = Array.isArray(response.results) ? response.results : [];
+    const items = extractSeekAfRecords(response);
     const sourceLabel = category === 'seekaf-stealer'
       ? 'SeekAF Stealer'
       : category === 'seekaf-deep'
         ? 'SeekAF Deep'
         : 'SeekAF';
+
+    if (items.length === 0 && response.success === false) {
+      console.log(`SeekAF ${category}: no results (${response.message || 'success=false'})`);
+      return;
+    }
 
     items.forEach((item, index) => {
       const text = formatRecordFields({

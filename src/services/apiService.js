@@ -148,6 +148,7 @@ class APIService {
   }
 
   async searchBreach(query) {
+    // GET https://www.osintcat.net/api/breach?query=... with X-API-KEY header (OsintCat docs)
     return this.osintCatGet('/breach', query);
   }
 
@@ -347,9 +348,25 @@ class APIService {
 
   getSeekAfHeaders() {
     return {
-      Authorization: `Bearer ${config.seekAfApiKey}`,
-      'X-API-Key': config.seekAfApiKey
+      'X-API-Key': config.seekAfApiKey,
+      Accept: 'application/json',
+      'User-Agent': config.seekAfUserAgent || 'FindNow-OSINT-Bot/1.0'
     };
+  }
+
+  logSeekAfResponse(path, statusCode, parsed, rawData) {
+    if (statusCode >= 200 && statusCode < 300 && parsed && typeof parsed === 'object') {
+      console.log(
+        `SeekAF ${path} OK | query=${parsed.query || 'n/a'} | total=${parsed.total ?? parsed.results?.length ?? 0} | credits=${parsed.credits_remaining ?? 'n/a'} | search_id=${parsed.search_id || parsed.id || 'n/a'}`
+      );
+      return;
+    }
+
+    const preview = typeof parsed === 'string'
+      ? parsed.substring(0, 160)
+      : JSON.stringify(parsed || {}).substring(0, 300);
+
+    console.error(`SeekAF ${path} HTTP ${statusCode}: ${preview}`);
   }
 
   async seekAfPost(path, body, timeoutMs = config.seekAfTimeoutFast) {
@@ -358,10 +375,20 @@ class APIService {
     }
 
     const url = `${config.seekAfBaseUrl}${path}`;
-    return this.requestJson(url, {
+    console.log(`SeekAF request POST ${url}: ${JSON.stringify(body)}`);
+
+    const response = await this.requestJson(url, {
       method: 'POST',
       headers: this.getSeekAfHeaders()
     }, body, timeoutMs);
+
+    if (response && response.error) {
+      console.error(`SeekAF ${path} failed: ${response.message}`);
+    } else {
+      this.logSeekAfResponse(path, 200, response);
+    }
+
+    return response;
   }
 
   async seekAfSearch(query, type, limit = config.seekAfSearchLimit) {

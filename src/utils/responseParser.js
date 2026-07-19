@@ -223,6 +223,39 @@ function extractSnusbaseRecords(response) {
   return records;
 }
 
+function extractSeekAfRecords(response) {
+  if (!response || response.error) {
+    return [];
+  }
+
+  if (response.success === false) {
+    return [];
+  }
+
+  const candidates = [
+    response.results,
+    response.data && response.data.results,
+    response.data && response.data.data,
+    response.data,
+    response.items,
+    response.hits
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length > 0) {
+      return candidate;
+    }
+  }
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  return [];
+}
+
 function extractSnusbaseWhois(response, query) {
   const payload = response.data || response;
   const sections = [];
@@ -256,5 +289,6 @@ module.exports = {
   hasOnlyMetadata,
   extractIpSections,
   extractSnusbaseRecords,
-  extractSnusbaseWhois
+  extractSnusbaseWhois,
+  extractSeekAfRecords
 };
