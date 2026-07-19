@@ -98,6 +98,10 @@ class OSINTService {
       return [];
     }
 
+    if (response.error === true) {
+      return [];
+    }
+
     if (response.error && typeof response.error === 'string') {
       return [];
     }
@@ -149,7 +153,10 @@ class OSINTService {
         'username', 'user_id', 'email', 'password', 'id', 'name', 'vin',
         'make', 'model', 'display_name', 'discriminator', 'created_at',
         'file_count', 'total_size', 'imported_at', 'profile_url', 'bio',
-        'avatar', 'banner', 'premium_type', 'badges'
+        'avatar', 'banner', 'premium_type', 'badges',
+        'roblox_name', 'discord_id', 'discord_username', 'discord_avatar',
+        'ip', 'country', 'city', 'region', 'isp', 'org', 'asn', 'hostname',
+        'latitude', 'longitude', 'source', 'breach_date'
       ].includes(key));
 
       if (looksLikeRecord) {
@@ -201,9 +208,11 @@ class OSINTService {
     console.log(`Unified search for: ${query}`);
     console.log(`Detected types: ${types.join(', ')}`);
 
+    const stealerType = query.includes('@') ? 'email' : 'domain';
+
     const tasks = [
       apiService.searchBreach(query).then((data) => ({ name: 'breach', data })),
-      apiService.searchDatabase(query).then((data) => ({ name: 'database', data }))
+      apiService.searchStealerLogs(query, stealerType).then((data) => ({ name: 'stealer', data }))
     ];
 
     if (types.includes('email')) {
@@ -224,6 +233,10 @@ class OSINTService {
       tasks.push(apiService.searchDiscordToRoblox(query).then((data) => ({ name: 'discord-to-roblox', data })));
     }
 
+    if (types.includes('ip')) {
+      tasks.push(apiService.searchIP(query).then((data) => ({ name: 'ip', data })));
+    }
+
     if (types.includes('vin')) {
       tasks.push(apiService.searchVIN(query).then((data) => ({ name: 'vin', data })));
     }
@@ -236,7 +249,6 @@ class OSINTService {
       tasks.push(apiService.searchRoblox(query).then((data) => ({ name: 'roblox', data })));
     }
 
-    tasks.push(apiService.searchStealerLogs(query, types.includes('email') ? 'email' : 'domain').then((data) => ({ name: 'stealer', data })));
     tasks.push(apiService.searchMachines(query).then((data) => ({ name: 'machine', data })));
 
     const settled = await Promise.allSettled(tasks);
