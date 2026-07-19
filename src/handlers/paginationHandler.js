@@ -1,58 +1,76 @@
 class PaginationHandler {
   constructor() {
     this.sessions = new Map();
-    this.ITEMS_PER_PAGE = 10;
-    
-    // Clear all sessions on startup
-    console.log('Pagination handler initialized - all sessions cleared');
-    
-    // Clear sessions after 2 minutes of inactivity
+    this.ITEMS_PER_PAGE = 5;
+    this.MAX_MESSAGE_LENGTH = 3900;
+    this.MAX_ITEM_LENGTH = 700;
+
     setInterval(() => {
       const now = Date.now();
       for (const [chatId, session] of this.sessions.entries()) {
-        if (now - session.timestamp > 2 * 60 * 1000) {
+        if (now - session.timestamp > 5 * 60 * 1000) {
           this.sessions.delete(chatId);
-          console.log(`Cleared session for chat ${chatId}`);
         }
       }
-    }, 30000); // Check every 30 seconds
+    }, 30000);
   }
 
   clearSession(chatId) {
     this.sessions.delete(chatId);
-    console.log(`Manually cleared session for chat ${chatId}`);
   }
 
   clearAllSessions() {
     this.sessions.clear();
-    console.log('All sessions cleared');
+  }
+
+  truncateItem(item) {
+    if (typeof item !== 'string') {
+      return String(item);
+    }
+    if (item.length <= this.MAX_ITEM_LENGTH) {
+      return item;
+    }
+    return `${item.substring(0, this.MAX_ITEM_LENGTH)}\n...(truncated)`;
+  }
+
+  buildPageMessage(query, pageResults, page, totalPages, totalResults, startIndex) {
+    let message = `Results for: ${query}\n`;
+    message += `Page ${page + 1} of ${totalPages} | Total: ${totalResults}\n`;
+    message += `${'─'.repeat(28)}\n\n`;
+
+    for (let index = 0; index < pageResults.length; index += 1) {
+      const item = pageResults[index];
+      const globalIndex = startIndex + index + 1;
+      const block = `[${globalIndex}]\n${this.truncateItem(item)}\n\n`;
+
+      if (message.length + block.length > this.MAX_MESSAGE_LENGTH) {
+        message += '\n...message limit reached. Use Next for more results.';
+        break;
+      }
+
+      message += block;
+    }
+
+    return message.trim();
   }
 
   sendPaginatedResults(bot, chatId, query, results, page = 0) {
-    const totalPages = Math.ceil(results.length / this.ITEMS_PER_PAGE);
-    const start = page * this.ITEMS_PER_PAGE;
-    const end = start + this.ITEMS_PER_PAGE;
-    const pageResults = results.slice(start, end);
+    const totalPages = Math.max(1, Math.ceil(results.length / this.ITEMS_PER_PAGE));
+    const safePage = Math.min(page, totalPages - 1);
+    const start = safePage * this.ITEMS_PER_PAGE;
+    const pageResults = results.slice(start, start + this.ITEMS_PER_PAGE);
 
-    this.sessions.set(chatId, { 
-      query, 
-      results, 
-      page,
+    this.sessions.set(chatId, {
+      query,
+      results,
+      page: safePage,
       timestamp: Date.now()
     });
 
-    let message = `Results for: ${query}\n`;
-    message += `Page ${page + 1} of ${totalPages}\n`;
-    message += `Total results: ${results.length}\n\n`;
+    const message = this.buildPageMessage(query, pageResults, safePage, totalPages, results.length, start);
+    const keyboard = this.createKeyboard(safePage, totalPages);
 
-    pageResults.forEach((item, index) => {
-      const globalIndex = start + index + 1;
-      message += `${globalIndex}. ${item}\n\n`;
-    });
-
-    const keyboard = this.createKeyboard(page, totalPages);
-
-    bot.sendMessage(chatId, message, {
+    return bot.sendMessage(chatId, message, {
       reply_markup: keyboard,
       disable_web_page_preview: true
     });
@@ -63,7 +81,7 @@ class PaginationHandler {
 
     if (page > 0) {
       buttons.push({
-        text: 'Back',
+        text: '◀ Back',
         callback_data: `page_${page - 1}`
       });
     }
@@ -75,7 +93,7 @@ class PaginationHandler {
 
     if (page < totalPages - 1) {
       buttons.push({
-        text: 'Next',
+        text: 'Next ▶',
         callback_data: `page_${page + 1}`
       });
     }
@@ -95,46 +113,48 @@ class PaginationHandler {
       return;
     }
 
-    if (data.startsWith('page_')) {
-      const page = parseInt(data.split('_')[1]);
-      const session = this.sessions.get(chatId);
-
-      if (!session) {
-        bot.answerCallbackQuery(callbackQuery.id, { 
-          text: 'Session expired. Please search again.',
-          show_alert: true 
-        });
-        return;
-      }
-
-      const totalPages = Math.ceil(session.results.length / this.ITEMS_PER_PAGE);
-      const start = page * this.ITEMS_PER_PAGE;
-      const end = start + this.ITEMS_PER_PAGE;
-      const pageResults = session.results.slice(start, end);
-
-      session.page = page;
-      session.timestamp = Date.now(); // Update timestamp on interaction
-
-      let message = `Results for: ${session.query}\n`;
-      message += `Page ${page + 1} of ${totalPages}\n`;
-      message += `Total results: ${session.results.length}\n\n`;
-
-      pageResults.forEach((item, index) => {
-        const globalIndex = start + index + 1;
-        message += `${globalIndex}. ${item}\n\n`;
-      });
-
-      const keyboard = this.createKeyboard(page, totalPages);
-
-      bot.editMessageText(message, {
-        chat_id: chatId,
-        message_id: messageId,
-        reply_markup: keyboard,
-        disable_web_page_preview: true
-      });
-
+    if (!data.startsWith('page_')) {
       bot.answerCallbackQuery(callbackQuery.id);
+      return;
     }
+
+    const page = parseInt(data.split('_')[1], 10);
+    const session = this.sessions.get(chatId);
+
+    if (!session) {
+      bot.answerCallbackQuery(callbackQuery.id, {
+        text: 'Session expired. Search again.',
+        show_alert: true
+      });
+      return;
+    }
+
+    const totalPages = Math.max(1, Math.ceil(session.results.length / this.ITEMS_PER_PAGE));
+    const safePage = Math.min(Math.max(page, 0), totalPages - 1);
+    const start = safePage * this.ITEMS_PER_PAGE;
+    const pageResults = session.results.slice(start, start + this.ITEMS_PER_PAGE);
+
+    session.page = safePage;
+    session.timestamp = Date.now();
+
+    const message = this.buildPageMessage(
+      session.query,
+      pageResults,
+      safePage,
+      totalPages,
+      session.results.length,
+      start
+    );
+    const keyboard = this.createKeyboard(safePage, totalPages);
+
+    bot.editMessageText(message, {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: keyboard,
+      disable_web_page_preview: true
+    });
+
+    bot.answerCallbackQuery(callbackQuery.id);
   }
 }
 

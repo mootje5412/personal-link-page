@@ -1,4 +1,5 @@
 const apiService = require('../services/apiService');
+const osintService = require('../services/osintService');
 const userService = require('../services/userService');
 const config = require('../../config/config');
 const { getMachineId, getDownloadCommand, extractMachineUuid, isValidMachineUuid } = require('../utils/machineUtils');
@@ -281,15 +282,14 @@ To purchase, contact @strafbaar on Telegram`;
   async handleMachine(bot, msg, match) {
     const chatId = msg.chat.id;
     const query = match[1].trim();
-    
-    const statusMsg = await bot.sendMessage(chatId, `Machine Search\n\nSearching for: ${query}\nPlease wait...`);
-    
+
+    const statusMsg = await bot.sendMessage(chatId, `Machine Search\n\nSearching: ${query}...`);
+
     try {
       const machineResults = await apiService.searchMachines(query);
-      
+
       if (machineResults && machineResults.error) {
-        const errorMsg = `Machine Search\n\nQuery: ${query}\nStatus: Error\n\n${machineResults.message}`;
-        bot.editMessageText(errorMsg, {
+        bot.editMessageText(`Machine Search\n\nQuery: ${query}\nError: ${machineResults.message}`, {
           chat_id: chatId,
           message_id: statusMsg.message_id
         });
@@ -297,61 +297,39 @@ To purchase, contact @strafbaar on Telegram`;
       }
 
       const machines = machineResults.machines || machineResults.results || [];
-      
-      if (machines.length > 0) {
-        bot.deleteMessage(chatId, statusMsg.message_id);
-        
-        const totalResults = machines.length;
-        bot.sendMessage(chatId, `Machine Search Results\n\nFound ${totalResults} machine(s) for: ${query}`);
-        
-        machines.forEach((machine, index) => {
-          let machineInfo = `Machine ${index + 1} of ${totalResults}\n\n`;
-          
-          // Build machine info with better formatting
-          Object.keys(machine).forEach((key) => {
-            const value = machine[key];
-            if (value !== null && value !== undefined) {
-              if (key === 'id' || key === 'machine_id') {
-                machineInfo += `ID: ${value}\n`;
-              } else if (typeof value === 'string') {
-                machineInfo += `${key}: ${value}\n`;
-              } else if (typeof value === 'number') {
-                machineInfo += `${key}: ${value}\n`;
-              } else if (Array.isArray(value)) {
-                machineInfo += `${key}: ${value.join(', ')}\n`;
-              }
-            }
-          });
-          
-          const machineId = getMachineId(machine);
 
-          if (!machineId) {
-            bot.sendMessage(chatId, machineInfo || 'No details available');
-            return;
-          }
-
-          const keyboard = {
-            inline_keyboard: [
-              [
-                {
-                  text: 'Download Full Data',
-                  callback_data: `download_machine_${machineId}`
-                }
-              ]
-            ]
-          };
-
-          bot.sendMessage(chatId, machineInfo || 'No details available', { reply_markup: keyboard });
-        });
-      } else {
-        bot.editMessageText(`Machine Search\n\nQuery: ${query}\nStatus: No Results\n\nNo machines found matching your query.`, {
+      if (machines.length === 0) {
+        bot.editMessageText(`Machine Search\n\nQuery: ${query}\nNo machines found.`, {
           chat_id: chatId,
           message_id: statusMsg.message_id
         });
+        return;
       }
+
+      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+      bot.sendMessage(chatId, `Found ${machines.length} machine(s) for: ${query}`);
+
+      machines.forEach((machine, index) => {
+        const machineInfo = osintService.formatMachineRecord(machine);
+        const machineId = getMachineId(machine);
+
+        if (!machineId) {
+          bot.sendMessage(chatId, `[${index + 1}] ${machineInfo}`);
+          return;
+        }
+
+        bot.sendMessage(chatId, `[${index + 1}] ${machineInfo}`, {
+          reply_markup: {
+            inline_keyboard: [[{
+              text: 'Download Full Data',
+              callback_data: `download_machine_${machineId}`
+            }]]
+          }
+        });
+      });
     } catch (error) {
       console.error('Machine search error:', error);
-      bot.editMessageText(`Machine Search\n\nQuery: ${query}\nStatus: Failed\n\nAn error occurred. Please try again.`, {
+      bot.editMessageText(`Machine Search\n\nQuery: ${query}\nFailed. Please try again.`, {
         chat_id: chatId,
         message_id: statusMsg.message_id
       });

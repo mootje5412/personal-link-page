@@ -10,7 +10,7 @@ module.exports = {
   snusbaseApiKey: 'sbmeovhou6ecsn9fd9wcwnwwvvwnc',
   snusbaseBaseUrl: 'https://api.snusbase.com',
   
-  // Bot settings
+  apiTimeoutMs: 8000,
   botName: 'FindNow OSINT Bot',
   version: '1.0.0',
   

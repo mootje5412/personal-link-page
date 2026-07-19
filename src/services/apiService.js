@@ -1,10 +1,12 @@
 const https = require('https');
 const config = require('../../config/config');
 
+const API_TIMEOUT_MS = config.apiTimeoutMs || 8000;
+
 class APIService {
-  makeRequest(url, headers) {
+  makeRequest(url, headers, timeoutMs = API_TIMEOUT_MS) {
     return new Promise((resolve, reject) => {
-      https.get(url, { headers }, (res) => {
+      const req = https.get(url, { headers, timeout: timeoutMs }, (res) => {
         let data = '';
 
         res.on('data', (chunk) => {
@@ -28,8 +30,17 @@ class APIService {
 
           resolve(parsed);
         });
-      }).on('error', (error) => {
-        reject(error);
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({ error: true, message: 'Request timed out' });
+      });
+
+      req.on('error', (error) => {
+        if (error.message !== 'Request timed out') {
+          reject(error);
+        }
       });
     });
   }
@@ -42,9 +53,7 @@ class APIService {
         'X-API-KEY': config.osintCatApiKey
       };
 
-      console.log(`Calling OSINT Cat API: ${url}`);
       const data = await this.makeRequest(url, headers);
-      console.log('OSINT Cat response:', JSON.stringify(data).substring(0, 1000));
 
       if (data && data.error === true) {
         return data;
@@ -52,7 +61,7 @@ class APIService {
 
       if (data && typeof data.error === 'string') {
         const lower = data.error.toLowerCase();
-        if (lower.includes('no matches') || lower.includes('not found')) {
+        if (lower.includes('no matches') || lower.includes('not found') || lower.includes('no results')) {
           return data;
         }
         console.error('API Error:', data.error, data.message);
@@ -90,9 +99,7 @@ class APIService {
         'X-API-KEY': config.osintCatApiKey
       };
 
-      console.log(`Downloading machine: ${url}`);
-
-      https.get(url, { headers }, (res) => {
+      const req = https.get(url, { headers, timeout: 60000 }, (res) => {
         const chunks = [];
 
         res.on('data', (chunk) => {
@@ -120,7 +127,14 @@ class APIService {
             filename: `machine_${machineId}.zip`
           });
         });
-      }).on('error', (error) => {
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({ error: true, message: 'Download timed out' });
+      });
+
+      req.on('error', (error) => {
         console.error('Machine download error:', error.message);
         resolve({ error: true, message: error.message });
       });
@@ -161,10 +175,7 @@ class APIService {
         wildcard: false
       });
 
-      console.log(`Searching for ${searchType}: ${query}`);
-      console.log('Request payload:', postData);
-
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         const urlObj = new URL(url);
         const options = {
           hostname: urlObj.hostname,
@@ -173,13 +184,12 @@ class APIService {
           headers: {
             ...headers,
             'Content-Length': Buffer.byteLength(postData)
-          }
+          },
+          timeout: API_TIMEOUT_MS
         };
 
         const req = https.request(options, (res) => {
           let data = '';
-
-          console.log(`Response status code: ${res.statusCode}`);
 
           res.on('data', (chunk) => {
             data += chunk;
@@ -188,23 +198,24 @@ class APIService {
           res.on('end', () => {
             try {
               const parsed = JSON.parse(data);
-              console.log('Search response:', JSON.stringify(parsed).substring(0, 1000));
 
               if (res.statusCode !== 200) {
-                console.error('Search error:', parsed);
                 resolve({ error: true, message: parsed.message || `HTTP ${res.statusCode}`, data: parsed });
               } else {
                 resolve(parsed);
               }
             } catch (error) {
-              console.error('Failed to parse response:', data.substring(0, 500));
               resolve({ error: true, message: 'Failed to parse response', data });
             }
           });
         });
 
+        req.on('timeout', () => {
+          req.destroy();
+          resolve({ error: true, message: 'Request timed out' });
+        });
+
         req.on('error', (error) => {
-          console.error('Request error:', error);
           resolve({ error: true, message: error.message });
         });
 
@@ -212,7 +223,6 @@ class APIService {
         req.end();
       });
     } catch (error) {
-      console.error('Search error:', error.message);
       return { error: true, message: error.message };
     }
   }

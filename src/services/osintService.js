@@ -49,28 +49,262 @@ class OSINTService {
     return types;
   }
 
-  formatItem(item, index = 0) {
-    if (index === 0) {
-      console.log('Sample item structure:', JSON.stringify(item));
+  buildSearchTasks(query, types) {
+    const tasks = [];
+    const stealerType = query.includes('@') ? 'email' : 'domain';
+
+    tasks.push({ name: 'breach', run: () => apiService.searchBreach(query) });
+    tasks.push({ name: 'stealer', run: () => apiService.searchStealerLogs(query, stealerType) });
+
+    if (types.includes('discord')) {
+      tasks.push({ name: 'discord', run: () => apiService.searchDiscord(query) });
+      tasks.push({ name: 'discord-to-roblox', run: () => apiService.searchDiscordToRoblox(query) });
+      return tasks;
     }
 
+    if (types.includes('vin')) {
+      tasks.push({ name: 'vin', run: () => apiService.searchVIN(query) });
+      return tasks;
+    }
+
+    if (types.includes('ip')) {
+      tasks.push({ name: 'ip', run: () => apiService.searchIP(query) });
+    }
+
+    if (types.includes('phone')) {
+      tasks.push({ name: 'snusbase', run: () => apiService.snusbaseSearch(query, 'phone') });
+      tasks.push({ name: 'phone-osint', run: () => apiService.searchPhoneOSINT(query) });
+    } else if (types.includes('email')) {
+      tasks.push({ name: 'snusbase', run: () => apiService.snusbaseSearch(query, 'email') });
+    } else if (types.includes('username')) {
+      tasks.push({ name: 'snusbase', run: () => apiService.snusbaseSearch(query, 'username') });
+    } else if (types.includes('name')) {
+      tasks.push({ name: 'snusbase', run: () => apiService.snusbaseSearch(query, 'name') });
+    } else if (types.includes('roblox')) {
+      tasks.push({ name: 'snusbase', run: () => apiService.snusbaseSearch(query, 'username') });
+    } else {
+      tasks.push({ name: 'snusbase', run: () => apiService.snusbaseSearch(query, 'email') });
+    }
+
+    if (types.includes('roblox') || types.includes('username')) {
+      tasks.push({ name: 'roblox', run: () => apiService.searchRoblox(query) });
+    }
+
+    return tasks;
+  }
+
+  addUniqueResult(results, seen, formatted, key) {
+    const dedupeKey = key || formatted;
+    if (!dedupeKey || seen.has(dedupeKey)) {
+      return false;
+    }
+    seen.add(dedupeKey);
+    results.push(formatted);
+    return true;
+  }
+
+  formatDiscordUsername(info) {
+    if (!info.username) {
+      return null;
+    }
+    if (info.discriminator && info.discriminator !== '0') {
+      return `${info.username}#${info.discriminator}`;
+    }
+    return `@${info.username}`;
+  }
+
+  formatDiscordAvatar(info) {
+    const userId = info.id || info.user_id;
+    if (!info.avatar) {
+      return null;
+    }
+    if (String(info.avatar).startsWith('http')) {
+      return info.avatar;
+    }
+    if (userId) {
+      return `https://cdn.discordapp.com/avatars/${userId}/${info.avatar}.png?size=256`;
+    }
+    return info.avatar;
+  }
+
+  formatDiscordProfile(info) {
+    if (!info || typeof info !== 'object') {
+      return null;
+    }
+
+    const lines = ['Discord Profile'];
+    const username = this.formatDiscordUsername(info);
+    const displayName = info.display_name || info.global_name || info.nick;
+
+    if (displayName) {
+      lines.push(`Display Name: ${displayName}`);
+    }
+    if (username) {
+      lines.push(`Username: ${username}`);
+    }
+    if (info.id || info.user_id) {
+      lines.push(`User ID: ${info.id || info.user_id}`);
+    }
+
+    const avatar = this.formatDiscordAvatar(info);
+    if (avatar) {
+      lines.push(`Avatar: ${avatar}`);
+    }
+    if (info.banner) {
+      lines.push(`Banner: ${info.banner}`);
+    }
+    if (info.bio) {
+      lines.push(`Bio: ${info.bio}`);
+    }
+    if (info.premium_type) {
+      const nitro = info.premium_type === 2 ? 'Nitro' : info.premium_type === 1 ? 'Nitro Classic' : 'None';
+      lines.push(`Nitro: ${nitro}`);
+    }
+    if (info.badges && info.badges.length) {
+      lines.push(`Badges: ${Array.isArray(info.badges) ? info.badges.join(', ') : info.badges}`);
+    }
+    if (info.created_at) {
+      lines.push(`Created: ${info.created_at}`);
+    }
+    if (info.profile_url) {
+      lines.push(`Profile: ${info.profile_url}`);
+    }
+    if (info.public_flags !== undefined && info.public_flags !== null) {
+      lines.push(`Public Flags: ${info.public_flags}`);
+    }
+
+    return lines.length > 1 ? lines.join('\n') : null;
+  }
+
+  formatRobloxProfile(item) {
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+
+    const lines = ['Roblox Profile'];
+    const robloxName = item.roblox_name || item.roblox_username || item.username || item.name;
+    const robloxId = item.roblox_id || item.user_id || item.id;
+
+    if (robloxName) {
+      lines.push(`Roblox Username: ${robloxName}`);
+    }
+    if (robloxId && !String(robloxId).match(/^\d{17,19}$/)) {
+      lines.push(`Roblox ID: ${robloxId}`);
+    }
+
+    if (item.discord_id) {
+      lines.push(`Linked Discord ID: ${item.discord_id}`);
+      if (item.discord_username) {
+        lines.push(`Discord Username: @${item.discord_username}`);
+      }
+      if (item.discord_avatar) {
+        lines.push(`Discord Avatar: ${item.discord_avatar}`);
+      }
+    } else if (item.discord_username) {
+      lines.push(`Discord Username: @${item.discord_username}`);
+    } else if (robloxName) {
+      lines.push('Linked Discord: Not found');
+    }
+
+    return lines.length > 1 ? lines.join('\n') : null;
+  }
+
+  formatDiscordToRobloxProfile(response) {
+    if (!response || typeof response !== 'object' || response.error) {
+      return null;
+    }
+
+    const lines = ['Discord to Roblox Link'];
+    const robloxName = response.roblox_username || response.roblox_name || response.username;
+    const robloxId = response.roblox_id || response.user_id;
+    const discordId = response.discord_id || response.query;
+
+    if (robloxName) {
+      lines.push(`Roblox Username: ${robloxName}`);
+    }
+    if (robloxId) {
+      lines.push(`Roblox ID: ${robloxId}`);
+    }
+    if (discordId) {
+      lines.push(`Discord ID: ${discordId}`);
+    }
+    if (response.profile_url) {
+      lines.push(`Profile: ${response.profile_url}`);
+    }
+
+    return lines.length > 1 ? lines.join('\n') : null;
+  }
+
+  formatBreachRecord(item, sourceLabel) {
+    if (!item || typeof item !== 'object') {
+      return typeof item === 'string' ? item : null;
+    }
+
+    const lines = [];
+    if (sourceLabel) {
+      lines.push(`Source: ${sourceLabel}`);
+    }
+    if (item.source) {
+      lines.push(`Database: ${item.source}`);
+    }
+    if (item.email) {
+      lines.push(`Email: ${item.email}`);
+    }
+    if (item.username) {
+      lines.push(`Username: ${item.username}`);
+    }
+    if (item.password) {
+      lines.push(`Password: ${item.password}`);
+    }
+    if (item.phone) {
+      lines.push(`Phone: ${item.phone}`);
+    }
+    if (item.ip) {
+      lines.push(`IP: ${item.ip}`);
+    }
+    if (item.name && !item.roblox_name) {
+      lines.push(`Name: ${item.name}`);
+    }
+    if (item.breach_date) {
+      lines.push(`Breach Date: ${item.breach_date}`);
+    }
+    if (item.url) {
+      lines.push(`URL: ${item.url}`);
+    }
+
+    if (lines.length === 0) {
+      return this.formatGenericRecord(item);
+    }
+
+    return lines.join('\n');
+  }
+
+  formatGenericRecord(item) {
     if (typeof item === 'string') {
       return item;
     }
 
+    const skipKeys = new Set([
+      '_meta', 'api', 'elapsed_ms', 'timestamp', 'results_count',
+      'execution_time', 'query', 'total', 'success', 'message', 'mode',
+      'Count', 'Message', 'SearchCriteria', 'count'
+    ]);
+
     const lines = [];
-
     Object.keys(item).forEach((key) => {
-      const value = item[key];
+      if (skipKeys.has(key)) {
+        return;
+      }
 
-      if (value === null || value === undefined) return;
+      const value = item[key];
+      if (value === null || value === undefined || value === '') {
+        return;
+      }
 
       if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
         lines.push(`${key}: ${value}`);
       } else if (Array.isArray(value)) {
         lines.push(`${key}: ${value.join(', ')}`);
-      } else if (typeof value === 'object') {
-        lines.push(`${key}: ${JSON.stringify(value)}`);
       }
     });
 
@@ -82,8 +316,10 @@ class OSINTService {
       return null;
     }
 
-    const lines = [];
-    if (response.SearchCriteria) lines.push(`SearchCriteria: ${response.SearchCriteria}`);
+    const lines = ['VIN Decode'];
+    if (response.SearchCriteria) {
+      lines.push(`VIN: ${response.SearchCriteria}`);
+    }
 
     response.Results.forEach((row) => {
       if (row && row.Variable && row.Value && row.Value !== 'Not Applicable' && row.Value !== '') {
@@ -91,95 +327,176 @@ class OSINTService {
       }
     });
 
-    return lines.length > 0 ? lines.join('\n') : null;
+    return lines.length > 1 ? lines.join('\n') : null;
   }
 
-  extractOsintCatResults(response) {
-    if (!response || typeof response !== 'object') {
-      return [];
+  formatMachineRecord(machine) {
+    const lines = ['Machine Record'];
+    if (machine.name) {
+      lines.push(`Name: ${machine.name}`);
+    }
+    if (machine.id || machine.machine_id) {
+      lines.push(`ID: ${machine.id || machine.machine_id}`);
+    }
+    if (machine.file_count !== undefined) {
+      lines.push(`Files: ${machine.file_count}`);
+    }
+    if (machine.total_size !== undefined) {
+      lines.push(`Size: ${machine.total_size} bytes`);
+    }
+    if (machine.imported_at) {
+      lines.push(`Imported: ${machine.imported_at}`);
     }
 
-    if (response.error === true) {
-      return [];
+    const machineId = getMachineId(machine);
+    if (machineId) {
+      lines.push(`Download: ${getDownloadCommand(machineId)}`);
     }
 
+    return lines.join('\n');
+  }
+
+  appendDiscordResults(results, response, seen) {
+    if (!response || response.error === true) {
+      return;
+    }
     if (response.error && typeof response.error === 'string') {
-      return [];
+      return;
     }
 
-    const items = [];
-    const skipKeys = new Set([
-      '_meta', 'api', 'elapsed_ms', 'timestamp', 'results_count',
-      'execution_time', 'query', 'total', 'success', 'message', 'mode',
-      'Count', 'Message', 'SearchCriteria'
-    ]);
+    if (response.user_info) {
+      const profile = this.formatDiscordProfile(response.user_info);
+      if (profile) {
+        const userId = response.user_info.id || response.user_info.user_id || 'profile';
+        this.addUniqueResult(results, seen, profile, `discord-profile:${userId}`);
+      }
+    }
 
-    const pushItem = (item) => {
-      if (item === null || item === undefined) return;
-      if (typeof item === 'object' && Object.keys(item).length === 0) return;
-      items.push(item);
-    };
+    const collections = [
+      response.breach_data,
+      response.results,
+      response.data,
+      response.leaks
+    ];
+
+    collections.forEach((collection) => {
+      if (!Array.isArray(collection)) {
+        return;
+      }
+
+      collection.forEach((item, index) => {
+        if (item && item.username && (item.id || item.user_id) && !item.email && !item.password) {
+          const profile = this.formatDiscordProfile(item);
+          if (profile) {
+            this.addUniqueResult(results, seen, profile, `discord-item-profile:${item.id || item.user_id || index}`);
+            return;
+          }
+        }
+
+        const formatted = this.formatBreachRecord(item, 'Discord Leak');
+        if (formatted) {
+          const key = `discord-leak:${item.email || ''}:${item.username || ''}:${item.password || ''}:${item.source || index}`;
+          this.addUniqueResult(results, seen, formatted, key);
+        }
+      });
+    });
+
+    if (results.length === 0 || !response.user_info) {
+      const profile = this.formatDiscordProfile(response);
+      if (profile) {
+        this.addUniqueResult(results, seen, profile, `discord-root:${response.id || response.user_id || 'root'}`);
+      }
+    }
+  }
+
+  appendRobloxResults(results, response, seen, sourceName) {
+    if (!response || response.error === true) {
+      return;
+    }
+    if (response.error && typeof response.error === 'string') {
+      return;
+    }
+
+    if (sourceName === 'discord-to-roblox') {
+      const linked = this.formatDiscordToRobloxProfile(response);
+      if (linked) {
+        this.addUniqueResult(results, seen, linked, `d2r:${response.roblox_id || response.roblox_username || response.query}`);
+      }
+    }
+
+    const matches = Array.isArray(response.results) ? response.results : [];
+    matches.forEach((item, index) => {
+      const profile = this.formatRobloxProfile(item);
+      if (profile) {
+        const key = `roblox:${item.roblox_name || item.roblox_username || item.discord_id || index}`;
+        this.addUniqueResult(results, seen, profile, key);
+      }
+    });
+
+    if (matches.length === 0) {
+      const profile = this.formatRobloxProfile(response) || this.formatDiscordToRobloxProfile(response);
+      if (profile) {
+        this.addUniqueResult(results, seen, profile, `roblox-root:${response.roblox_name || response.query || 'root'}`);
+      }
+    }
+  }
+
+  appendOsintCatResponse(results, response, seen, sourceName) {
+    if (!response || response.error === true) {
+      return;
+    }
+    if (response.error && typeof response.error === 'string') {
+      return;
+    }
 
     const vinFormatted = this.formatVinResults(response);
     if (vinFormatted) {
-      items.push(vinFormatted);
-      return items;
+      this.addUniqueResult(results, seen, vinFormatted, `vin:${response.SearchCriteria || 'decode'}`);
+      return;
     }
 
-    ['results', 'machines', 'breach_data', 'data'].forEach((key) => {
-      const value = response[key];
-      if (Array.isArray(value)) {
-        value.forEach(pushItem);
-      } else if (value && typeof value === 'object') {
-        pushItem(value);
+    const collections = [
+      { items: response.breach_data, label: 'Breach' },
+      { items: response.results, label: sourceName || 'Result' },
+      { items: response.data, label: sourceName || 'Data' },
+      { items: response.machines, label: 'Machine' }
+    ];
+
+    collections.forEach(({ items, label }) => {
+      if (!Array.isArray(items)) {
+        return;
       }
+
+      items.forEach((item, index) => {
+        let formatted;
+        if (label === 'Machine') {
+          formatted = this.formatMachineRecord(item);
+        } else {
+          formatted = this.formatBreachRecord(item, label);
+        }
+
+        if (formatted) {
+          const key = `${label}:${item.email || ''}:${item.username || ''}:${item.password || ''}:${item.id || item.name || index}`;
+          this.addUniqueResult(results, seen, formatted, key);
+        }
+      });
     });
 
-    if (response.user_info && typeof response.user_info === 'object') {
-      pushItem(response.user_info);
+    if (response.user_info) {
+      const profile = this.formatDiscordProfile(response.user_info);
+      if (profile) {
+        this.addUniqueResult(results, seen, profile, `profile:${response.user_info.id || response.user_info.user_id}`);
+      }
     }
 
     if (Array.isArray(response.Results) && response.Results[0] && response.Results[0].Variable) {
-      response.Results.forEach((row) => {
-        if (row && row.Variable && row.Value) {
-          pushItem({ [row.Variable]: row.Value });
-        }
-      });
-      return items;
+      return;
     }
 
-    if (items.length === 0) {
-      const keys = Object.keys(response).filter((key) => !skipKeys.has(key));
-      const looksLikeRecord = keys.some((key) => [
-        'username', 'user_id', 'email', 'password', 'id', 'name', 'vin',
-        'make', 'model', 'display_name', 'discriminator', 'created_at',
-        'file_count', 'total_size', 'imported_at', 'profile_url', 'bio',
-        'avatar', 'banner', 'premium_type', 'badges',
-        'roblox_name', 'discord_id', 'discord_username', 'discord_avatar',
-        'ip', 'country', 'city', 'region', 'isp', 'org', 'asn', 'hostname',
-        'latitude', 'longitude', 'source', 'breach_date'
-      ].includes(key));
-
-      if (looksLikeRecord) {
-        pushItem(response);
-      }
+    const generic = this.formatGenericRecord(response);
+    if (generic && !generic.startsWith('{')) {
+      this.addUniqueResult(results, seen, generic, `generic:${sourceName}:${response.query || generic.substring(0, 80)}`);
     }
-
-    return items;
-  }
-
-  appendOsintCatResponse(results, response, seen) {
-    const items = this.extractOsintCatResults(response);
-
-    items.forEach((item) => {
-      const formatted = typeof item === 'string' ? item : this.formatItem(item);
-      if (!seen.has(formatted)) {
-        seen.add(formatted);
-        results.push(formatted);
-      }
-    });
-
-    return items.length;
   }
 
   appendSnusbaseResults(results, response, seen) {
@@ -189,105 +506,81 @@ class OSINTService {
 
     Object.keys(response.results).forEach((dbName) => {
       const dbResults = response.results[dbName];
-      if (Array.isArray(dbResults)) {
-        dbResults.forEach((item) => {
-          const formatted = this.formatItem(item);
-          if (!seen.has(formatted)) {
-            seen.add(formatted);
-            results.push(formatted);
-          }
-        });
+      if (!Array.isArray(dbResults)) {
+        return;
       }
+
+      dbResults.forEach((item, index) => {
+        const formatted = this.formatBreachRecord({ ...item, source: dbName }, 'Snusbase');
+        const key = `snusbase:${dbName}:${item.email || ''}:${item.username || ''}:${item.password || ''}:${index}`;
+        this.addUniqueResult(results, seen, formatted, key);
+      });
     });
   }
 
-  async search(query) {
+  processTaskResult(name, data, results, seen) {
+    if (name === 'snusbase') {
+      this.appendSnusbaseResults(results, data, seen);
+      return;
+    }
+
+    if (name === 'discord') {
+      this.appendDiscordResults(results, data, seen);
+      return;
+    }
+
+    if (name === 'roblox') {
+      this.appendRobloxResults(results, data, seen, 'roblox');
+      return;
+    }
+
+    if (name === 'discord-to-roblox') {
+      this.appendRobloxResults(results, data, seen, 'discord-to-roblox');
+      return;
+    }
+
+    this.appendOsintCatResponse(results, data, seen, name);
+  }
+
+  async search(query, onProgress) {
     const results = [];
     const seen = new Set();
     const types = this.detectQueryTypes(query);
+    const tasks = this.buildSearchTasks(query, types);
 
-    console.log(`Unified search for: ${query}`);
-    console.log(`Detected types: ${types.join(', ')}`);
+    console.log(`Search: ${query} | Types: ${types.join(', ')} | APIs: ${tasks.map((task) => task.name).join(', ')}`);
 
-    const stealerType = query.includes('@') ? 'email' : 'domain';
-
-    const tasks = [
-      apiService.searchBreach(query).then((data) => ({ name: 'breach', data })),
-      apiService.searchStealerLogs(query, stealerType).then((data) => ({ name: 'stealer', data }))
-    ];
-
-    if (types.includes('email')) {
-      tasks.push(apiService.snusbaseSearch(query, 'email').then((data) => ({ name: 'snusbase', data })));
-    } else if (types.includes('phone')) {
-      tasks.push(apiService.snusbaseSearch(query, 'phone').then((data) => ({ name: 'snusbase', data })));
-      tasks.push(apiService.searchPhoneOSINT(query).then((data) => ({ name: 'phone-osint', data })));
-    } else if (types.includes('username')) {
-      tasks.push(apiService.snusbaseSearch(query, 'username').then((data) => ({ name: 'snusbase', data })));
-    } else if (types.includes('name')) {
-      tasks.push(apiService.snusbaseSearch(query, 'name').then((data) => ({ name: 'snusbase', data })));
-    } else {
-      tasks.push(apiService.snusbaseSearch(query, 'email').then((data) => ({ name: 'snusbase', data })));
-    }
-
-    if (types.includes('discord')) {
-      tasks.push(apiService.searchDiscord(query).then((data) => ({ name: 'discord', data })));
-      tasks.push(apiService.searchDiscordToRoblox(query).then((data) => ({ name: 'discord-to-roblox', data })));
-    }
-
-    if (types.includes('ip')) {
-      tasks.push(apiService.searchIP(query).then((data) => ({ name: 'ip', data })));
-    }
-
-    if (types.includes('vin')) {
-      tasks.push(apiService.searchVIN(query).then((data) => ({ name: 'vin', data })));
-    }
-
-    if (types.includes('roblox')) {
-      tasks.push(apiService.searchRoblox(query).then((data) => ({ name: 'roblox', data })));
-    }
-
-    if (types.includes('username') && !types.includes('roblox')) {
-      tasks.push(apiService.searchRoblox(query).then((data) => ({ name: 'roblox', data })));
-    }
-
-    tasks.push(apiService.searchMachines(query).then((data) => ({ name: 'machine', data })));
-
-    const settled = await Promise.allSettled(tasks);
-
-    settled.forEach((result) => {
-      if (result.status !== 'fulfilled') {
-        console.error('Search task failed:', result.reason);
-        return;
+    const notify = () => {
+      if (typeof onProgress === 'function') {
+        onProgress([...results], tasks.length);
       }
+    };
 
-      const { name, data } = result.value;
-      console.log(`Processing ${name} response`);
-
-      if (name === 'snusbase') {
-        this.appendSnusbaseResults(results, data, seen);
-        return;
+    await Promise.all(tasks.map(async ({ name, run }) => {
+      try {
+        const data = await run();
+        this.processTaskResult(name, data, results, seen);
+        notify();
+      } catch (error) {
+        console.error(`Search task ${name} failed:`, error.message);
       }
+    }));
 
-      if (name === 'machine') {
-        if (data && !data.error) {
-          const machines = data.machines || data.results || [];
-          machines.forEach((machine) => {
-            let formatted = this.formatItem(machine);
-            const machineId = getMachineId(machine);
-            if (machineId) {
-              formatted += `\n\nDownload: ${getDownloadCommand(machineId)}`;
-            }
-            if (!seen.has(formatted)) {
-              seen.add(formatted);
-              results.push(formatted);
-            }
-          });
-        }
-        return;
-      }
+    return results;
+  }
 
-      this.appendOsintCatResponse(results, data, seen);
-    });
+  async machineSearch(query) {
+    const results = [];
+    const seen = new Set();
+    const data = await apiService.searchMachines(query);
+
+    if (data && !data.error) {
+      const machines = data.machines || data.results || [];
+      machines.forEach((machine, index) => {
+        const formatted = this.formatMachineRecord(machine);
+        this.addUniqueResult(results, seen, formatted, `machine:${getMachineId(machine) || machine.name || index}`);
+      });
+    }
 
     return results;
   }
@@ -325,10 +618,6 @@ class OSINTService {
   }
 
   async vinSearch(query) {
-    return this.search(query);
-  }
-
-  async machineSearch(query) {
     return this.search(query);
   }
 }
