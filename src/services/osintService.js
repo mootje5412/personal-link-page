@@ -38,54 +38,6 @@ class OSINTService {
   async generalSearch(query) {
     const results = [];
     
-    // Check if it might be a Discord ID (numeric, 17-19 digits)
-    const isDiscordId = /^\d{17,19}$/.test(query);
-    
-    // Check if it might be a VIN (17 alphanumeric characters)
-    const isVIN = /^[A-HJ-NPR-Z0-9]{17}$/i.test(query);
-    
-    // Try Discord ID search
-    if (isDiscordId) {
-      try {
-        const discordData = await apiService.searchDiscord(query);
-        if (discordData && !discordData.error && discordData.data) {
-          results.push(this.formatItem(discordData.data, 0));
-        }
-        
-        // Also try Discord-to-Roblox
-        const d2rData = await apiService.searchDiscordToRoblox(query);
-        if (d2rData && !d2rData.error && d2rData.data) {
-          results.push(this.formatItem(d2rData.data, 0));
-        }
-      } catch (error) {
-        console.error('Discord search failed:', error.message);
-      }
-    }
-    
-    // Try VIN search
-    if (isVIN) {
-      try {
-        const vinData = await apiService.searchVIN(query);
-        if (vinData && !vinData.error && vinData.data) {
-          results.push(this.formatItem(vinData.data, 0));
-        }
-      } catch (error) {
-        console.error('VIN search failed:', error.message);
-      }
-    }
-    
-    // Try Roblox username search (if not numeric)
-    if (!isDiscordId && query.length >= 3) {
-      try {
-        const robloxData = await apiService.searchRoblox(query);
-        if (robloxData && !robloxData.error && robloxData.data) {
-          results.push(this.formatItem(robloxData.data, 0));
-        }
-      } catch (error) {
-        console.error('Roblox search failed:', error.message);
-      }
-    }
-    
     // Try Snusbase with lastip type for general searches
     try {
       const snusbaseData = await apiService.snusbaseSearch(query, 'lastip');
@@ -499,6 +451,142 @@ class OSINTService {
         
         results.push(machineInfo);
       });
+    }
+    
+    return results;
+  }
+
+  async discordSearch(discordId) {
+    const results = [];
+    
+    console.log(`Discord ID detected: ${discordId}`);
+    
+    // Try OSINT Cat Discord API
+    try {
+      const discordData = await apiService.searchDiscord(discordId);
+      
+      if (discordData && !discordData.error) {
+        if (discordData.data) {
+          results.push(this.formatItem(discordData.data, 0));
+        } else if (discordData.results) {
+          discordData.results.forEach((item, index) => {
+            results.push(this.formatItem(item, index));
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Discord search failed:', error.message);
+    }
+    
+    // Try Discord-to-Roblox link
+    try {
+      const d2rData = await apiService.searchDiscordToRoblox(discordId);
+      
+      if (d2rData && !d2rData.error) {
+        if (d2rData.data) {
+          results.push(this.formatItem(d2rData.data, 0));
+        } else if (d2rData.results) {
+          d2rData.results.forEach((item, index) => {
+            results.push(this.formatItem(item, index));
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Discord-to-Roblox search failed:', error.message);
+    }
+    
+    // Also search in regular databases
+    try {
+      const dbResults = await apiService.searchDatabase(discordId);
+      
+      if (dbResults && !dbResults.error && dbResults.results && dbResults.results.length > 0) {
+        dbResults.results.forEach((item, index) => {
+          results.push(this.formatItem(item, index));
+        });
+      }
+    } catch (error) {
+      console.error('Database search failed:', error.message);
+    }
+    
+    if (results.length === 0) {
+      results.push('No results found');
+    }
+    
+    return results;
+  }
+
+  async robloxSearch(username) {
+    const results = [];
+    
+    console.log(`Roblox username detected: ${username}`);
+    
+    // Try OSINT Cat Roblox API
+    try {
+      const robloxData = await apiService.searchRoblox(username);
+      
+      if (robloxData && !robloxData.error) {
+        if (robloxData.data) {
+          results.push(this.formatItem(robloxData.data, 0));
+        } else if (robloxData.results) {
+          robloxData.results.forEach((item, index) => {
+            results.push(this.formatItem(item, index));
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Roblox search failed:', error.message);
+    }
+    
+    // Also search as username in other databases
+    try {
+      const snusbaseData = await apiService.snusbaseSearch(username, 'username');
+      
+      if (snusbaseData && !snusbaseData.error && snusbaseData.results) {
+        const dbNames = Object.keys(snusbaseData.results);
+        dbNames.forEach((dbName) => {
+          const dbResults = snusbaseData.results[dbName];
+          if (dbResults && Array.isArray(dbResults) && dbResults.length > 0) {
+            dbResults.forEach((item, index) => {
+              results.push(this.formatItem(item, index));
+            });
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Snusbase search failed:', error.message);
+    }
+    
+    if (results.length === 0) {
+      results.push('No results found');
+    }
+    
+    return results;
+  }
+
+  async vinSearch(vin) {
+    const results = [];
+    
+    console.log(`VIN detected: ${vin}`);
+    
+    // Try OSINT Cat VIN API
+    try {
+      const vinData = await apiService.searchVIN(vin);
+      
+      if (vinData && !vinData.error) {
+        if (vinData.data) {
+          results.push(this.formatItem(vinData.data, 0));
+        } else if (vinData.results) {
+          vinData.results.forEach((item, index) => {
+            results.push(this.formatItem(item, index));
+          });
+        }
+      }
+    } catch (error) {
+      console.error('VIN search failed:', error.message);
+    }
+    
+    if (results.length === 0) {
+      results.push('No results found');
     }
     
     return results;

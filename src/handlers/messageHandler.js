@@ -45,8 +45,14 @@ Use /prices to view available plans and contact @strafbaar to purchase a subscri
         results = await osintService.emailSearch(query);
       } else if (this.isIP(query)) {
         results = await osintService.ipSearch(query);
+      } else if (this.isDiscordId(query)) {
+        results = await osintService.discordSearch(query);
+      } else if (this.isVIN(query)) {
+        results = await osintService.vinSearch(query);
       } else if (this.isPhone(query)) {
         results = await osintService.phoneSearch(query);
+      } else if (this.isRobloxUsername(query)) {
+        results = await osintService.robloxSearch(query);
       } else if (this.isName(query)) {
         results = await osintService.nameSearch(query);
       } else if (this.isUsername(query)) {
@@ -95,6 +101,21 @@ Use /prices to view available plans and contact @strafbaar to purchase a subscri
   isPhone(text) {
     const phoneRegex = /^[\+]?[(]?[0-9]{1,3}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,4}[-\s\.]?[0-9]{1,9}$/;
     return phoneRegex.test(text.replace(/\s/g, ''));
+  }
+
+  isDiscordId(text) {
+    // Discord IDs are 17-19 digit numbers
+    return /^\d{17,19}$/.test(text);
+  }
+
+  isVIN(text) {
+    // VINs are exactly 17 alphanumeric characters (no I, O, Q)
+    return /^[A-HJ-NPR-Z0-9]{17}$/i.test(text);
+  }
+
+  isRobloxUsername(text) {
+    // Roblox usernames are 3-20 alphanumeric with underscores
+    return /^[a-zA-Z0-9_]{3,20}$/.test(text) && !this.isDiscordId(text);
   }
 
   isUsername(text) {
