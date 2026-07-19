@@ -409,10 +409,16 @@ class OSINTService {
     }
 
     const items = Array.isArray(response.results) ? response.results : [];
+    const sourceLabel = category === 'seekaf-stealer'
+      ? 'SeekAF Stealer'
+      : category === 'seekaf-deep'
+        ? 'SeekAF Deep'
+        : 'SeekAF';
+
     items.forEach((item, index) => {
       const text = formatRecordFields({
         ...item,
-        source: item.source || response.mode || category
+        source: item.source || sourceLabel
       });
 
       if (text) {
