@@ -99,6 +99,10 @@ Use /prices to view available plans and contact @strafbaar to purchase a subscri
   }
 
   isPhone(text) {
+    // Pure numeric strings 17+ digits are Discord IDs, not phones
+    if (/^\d{17,}$/.test(text.replace(/\s/g, ''))) {
+      return false;
+    }
     const phoneRegex = /^[\+]?[(]?[0-9]{1,3}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,4}[-\s\.]?[0-9]{1,9}$/;
     return phoneRegex.test(text.replace(/\s/g, ''));
   }

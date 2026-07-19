@@ -163,21 +163,48 @@ class APIService {
     }
   }
 
-  async downloadMachine(machineId) {
-    try {
-      const url = `${config.osintCatBaseUrl}/machine_viewer/download/${machineId}`;
+  downloadMachine(machineId) {
+    return new Promise((resolve) => {
+      const url = `${config.osintCatBaseUrl}/machine_viewer/machines/${encodeURIComponent(machineId)}/download`;
       const headers = {
         'X-API-KEY': config.osintCatApiKey
       };
-      
-      console.log(`Downloading machine: ${machineId}`);
-      const data = await this.makeRequest(url, headers);
-      
-      return data;
-    } catch (error) {
-      console.error('Machine download error:', error.message);
-      return { error: true, message: error.message };
-    }
+
+      console.log(`Downloading machine: ${url}`);
+
+      https.get(url, { headers }, (res) => {
+        const chunks = [];
+
+        res.on('data', (chunk) => {
+          chunks.push(chunk);
+        });
+
+        res.on('end', () => {
+          const buffer = Buffer.concat(chunks);
+
+          if (res.statusCode !== 200) {
+            let message = `HTTP ${res.statusCode}`;
+            try {
+              const parsed = JSON.parse(buffer.toString('utf8'));
+              message = parsed.message || parsed.error || message;
+            } catch (error) {
+              message = buffer.toString('utf8').substring(0, 200) || message;
+            }
+            resolve({ error: true, message });
+            return;
+          }
+
+          resolve({
+            buffer,
+            contentType: res.headers['content-type'] || 'application/zip',
+            filename: `machine_${machineId}.zip`
+          });
+        });
+      }).on('error', (error) => {
+        console.error('Machine download error:', error.message);
+        resolve({ error: true, message: error.message });
+      });
+    });
   }
 
   async searchStealerLogs(query, type = 'email') {
@@ -228,7 +255,7 @@ class APIService {
 
   async searchRoblox(query) {
     try {
-      const url = `${config.osintCatBaseUrl}/roblox?query=${encodeURIComponent(query)}`;
+      const url = `${config.osintCatBaseUrl}/roblox?username=${encodeURIComponent(query)}`;
       const headers = {
         'X-API-KEY': config.osintCatApiKey
       };
@@ -297,7 +324,7 @@ class APIService {
 
   async searchVIN(query) {
     try {
-      const url = `${config.osintCatBaseUrl}/vin?query=${encodeURIComponent(query)}`;
+      const url = `${config.osintCatBaseUrl}/vin?type=decode&query=${encodeURIComponent(query)}`;
       const headers = {
         'X-API-KEY': config.osintCatApiKey
       };

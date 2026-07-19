@@ -287,21 +287,23 @@ To purchase, contact @strafbaar on Telegram`;
       const machineResults = await apiService.searchMachines(query);
       
       if (machineResults && machineResults.error) {
-        const errorMsg = `Machine Search\n\nQuery: ${query}\nStatus: Error\n\n${machineResults.message}\n\nNote: Make sure your server IP (109.71.252.128) is whitelisted in OSINT Cat dashboard for machine viewer access.`;
+        const errorMsg = `Machine Search\n\nQuery: ${query}\nStatus: Error\n\n${machineResults.message}`;
         bot.editMessageText(errorMsg, {
           chat_id: chatId,
           message_id: statusMsg.message_id
         });
         return;
       }
+
+      const machines = machineResults.machines || machineResults.results || [];
       
-      if (machineResults && machineResults.results && machineResults.results.length > 0) {
+      if (machines.length > 0) {
         bot.deleteMessage(chatId, statusMsg.message_id);
         
-        const totalResults = machineResults.results.length;
+        const totalResults = machines.length;
         bot.sendMessage(chatId, `Machine Search Results\n\nFound ${totalResults} machine(s) for: ${query}`);
         
-        machineResults.results.forEach((machine, index) => {
+        machines.forEach((machine, index) => {
           let machineInfo = `Machine ${index + 1} of ${totalResults}\n\n`;
           
           // Build machine info with better formatting
@@ -365,19 +367,11 @@ To purchase, contact @strafbaar on Telegram`;
         return;
       }
       
-      if (downloadData) {
-        const formattedData = typeof downloadData === 'string' ? downloadData : JSON.stringify(downloadData, null, 2);
-        
-        if (formattedData.length > 4000) {
-          // Send as file if too long
-          const buffer = Buffer.from(formattedData, 'utf-8');
-          bot.sendDocument(chatId, buffer, {}, {
-            filename: `machine_${machineId}.json`,
-            contentType: 'application/json'
-          });
-        } else {
-          bot.sendMessage(chatId, `Machine Data:\n\n${formattedData}`);
-        }
+      if (downloadData && downloadData.buffer) {
+        bot.sendDocument(chatId, downloadData.buffer, {}, {
+          filename: downloadData.filename || `machine_${machineId}.zip`,
+          contentType: downloadData.contentType || 'application/zip'
+        });
       } else {
         bot.sendMessage(chatId, 'No data available for this machine');
       }
@@ -406,22 +400,12 @@ To purchase, contact @strafbaar on Telegram`;
         return;
       }
       
-      if (downloadData) {
-        const formattedData = typeof downloadData === 'string' ? downloadData : JSON.stringify(downloadData, null, 2);
-        
+      if (downloadData && downloadData.buffer) {
         bot.deleteMessage(chatId, downloadMsg.message_id);
-        
-        if (formattedData.length > 4000) {
-          bot.sendMessage(chatId, `Machine Download\n\nMachine ID: ${machineId}\nSize: ${formattedData.length} bytes\n\nDownloading as file...`);
-          
-          const buffer = Buffer.from(formattedData, 'utf-8');
-          bot.sendDocument(chatId, buffer, {}, {
-            filename: `machine_${machineId}.json`,
-            contentType: 'application/json'
-          });
-        } else {
-          bot.sendMessage(chatId, `Machine Download\n\nMachine ID: ${machineId}\n\n${formattedData}`);
-        }
+        bot.sendDocument(chatId, downloadData.buffer, {}, {
+          filename: downloadData.filename || `machine_${machineId}.zip`,
+          contentType: downloadData.contentType || 'application/zip'
+        });
       } else {
         bot.editMessageText(`Machine Download\n\nMachine ID: ${machineId}\nStatus: No Data\n\nNo data available for this machine.`, {
           chat_id: chatId,
