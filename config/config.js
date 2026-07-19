@@ -9,6 +9,18 @@ module.exports = {
   // Snusbase API
   snusbaseApiKey: 'sbmeovhou6ecsn9fd9wcwnwwvvwnc',
   snusbaseBaseUrl: 'https://api.snusbase.com',
+
+  // SeekAF API (see-know.xyz — see-know.ru redirects here)
+  seekAfApiKey: process.env.SEEKAF_API_KEY || 'seek-aca7290de18a199818c43abec7d9b22a354066f4d2659b91',
+  seekAfBaseUrl: process.env.SEEKAF_BASE_URL || 'https://see-know.xyz/api/v1',
+  seekAfEnabled: true,
+  seekAfSearchLimit: 50,
+  seekAfStealerLimit: 50,
+  seekAfUseDeepSearch: false,
+  seekAfStealerDeep: true,
+  seekAfTimeoutFast: 12000,
+  seekAfTimeoutDeep: 45000,
+  seekAfTimeoutStealer: 25000,
   
   apiTimeoutMs: 8000,
   botName: 'FindNow OSINT Bot',

@@ -1,4 +1,5 @@
 const apiService = require('./apiService');
+const config = require('../../config/config');
 const { getMachineId } = require('../utils/machineUtils');
 const {
   formatRecordFields,
@@ -61,6 +62,40 @@ class OSINTService {
     return types;
   }
 
+  getSeekAfType(types, query) {
+    if (types.includes('email')) return 'email';
+    if (types.includes('phone')) return 'phone';
+    if (types.includes('ip')) return 'ip';
+    if (types.includes('username')) return 'username';
+    if (/^[a-f0-9]{32}$/i.test(query.trim())) return 'hash';
+    return undefined;
+  }
+
+  appendSeekAfTasks(tasks, query, types) {
+    if (!config.seekAfEnabled || !config.seekAfApiKey) {
+      return;
+    }
+
+    const seekType = this.getSeekAfType(types, query);
+
+    tasks.push({
+      name: 'seekaf-search',
+      run: () => apiService.seekAfSearch(query, seekType)
+    });
+
+    if (config.seekAfUseDeepSearch) {
+      tasks.push({
+        name: 'seekaf-deep',
+        run: () => apiService.seekAfSearchDeep(query, seekType)
+      });
+    }
+
+    tasks.push({
+      name: 'seekaf-stealer',
+      run: () => apiService.seekAfStealer(query, config.seekAfStealerDeep)
+    });
+  }
+
   buildSearchTasks(query, types) {
     const tasks = [];
 
@@ -68,6 +103,7 @@ class OSINTService {
       tasks.push({ name: 'breach', run: () => apiService.searchBreach(query) });
       tasks.push({ name: 'discord', run: () => apiService.searchDiscord(query) });
       tasks.push({ name: 'discord-to-roblox', run: () => apiService.searchDiscordToRoblox(query) });
+      this.appendSeekAfTasks(tasks, query, types);
       return tasks;
     }
 
@@ -82,6 +118,7 @@ class OSINTService {
       tasks.push({ name: 'ip', run: () => apiService.searchIP(query) });
       tasks.push({ name: 'snusbase', run: () => apiService.snusbaseSearch(query, 'lastip') });
       tasks.push({ name: 'snusbase-whois', run: () => apiService.snusbaseIpWhois(query) });
+      this.appendSeekAfTasks(tasks, query, types);
       return tasks;
     }
 
@@ -109,6 +146,8 @@ class OSINTService {
     if (types.includes('roblox') || types.includes('username')) {
       tasks.push({ name: 'roblox', run: () => apiService.searchRoblox(query) });
     }
+
+    this.appendSeekAfTasks(tasks, query, types);
 
     return tasks;
   }
@@ -360,6 +399,30 @@ class OSINTService {
     });
   }
 
+  appendSeekAfResults(results, response, seen, category) {
+    if (!response || response.error) {
+      return;
+    }
+
+    if (response.success === false) {
+      return;
+    }
+
+    const items = Array.isArray(response.results) ? response.results : [];
+    items.forEach((item, index) => {
+      const text = formatRecordFields({
+        ...item,
+        source: item.source || response.mode || category
+      });
+
+      if (text) {
+        this.addUniqueResult(results, seen, this.makeResult(category, text, {
+          key: this.getRecordKey(`seekaf:${category}`, item, index)
+        }));
+      }
+    });
+  }
+
   appendSnusbaseWhoisResults(results, response, seen, query) {
     if (!response || response.error) return;
 
@@ -451,6 +514,21 @@ class OSINTService {
 
     if (name === 'snusbase-whois') {
       this.appendSnusbaseWhoisResults(results, data, seen, query);
+      return;
+    }
+
+    if (name === 'seekaf-search') {
+      this.appendSeekAfResults(results, data, seen, 'seekaf');
+      return;
+    }
+
+    if (name === 'seekaf-deep') {
+      this.appendSeekAfResults(results, data, seen, 'seekaf-deep');
+      return;
+    }
+
+    if (name === 'seekaf-stealer') {
+      this.appendSeekAfResults(results, data, seen, 'seekaf-stealer');
       return;
     }
 

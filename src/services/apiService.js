@@ -4,6 +4,78 @@ const config = require('../../config/config');
 const API_TIMEOUT_MS = config.apiTimeoutMs || 8000;
 
 class APIService {
+  requestJson(url, options = {}, body = null, timeoutMs = API_TIMEOUT_MS) {
+    return new Promise((resolve) => {
+      const urlObj = new URL(url);
+      const payload = body === null ? null : JSON.stringify(body);
+      const headers = { ...(options.headers || {}) };
+
+      if (payload !== null) {
+        headers['Content-Type'] = 'application/json';
+        headers['Content-Length'] = Buffer.byteLength(payload);
+      }
+
+      const req = https.request({
+        hostname: urlObj.hostname,
+        path: `${urlObj.pathname}${urlObj.search}`,
+        method: options.method || 'GET',
+        headers,
+        timeout: timeoutMs
+      }, (res) => {
+        let data = '';
+
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', () => {
+          let parsed;
+          try {
+            parsed = JSON.parse(data);
+          } catch (error) {
+            parsed = data;
+          }
+
+          if (typeof parsed === 'string' && (parsed.includes('Just a moment') || parsed.includes('cf-mitigated'))) {
+            resolve({
+              error: true,
+              statusCode: res.statusCode,
+              message: 'Cloudflare blocked the request. Use a whitelisted static IP server.',
+              data: parsed
+            });
+            return;
+          }
+
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            resolve({
+              error: true,
+              statusCode: res.statusCode,
+              message: (parsed && (parsed.message || parsed.error)) || `HTTP ${res.statusCode}`,
+              data: parsed
+            });
+            return;
+          }
+
+          resolve(parsed);
+        });
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({ error: true, message: 'Request timed out' });
+      });
+
+      req.on('error', (error) => {
+        resolve({ error: true, message: error.message });
+      });
+
+      if (payload !== null) {
+        req.write(payload);
+      }
+      req.end();
+    });
+  }
+
   makeRequest(url, headers, timeoutMs = API_TIMEOUT_MS) {
     return new Promise((resolve, reject) => {
       const req = https.get(url, { headers, timeout: timeoutMs }, (res) => {
@@ -153,6 +225,42 @@ class APIService {
     return this.osintCatGet('/discord-to-roblox', query);
   }
 
+  async lookupRobloxProfile(username) {
+    const resolved = await this.requestJson(
+      'https://users.roblox.com/v1/usernames/users',
+      { method: 'POST' },
+      { usernames: [username], excludeBannedUsers: false }
+    );
+
+    if (resolved.error || !Array.isArray(resolved.data) || resolved.data.length === 0) {
+      return { error: true, message: resolved.message || 'Roblox user not found' };
+    }
+
+    const base = resolved.data[0];
+    const [details, thumbnail] = await Promise.all([
+      this.requestJson(`https://users.roblox.com/v1/users/${base.id}`),
+      this.requestJson(
+        `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${base.id}&size=180x180&format=Png&isCircular=false`
+      )
+    ]);
+
+    const avatar = !thumbnail.error && Array.isArray(thumbnail.data)
+      ? thumbnail.data[0] && thumbnail.data[0].imageUrl
+      : null;
+
+    return {
+      id: base.id,
+      username: (details && details.name) || base.name,
+      display_name: (details && details.displayName) || base.displayName,
+      description: details && details.description,
+      created_at: details && details.created,
+      is_banned: details && details.isBanned,
+      verified: base.hasVerifiedBadge,
+      avatar,
+      profile_url: `https://www.roblox.com/users/${base.id}/profile`
+    };
+  }
+
   async searchPhoneOSINT(query) {
     return this.osintCatGet('/phone-osint', query);
   }
@@ -235,6 +343,49 @@ class APIService {
     return this.snusbasePost('/tools/ip-whois', {
       terms: [query]
     });
+  }
+
+  getSeekAfHeaders() {
+    return {
+      Authorization: `Bearer ${config.seekAfApiKey}`,
+      'X-API-Key': config.seekAfApiKey
+    };
+  }
+
+  async seekAfPost(path, body, timeoutMs = config.seekAfTimeoutFast) {
+    if (!config.seekAfEnabled || !config.seekAfApiKey) {
+      return { error: true, message: 'SeekAF is not configured' };
+    }
+
+    const url = `${config.seekAfBaseUrl}${path}`;
+    return this.requestJson(url, {
+      method: 'POST',
+      headers: this.getSeekAfHeaders()
+    }, body, timeoutMs);
+  }
+
+  async seekAfSearch(query, type, limit = config.seekAfSearchLimit) {
+    const body = { query, limit };
+    if (type) {
+      body.type = type;
+    }
+    return this.seekAfPost('/search', body, config.seekAfTimeoutFast);
+  }
+
+  async seekAfSearchDeep(query, type, limit = config.seekAfSearchLimit) {
+    const body = { query, limit };
+    if (type) {
+      body.type = type;
+    }
+    return this.seekAfPost('/search/deep', body, config.seekAfTimeoutDeep);
+  }
+
+  async seekAfStealer(query, deep = config.seekAfStealerDeep, limit = config.seekAfStealerLimit) {
+    return this.seekAfPost('/stealer', {
+      query,
+      deep,
+      limit
+    }, config.seekAfTimeoutStealer);
   }
 }
 

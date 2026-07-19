@@ -12,7 +12,10 @@ const CATEGORY_LABELS = {
   vin: 'VIN',
   phone: 'PHONE',
   'phone-osint': 'PHONE',
-  machine: 'MACHINE'
+  machine: 'MACHINE',
+  seekaf: 'SEEKAF',
+  'seekaf-deep': 'SEEKAF DEEP',
+  'seekaf-stealer': 'SEEKAF STEALER'
 };
 
 function formatBytes(bytes) {
@@ -125,7 +128,10 @@ function formatRecordFields(item) {
     ['host', 'Host'],
     ['application', 'App'],
     ['computer_name', 'Computer'],
-    ['machine', 'Machine'],
+    ['machine_id', 'Machine ID'],
+    ['os', 'OS'],
+    ['browser', 'Browser'],
+    ['ip_address', 'IP Address'],
     ['address', 'Address'],
     ['dob', 'DOB']
   ];
