@@ -6,15 +6,12 @@ const Hero = () => {
       <div className="hero-gradient"></div>
       <div className="container">
         <nav className="navbar">
-          <div className="brand">
-            BreachBase
-          </div>
           <div className="nav-links">
             <a href="#features">Features</a>
             <a href="#pricing">Pricing</a>
-            <a href="https://docs.breachbase.xyz" target="_blank" rel="noopener noreferrer">Docs</a>
-            <button className="btn-nav">Start Free</button>
+            <a href="https://docs.breachbase.xyz" target="_blank" rel="noopener noreferrer">Documentation</a>
           </div>
+          <button className="btn-nav">Get Access</button>
         </nav>
 
         <div className="hero-content">

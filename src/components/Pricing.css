@@ -8,12 +8,13 @@
 }
 
 .pricing-card-single {
-  background: var(--bg-card);
+  background: rgba(26, 26, 36, 0.8);
   border: 2px solid var(--accent);
-  border-radius: 1.5rem;
-  padding: 3rem;
+  border-radius: 2rem;
+  padding: 3.5rem;
   position: relative;
-  box-shadow: 0 8px 40px rgba(99, 102, 241, 0.2);
+  box-shadow: 0 16px 48px rgba(99, 102, 241, 0.3);
+  backdrop-filter: blur(16px);
 }
 
 .pricing-header {
@@ -111,18 +112,19 @@
 }
 
 .value-item {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 1rem;
+  background: rgba(26, 26, 36, 0.6);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: 1.25rem;
   padding: 2rem;
   text-align: center;
-  transition: all 0.3s;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(12px);
 }
 
 .value-item:hover {
   border-color: var(--accent);
-  transform: translateY(-4px);
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15);
+  transform: translateY(-6px);
+  box-shadow: 0 12px 32px rgba(99, 102, 241, 0.25);
 }
 
 .value-number {
@@ -144,13 +146,15 @@
 }
 
 .pricing-cta {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 1rem;
+  background: rgba(26, 26, 36, 0.6);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 1.5rem;
   padding: 3rem;
   text-align: center;
   max-width: 700px;
   margin: 0 auto;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
 .pricing-cta h3 {
