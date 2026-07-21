@@ -1,24 +1,70 @@
-# My Personal Links
+# BreachBase.xyz
 
-My personal corner of the internet, featuring all my important links in one place. Your one-stop shop to connect with me across different platforms!
+Professional OSINT intelligence platform for security professionals. Access comprehensive breach data through a powerful API with real-time queries, verified sources, and enterprise-grade reliability.
 
+## Features
 
----
+- **Lightning Fast**: Sub-100ms response times with globally distributed infrastructure
+- **Real-Time Updates**: Access the latest breach data as it becomes available
+- **Enterprise Security**: Bank-grade encryption, OAuth 2.0, and comprehensive audit logs
+- **Comprehensive Coverage**: 500M+ records from verified breach sources
+- **Developer Friendly**: RESTful API with comprehensive documentation
+- **99.9% Uptime**: Industry-leading reliability with automatic failover
 
-### Features:
+## Tech Stack
 
-* Centralized links to all my social media and important resources.
-* Clean and minimalist design.
-* Easy to navigate.
+- **React 18** - Modern UI library
+- **TypeScript** - Type-safe development
+- **Vite** - Fast build tool and dev server
+- **CSS3** - Modern styling with custom properties
 
-### Technologies Used:
+## Getting Started
 
-* HTML
-* CSS
-* JavaScript
+### Prerequisites
 
----
+- Node.js 18+ 
+- npm or yarn
 
-Feel free to explore the code, and if you have any questions, don't hesitate to reach out!
+### Installation
 
-discord: hexflood1
+```bash
+npm install
+```
+
+### Development
+
+```bash
+npm run dev
+```
+
+The site will be available at `http://localhost:5173`
+
+### Build
+
+```bash
+npm run build
+```
+
+Built files will be in the `dist/` directory.
+
+### Preview Production Build
+
+```bash
+npm run preview
+```
+
+## Pricing
+
+Starting at just **€5/month** for 10,000 API calls with full database access.
+
+- **Starter**: €5/month - 10,000 API calls
+- **Professional**: €49/month - 100,000 API calls with batch operations and webhooks
+- **Enterprise**: Custom pricing for unlimited calls and dedicated infrastructure
+
+## API Access
+
+Visit [breachbase.xyz](https://breachbase.xyz) to get your API key and start building.
+
+## License
+
+All rights reserved © 2026 BreachBase
