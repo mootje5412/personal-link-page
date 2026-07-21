@@ -44,8 +44,9 @@
 }
 
 .footer-social a:hover {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
   transform: translateY(-2px);
 }
 
@@ -76,7 +77,7 @@
 }
 
 .footer-column a:hover {
-  color: var(--accent);
+  color: var(--text-primary);
 }
 
 .footer-bottom {

@@ -17,7 +17,7 @@
   border: 1px solid var(--border);
   border-radius: 100px;
   font-size: 0.875rem;
-  color: var(--accent);
+  color: var(--text-primary);
   font-weight: 600;
   margin-bottom: 1.5rem;
 }
@@ -49,11 +49,30 @@
   border: 1px solid var(--border);
   border-radius: 1rem;
   transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--text-primary);
+  transform: scaleX(0);
+  transition: transform 0.3s;
 }
 
 .feature-card:hover {
-  border-color: var(--accent);
+  border-color: var(--text-primary);
   transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(255, 255, 255, 0.05);
+}
+
+.feature-card:hover::before {
+  transform: scaleX(1);
 }
 
 .feature-icon {
@@ -62,9 +81,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(59, 130, 246, 0.1);
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 1rem;
-  color: var(--accent);
+  color: var(--text-primary);
   margin-bottom: 1.5rem;
 }
 
