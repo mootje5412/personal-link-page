@@ -5,15 +5,18 @@
 }
 
 :root {
-  --bg-primary: #000000;
-  --bg-secondary: #0a0a0a;
-  --bg-card: #111111;
-  --accent: #ffffff;
-  --accent-hover: #e5e5e5;
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-card: #1a1a24;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --accent-light: #818cf8;
   --text-primary: #ffffff;
-  --text-secondary: #888888;
-  --border: #222222;
-  --success: #ffffff;
+  --text-secondary: #94a3b8;
+  --border: #1e293b;
+  --success: #10b981;
+  --gradient-start: #6366f1;
+  --gradient-end: #8b5cf6;
 }
 
 body {

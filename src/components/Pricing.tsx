@@ -12,8 +12,8 @@ const Pricing = () => {
             Just <span className="gradient-text">€5</span> Per Month
           </h2>
           <p className="section-description">
-            Access 500M+ breach records with enterprise-grade infrastructure.
-            Less than a coffee, but with the power to protect thousands.
+            Access 700 billion breach records with enterprise-grade infrastructure.
+            Less than a coffee, but with the power to protect millions.
           </p>
         </div>
 
@@ -39,7 +39,7 @@ const Pricing = () => {
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                   <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span><strong>500M+ records</strong> breach database</span>
+                <span><strong>700B+ records</strong> breach database</span>
               </li>
               <li>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none">

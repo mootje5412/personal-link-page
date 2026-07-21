@@ -9,11 +9,11 @@
 
 .pricing-card-single {
   background: var(--bg-card);
-  border: 2px solid var(--text-primary);
+  border: 2px solid var(--accent);
   border-radius: 1.5rem;
   padding: 3rem;
   position: relative;
-  box-shadow: 0 0 60px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 40px rgba(99, 102, 241, 0.2);
 }
 
 .pricing-header {
@@ -50,7 +50,10 @@
 .price-amount {
   font-size: 6rem;
   font-weight: 900;
-  color: var(--text-primary);
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   line-height: 1;
   letter-spacing: -0.03em;
 }
@@ -89,11 +92,15 @@
   border-radius: 0.75rem;
   font-weight: 700;
   transition: all 0.3s;
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  border: none;
+  color: white;
+  cursor: pointer;
 }
 
 .pricing-button-large:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
 }
 
 .value-grid {
@@ -113,14 +120,18 @@
 }
 
 .value-item:hover {
-  border-color: var(--text-primary);
+  border-color: var(--accent);
   transform: translateY(-4px);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15);
 }
 
 .value-number {
   font-size: 2.5rem;
   font-weight: 900;
-  color: var(--text-primary);
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: 0.5rem;
   letter-spacing: -0.02em;
 }

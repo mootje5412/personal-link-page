@@ -6,15 +6,14 @@ const Hero = () => {
       <div className="hero-gradient"></div>
       <div className="container">
         <nav className="navbar">
-          <div className="logo">
-            <span className="logo-icon">◈</span>
-            <span className="logo-text">BreachBase</span>
+          <div className="brand">
+            BreachBase
           </div>
           <div className="nav-links">
             <a href="#features">Features</a>
             <a href="#pricing">Pricing</a>
-            <a href="https://docs.breachbase.xyz" target="_blank" rel="noopener noreferrer">Documentation</a>
-            <button className="btn-primary">Get Started</button>
+            <a href="https://docs.breachbase.xyz" target="_blank" rel="noopener noreferrer">Docs</a>
+            <button className="btn-nav">Start Free</button>
           </div>
         </nav>
 
@@ -30,9 +29,9 @@ const Hero = () => {
           </h1>
           
           <p className="hero-description">
-            Access comprehensive breach data through our powerful API. 
-            Real-time queries, verified sources, and enterprise-grade reliability 
-            at an unbeatable price point.
+            Access 700 billion breach records through our lightning-fast API. 
+            Real-time intelligence, verified sources, and enterprise infrastructure 
+            for just €5 per month.
           </p>
 
           <div className="hero-cta">
@@ -49,7 +48,7 @@ const Hero = () => {
 
           <div className="hero-stats">
             <div className="stat">
-              <div className="stat-value">500M+</div>
+              <div className="stat-value">700B+</div>
               <div className="stat-label">Records Indexed</div>
             </div>
             <div className="stat-divider"></div>
@@ -59,7 +58,7 @@ const Hero = () => {
             </div>
             <div className="stat-divider"></div>
             <div className="stat">
-              <div className="stat-value">&lt;100ms</div>
+              <div className="stat-value">&lt;50ms</div>
               <div className="stat-label">Avg Response</div>
             </div>
           </div>

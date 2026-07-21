@@ -8,13 +8,12 @@ const Footer = () => {
       <div className="container">
         <div className="footer-content">
           <div className="footer-brand">
-            <div className="logo">
-              <span className="logo-icon">◈</span>
-              <span className="logo-text">BreachBase</span>
+            <div className="brand-footer">
+              BreachBase
             </div>
             <p className="footer-tagline">
               Professional OSINT intelligence for security professionals.
-              Real-time breach data at your fingertips.
+              700B+ breach records at your fingertips.
             </p>
             <div className="footer-social">
               <a href="https://twitter.com/breachbase" target="_blank" rel="noopener noreferrer" aria-label="Twitter">

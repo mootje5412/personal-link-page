@@ -9,7 +9,7 @@ const Features = () => {
         </svg>
       ),
       title: 'Lightning Fast',
-      description: 'Sub-100ms response times with globally distributed infrastructure. Get breach intelligence instantly.'
+      description: 'Sub-50ms response times with globally distributed infrastructure. Get breach intelligence instantly.'
     },
     {
       icon: (
@@ -39,7 +39,7 @@ const Features = () => {
         </svg>
       ),
       title: 'Comprehensive Coverage',
-      description: '500M+ records from verified breach sources. Most extensive database available.'
+      description: '700B+ records from verified breach sources. Most extensive database available.'
     },
     {
       icon: (
