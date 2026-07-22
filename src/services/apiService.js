@@ -117,7 +117,7 @@ class APIService {
     });
   }
 
-  async osintCatGet(endpoint, query, extraParams = {}) {
+  async osintCatGet(endpoint, query, extraParams = {}, timeoutMs = API_TIMEOUT_MS) {
     try {
       const params = new URLSearchParams({ query, ...extraParams });
       const url = `${config.osintCatBaseUrl}${endpoint}?${params.toString()}`;
@@ -125,7 +125,7 @@ class APIService {
         'X-API-KEY': config.osintCatApiKey
       };
 
-      const data = await this.makeRequest(url, headers);
+      const data = await this.makeRequest(url, headers, timeoutMs);
 
       if (data && data.error === true) {
         return data;
@@ -162,7 +162,12 @@ class APIService {
   }
 
   async searchMachines(query) {
-    return this.osintCatGet('/machine_viewer/search', query);
+    return this.osintCatGet(
+      '/machine_viewer/search',
+      query,
+      {},
+      config.machineSearchTimeoutMs || 45000
+    );
   }
 
   downloadMachine(machineId) {

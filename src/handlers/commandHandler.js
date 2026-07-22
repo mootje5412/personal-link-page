@@ -290,7 +290,11 @@ To purchase, contact @strafbaar on Telegram`;
       const machineResults = await osintService.machineSearch(query);
 
       if (machineResults.error) {
-        bot.editMessageText(`Machine Viewer\n\nQuery: ${query}\nError: ${machineResults.error}`, {
+        const errorText = machineResults.error === 'Request timed out'
+          ? 'Search timed out. The machine database is slow for name searches — try again or use a shorter query.'
+          : machineResults.error;
+
+        bot.editMessageText(`Machine Viewer\n\nQuery: ${query}\nError: ${errorText}`, {
           chat_id: chatId,
           message_id: statusMsg.message_id
         });

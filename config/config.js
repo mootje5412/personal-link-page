@@ -24,6 +24,7 @@ module.exports = {
   seekAfUserAgent: 'FindNow-OSINT-Bot/1.0',
   
   apiTimeoutMs: 8000,
+  machineSearchTimeoutMs: 45000,
   botName: 'FindNow OSINT Bot',
   version: '1.0.0',
   
