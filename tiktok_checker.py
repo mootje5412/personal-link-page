@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
-"""TikTok username checker CLI."""
+"""TikTok username checker CLI (user agents only)."""
 
 import itertools
 import json
 import string
 import sys
 
-from tiktok_checker_core import (
-    TikTokUsernameChecker,
-    UsernameStatus,
-    load_session_id,
-    print_setup_help,
-)
+from tiktok_checker_core import TikTokUsernameChecker, UsernameStatus
 
 
 def generate_letter_combos(length: int):
@@ -33,9 +28,7 @@ def scan_list(checker: TikTokUsernameChecker, usernames, workers: int, output_fi
             available.append(result.username)
             print(f"AVAILABLE @{result.username}")
         elif result.status == UsernameStatus.TAKEN:
-            print(f"taken @{result.username}")
-        elif result.status == UsernameStatus.UNAVAILABLE:
-            print(f"blocked @{result.username}")
+            pass
         elif result.status == UsernameStatus.ERROR:
             print(f"error @{result.username}: {result.message}")
 
@@ -45,12 +38,6 @@ def scan_list(checker: TikTokUsernameChecker, usernames, workers: int, output_fi
 
 
 def main():
-    sessionid = load_session_id()
-    if not sessionid:
-        print("Missing TikTok sessionid.")
-        print_setup_help()
-        sys.exit(1)
-
     print("TikTok Username Checker")
     print("1. Check 3-letter usernames")
     print("2. Check 4-letter usernames")
@@ -60,7 +47,7 @@ def main():
 
     choice = input("Select option (1-5): ").strip()
     workers = int(input("Workers (recommended 10-15): ").strip() or "12")
-    checker = TikTokUsernameChecker(sessionid)
+    checker = TikTokUsernameChecker()
 
     if choice == "1":
         scan_list(checker, list(generate_letter_combos(3)), workers, "available_3letter.txt")
