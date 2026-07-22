@@ -55,10 +55,17 @@ class FindNowBot {
       messageHandler.handleMessage(this.bot, msg);
     });
 
-    // Error handling
+    // Error handling — exit on 409 so duplicate instances stop fighting
     this.bot.on('polling_error', (error) => {
       console.error('Polling error:', error.code);
       console.error(error.message);
+
+      if (error.code === 'ETELEGRAM' && String(error.message).includes('409 Conflict')) {
+        console.error('Another bot instance is already polling this token. Stopping this instance.');
+        console.error('Run on your server: pkill -9 -f "node index.js" && cd ~/findnow-bot && ./restart.sh');
+        this.bot.stopPolling();
+        process.exit(1);
+      }
     });
 
     console.log('Bot is running and ready!');
