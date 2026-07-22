@@ -1,0 +1,116 @@
+Checking 1191 meaningful 5-letter usernames with 15 workers...
+
+[25/1191] found 0 available so far
+AVAILABLE @boost
+[50/1191] found 1 available so far
+[75/1191] found 1 available so far
+AVAILABLE @couch
+[100/1191] found 2 available so far
+AVAILABLE @dirty
+[125/1191] found 3 available so far
+[150/1191] found 3 available so far
+AVAILABLE @fight
+[175/1191] found 4 available so far
+AVAILABLE @found
+[200/1191] found 5 available so far
+AVAILABLE @gloss
+AVAILABLE @grasp
+[225/1191] found 7 available so far
+[250/1191] found 7 available so far
+[275/1191] found 7 available so far
+AVAILABLE @label
+[300/1191] found 8 available so far
+[325/1191] found 8 available so far
+[350/1191] found 8 available so far
+AVAILABLE @melon
+[375/1191] found 9 available so far
+[400/1191] found 9 available so far
+AVAILABLE @orbit
+[425/1191] found 10 available so far
+AVAILABLE @ovary
+AVAILABLE @panel
+[450/1191] found 12 available so far
+[475/1191] found 12 available so far
+[500/1191] found 12 available so far
+[525/1191] found 12 available so far
+[550/1191] found 12 available so far
+[575/1191] found 12 available so far
+AVAILABLE @roomy
+[600/1191] found 13 available so far
+AVAILABLE @scorn
+[625/1191] found 14 available so far
+AVAILABLE @scary
+[650/1191] found 15 available so far
+AVAILABLE @showy
+AVAILABLE @skiff
+[675/1191] found 17 available so far
+[700/1191] found 17 available so far
+AVAILABLE @snoop
+[725/1191] found 18 available so far
+AVAILABLE @sound
+[750/1191] found 19 available so far
+AVAILABLE @sprig
+[775/1191] found 20 available so far
+AVAILABLE @stink
+[800/1191] found 21 available so far
+[825/1191] found 21 available so far
+[850/1191] found 21 available so far
+AVAILABLE @sworn
+AVAILABLE @table
+[875/1191] found 23 available so far
+[900/1191] found 23 available so far
+[925/1191] found 23 available so far
+AVAILABLE @throb
+[950/1191] found 24 available so far
+AVAILABLE @total
+[975/1191] found 25 available so far
+[1000/1191] found 25 available so far
+AVAILABLE @twice
+[1025/1191] found 26 available so far
+AVAILABLE @unity
+[1050/1191] found 27 available so far
+[1075/1191] found 27 available so far
+[1100/1191] found 27 available so far
+AVAILABLE @waxen
+[1125/1191] found 28 available so far
+[1150/1191] found 28 available so far
+AVAILABLE @wordy
+[1175/1191] found 29 available so far
+
+============================================================
+Checked: 1191 | Available: 29 | Taken: 1162 | Errors: 0
+Time: 36.6s
+============================================================
+
+AVAILABLE USERNAMES:
+@boost
+@couch
+@dirty
+@fight
+@found
+@gloss
+@grasp
+@label
+@melon
+@orbit
+@ovary
+@panel
+@roomy
+@scary
+@scorn
+@showy
+@skiff
+@snoop
+@sound
+@sprig
+@stink
+@sworn
+@table
+@throb
+@total
+@twice
+@unity
+@waxen
+@wordy
+
+Saved to available_5letter_meaningful.txt
