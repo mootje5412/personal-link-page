@@ -6,6 +6,18 @@ const machinePaginationHandler = require('./machinePaginationHandler');
 const { getMachineId, extractMachineUuid, isValidMachineUuid } = require('../utils/machineUtils');
 
 class CommandHandler {
+  formatMachineError(error) {
+    if (error === 'Request timed out') {
+      return 'Search timed out. Try a shorter query or try again.';
+    }
+
+    if (error === 'DB_ERROR') {
+      return 'OsintCat database error for that query. Try just the username or hostname (e.g. /machine Ege).';
+    }
+
+    return error;
+  }
+
   handleStart(bot, msg) {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
@@ -290,11 +302,7 @@ To purchase, contact @strafbaar on Telegram`;
       const machineResults = await osintService.machineSearch(query);
 
       if (machineResults.error) {
-        const errorText = machineResults.error === 'Request timed out'
-          ? 'Search timed out. The machine database is slow for name searches — try again or use a shorter query.'
-          : machineResults.error;
-
-        bot.editMessageText(`Machine Viewer\n\nQuery: ${query}\nError: ${errorText}`, {
+        bot.editMessageText(`Machine Viewer\n\nQuery: ${query}\nError: ${this.formatMachineError(machineResults.error)}`, {
           chat_id: chatId,
           message_id: statusMsg.message_id
         });

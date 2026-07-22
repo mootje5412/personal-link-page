@@ -162,12 +162,77 @@ class APIService {
   }
 
   async searchMachines(query) {
-    return this.osintCatGet(
-      '/machine_viewer/search',
-      query,
-      {},
-      config.machineSearchTimeoutMs || 45000
-    );
+    const attempts = this.buildMachineSearchAttempts(query);
+    const timeoutMs = config.machineSearchTimeoutMs || 45000;
+    let lastError = null;
+    let collected = [];
+
+    for (const attempt of attempts) {
+      console.log(`Machine viewer search attempt: "${attempt}"`);
+      const data = await this.osintCatGet('/machine_viewer/search', attempt, {}, timeoutMs);
+
+      if (data && data.error === true) {
+        lastError = data.message;
+        if (this.isRetryableMachineError(data)) {
+          continue;
+        }
+        continue;
+      }
+
+      if (data && typeof data.error === 'string') {
+        const lower = data.error.toLowerCase();
+        if (lower.includes('no matches') || lower.includes('not found') || lower.includes('no results')) {
+          continue;
+        }
+
+        lastError = data.error;
+        if (this.isRetryableMachineError(data)) {
+          continue;
+        }
+        continue;
+      }
+
+      const found = data.machines || data.results || [];
+      collected = this.dedupeMachines([...collected, ...found]);
+    }
+
+    if (collected.length > 0) {
+      return { query, total: collected.length, machines: collected };
+    }
+
+    return { error: true, message: lastError || 'No infected machines found.' };
+  }
+
+  buildMachineSearchAttempts(query) {
+    const trimmed = String(query || '').trim();
+    const attempts = [trimmed];
+
+    if (trimmed.includes(' ')) {
+      const parts = trimmed.split(/\s+/).filter(Boolean);
+      attempts.push(parts[0], parts[parts.length - 1], parts.join(''));
+    }
+
+    return [...new Set(attempts.filter(Boolean))];
+  }
+
+  isRetryableMachineError(data) {
+    const message = String((data && (data.message || data.error)) || '').toUpperCase();
+    return message.includes('DB_ERROR') ||
+      message.includes('TIMEOUT') ||
+      message.includes('TIMED OUT');
+  }
+
+  dedupeMachines(machines) {
+    const seen = new Set();
+
+    return machines.filter((machine) => {
+      const id = machine.id || machine.machine_id || machine.uuid || machine.name;
+      if (!id || seen.has(id)) {
+        return false;
+      }
+      seen.add(id);
+      return true;
+    });
   }
 
   downloadMachine(machineId) {

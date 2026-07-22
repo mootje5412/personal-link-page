@@ -598,9 +598,22 @@ class OSINTService {
       return { error: data.message, machines: [] };
     }
 
-    return {
-      machines: data.machines || data.results || []
-    };
+    const machines = this.filterMachinesByQuery(data.machines || data.results || [], query);
+    return { machines };
+  }
+
+  filterMachinesByQuery(machines, query) {
+    const parts = String(query || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (parts.length <= 1 || !Array.isArray(machines)) {
+      return machines || [];
+    }
+
+    const filtered = machines.filter((machine) => {
+      const name = String(machine.name || machine.hostname || '').toLowerCase();
+      return parts.some((part) => name.includes(part));
+    });
+
+    return filtered.length > 0 ? filtered : machines;
   }
 }
 
