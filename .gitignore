@@ -3,3 +3,6 @@ node_modules/
 *.log
 .DS_Store
 data/
+search-api/venv/
+search-api/data/
+search-api/.env
