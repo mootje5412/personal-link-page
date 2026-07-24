@@ -21,10 +21,11 @@ DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
 SCHEMA_VERSION = 11
 PORT = 8080
-API_VERSION = "2026-07-24-disk-safe"
+API_VERSION = "2026-07-24-stats"
 CREDIT = "api made by Ami.192 on signal"
 API_USAGE = {
     "status": "/api",
+    "stats": "/api/stats",
     "name": "/api?q=Mootje bicep",
     "phone": "/api?q=905544784243",
     "email": "/api?q=email@example.com",
@@ -1131,6 +1132,113 @@ def read_7z_records(path: Path) -> list[dict]:
     return records
 
 
+def count_text_lines(path: Path) -> int:
+    wc = shutil.which("wc")
+    if wc:
+        result = subprocess.run(
+            [wc, "-l", str(path)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return int(result.stdout.split()[0])
+
+    total = 0
+    with path.open("rb", buffering=16 * 1024 * 1024) as handle:
+        while True:
+            chunk = handle.read(16 * 1024 * 1024)
+            if not chunk:
+                break
+            total += chunk.count(b"\n")
+    return total
+
+
+def count_xlsx_lines(path: Path) -> int:
+    from openpyxl import load_workbook
+
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    sheet = workbook.active
+    total = 0
+    for _ in sheet.iter_rows(values_only=True):
+        total += 1
+    workbook.close()
+    return total
+
+
+def count_db_lines(path: Path) -> int:
+    if path.resolve() == INDEX_DB.resolve():
+        return 0
+
+    conn = sqlite3.connect(path)
+    try:
+        tables = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='people'"
+        ).fetchall()
+        if not tables:
+            return 0
+        return conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
+    finally:
+        conn.close()
+
+
+def count_file_lines(path: Path) -> int | None:
+    suffix = path.suffix.lower()
+    if suffix in {".txt", ".csv", ".tsv"}:
+        return count_text_lines(path)
+    if suffix in {".xlsx", ".xlsm"}:
+        return count_xlsx_lines(path)
+    if suffix == ".db":
+        return count_db_lines(path)
+    return None
+
+
+def file_stats(path: Path) -> dict:
+    stat = path.stat()
+    suffix = path.suffix.lower()
+    lines = count_file_lines(path)
+    data_lines = None
+
+    if lines is not None and suffix in {".txt", ".csv", ".tsv", ".xlsx", ".xlsm"}:
+        if suffix == ".txt":
+            header_info = read_txt_header_info(path)
+            has_header = header_info[3] if header_info else False
+        else:
+            has_header = True
+        data_lines = max(lines - 1, 0) if has_header and lines > 0 else lines
+
+    return {
+        "file": path.name,
+        "type": suffix.lstrip(".") or "unknown",
+        "size_bytes": stat.st_size,
+        "size_mb": round(stat.st_size / (1024 * 1024), 2),
+        "lines": lines,
+        "data_lines": data_lines,
+    }
+
+
+def collect_stats() -> dict:
+    files = source_files()
+    file_rows = [file_stats(path) for path in files]
+    line_counts = [row["lines"] for row in file_rows if isinstance(row["lines"], int)]
+
+    stats = {
+        "files": len(file_rows),
+        "total_lines": sum(line_counts),
+        "total_size_bytes": sum(row["size_bytes"] for row in file_rows),
+        "total_size_mb": round(sum(row["size_bytes"] for row in file_rows) / (1024 * 1024), 2),
+        "free_disk_mb": free_disk_bytes() // (1024 * 1024),
+        "index_ready": INDEX_READY.is_set(),
+        "indexed_records": count_records() if INDEX_READY.is_set() and INDEX_DB.exists() else 0,
+        "sources": file_rows,
+    }
+
+    if INDEX_ERROR:
+        stats["index_error"] = INDEX_ERROR
+
+    return stats
+
+
 def source_files() -> list[Path]:
     files: list[Path] = []
     if not DATABASE_DIR.exists():
@@ -1536,6 +1644,16 @@ def raw_json(**data) -> Response:
     return Response(
         content=json.dumps(payload, ensure_ascii=False, indent=2),
         media_type="application/json; charset=utf-8",
+    )
+
+
+@app.get("/api/stats")
+def api_stats() -> Response:
+    started = time.perf_counter()
+    return raw_json(
+        ok=True,
+        stats=collect_stats(),
+        ms=round((time.perf_counter() - started) * 1000, 2),
     )
 
 
