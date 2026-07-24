@@ -1,4 +1,5 @@
 import csv
+import itertools
 import json
 import re
 import shutil
@@ -8,7 +9,6 @@ import threading
 import time
 import tempfile
 from contextlib import asynccontextmanager
-from io import StringIO
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
@@ -17,9 +17,9 @@ from fastapi.responses import Response
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 PORT = 8080
-API_VERSION = "2026-07-24-txt-fix"
+API_VERSION = "2026-07-24-fast-import"
 CREDIT = "api made by Ami.192 on signal"
 API_USAGE = {
     "status": "/api",
@@ -31,8 +31,9 @@ API_USAGE = {
 INDEX_LOCK = threading.Lock()
 INDEX_READY = threading.Event()
 INDEX_ERROR: str | None = None
-BATCH_SIZE = 5000
-PROGRESS_EVERY = 25000
+BATCH_SIZE = 20000
+PROGRESS_EVERY = 50000
+LARGE_FILE_BYTES = 100_000_000
 DATA_SUFFIXES = {".xlsx", ".xlsm", ".csv", ".tsv", ".txt", ".db"}
 ARCHIVE_SUFFIXES = {".7z"}
 
@@ -309,15 +310,6 @@ HEADER_WORDS = {
 }
 
 
-def non_empty_lines(text: str) -> list[str]:
-    lines = []
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped and not stripped.startswith("#"):
-            lines.append(stripped)
-    return lines
-
-
 def split_line(line: str, delimiter: str) -> list[str]:
     if delimiter == "space":
         return [part.strip() for part in re.split(r"\s{2,}", line.strip()) if part.strip()]
@@ -437,22 +429,57 @@ def detect_delimiter(sample: str, suffix: str = ".csv") -> str:
     return ","
 
 
-def read_text_content(path: Path) -> str:
-    raw = path.read_bytes()
+def detect_text_encoding(path: Path) -> str:
+    raw = path.read_bytes()[:262144]
     for encoding in ("utf-8-sig", "utf-8", "utf-16", "utf-16-le", "utf-16-be", "cp1254", "cp1252", "latin-1"):
         try:
-            return raw.decode(encoding)
+            raw.decode(encoding)
+            return encoding
         except UnicodeDecodeError:
             continue
-    return raw.decode("utf-8", errors="replace")
+    return "utf-8"
+
+
+def iter_text_lines(path: Path, encoding: str):
+    with path.open("r", encoding=encoding, errors="replace") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#"):
+                yield stripped
+
+
+def parse_delimited_line(line: str, delimiter: str, headers: list[str]) -> dict:
+    parts = split_line(line, delimiter)
+    if headers:
+        raw = {
+            headers[index]: parts[index] if index < len(parts) else ""
+            for index in range(len(headers))
+        }
+        return map_row(raw)
+    return map_row_positional(parts)
+
+
+def phone_index_fast(record: dict) -> str:
+    phone = record.get("phone", "")
+    if not phone:
+        return ""
+    keys = phone_keys(phone)
+    return "|".join(sorted(keys, key=len, reverse=True)) if keys else ""
+
+
+def tune_sqlite_for_bulk(conn: sqlite3.Connection) -> None:
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=OFF")
+    conn.execute("PRAGMA temp_store=MEMORY")
+    conn.execute("PRAGMA cache_size=-500000")
+
+
+def restore_sqlite_settings(conn: sqlite3.Connection) -> None:
+    conn.execute("PRAGMA synchronous=NORMAL")
 
 
 def read_delimited_rows(path: Path, suffix: str = ".csv") -> list[dict]:
-    text = read_text_content(path)
-    sample = text[:4096]
-    delimiter = detect_delimiter(sample, suffix)
-    reader = csv.DictReader(StringIO(text), delimiter=delimiter)
-    return [map_row(row) for row in reader]
+    return list(iter_delimited_records(path, suffix))
 
 
 def read_csv_rows(path: Path, suffix: str = ".csv") -> list[dict]:
@@ -468,6 +495,9 @@ def insert_record_batch(conn: sqlite3.Connection, batch: list[tuple]) -> None:
 def stream_records(conn: sqlite3.Connection, path: Path, records) -> int:
     batch: list[tuple] = []
     total = 0
+    progress_every = PROGRESS_EVERY
+    if path.stat().st_size >= LARGE_FILE_BYTES:
+        progress_every = 100000
 
     for record in records:
         if not row_is_valid(record):
@@ -476,7 +506,7 @@ def stream_records(conn: sqlite3.Connection, path: Path, records) -> int:
         total += 1
         if len(batch) >= BATCH_SIZE:
             insert_record_batch(conn, batch)
-        if total % PROGRESS_EVERY == 0:
+        if total % progress_every == 0:
             print(f"  Indexed {total} rows from {path.name}...", flush=True)
 
     insert_record_batch(conn, batch)
@@ -509,66 +539,58 @@ def iter_xlsx_records(path: Path):
             raw[header] = row[index]
         parsed += 1
         if parsed % PROGRESS_EVERY == 0:
-            print(f"  Reading row {parsed} from {path.name}...", flush=True)
+            print(f"  Indexed {parsed} rows from {path.name}...", flush=True)
         yield map_row(raw)
 
     workbook.close()
 
 
 def iter_delimited_records(path: Path, suffix: str = ".csv"):
-    text = read_text_content(path)
-    lines = non_empty_lines(text)
-    if not lines:
+    encoding = detect_text_encoding(path)
+    line_iter = iter_text_lines(path, encoding)
+    sample = list(itertools.islice(line_iter, 100))
+
+    if not sample:
         print(f"  {path.name} is empty", flush=True)
         return
 
-    delimiter = choose_best_delimiter(lines, suffix)
+    delimiter = choose_best_delimiter(sample, suffix)
     print(f"  Delimiter for {path.name}: {repr(delimiter)}", flush=True)
 
-    first_parts = split_line(lines[0], delimiter)
+    first_parts = split_line(sample[0], delimiter)
     has_header = line_is_header(first_parts)
+    headers = [clean_header(part) for part in first_parts] if has_header else []
+
     if has_header:
-        headers = [clean_header(part) for part in first_parts]
         print(f"  Headers for {path.name}: {headers[:12]}", flush=True)
-        data_lines = lines[1:]
     else:
-        headers = []
-        data_lines = lines
         print(f"  No header row in {path.name}, using positional columns", flush=True)
 
-    parsed = 0
+    progress_every = PROGRESS_EVERY
+    if path.stat().st_size >= LARGE_FILE_BYTES:
+        progress_every = 100000
+        print(f"  Large file detected ({path.stat().st_size // (1024 * 1024)} MB), streaming...", flush=True)
+
     valid = 0
-    for line in data_lines:
-        parts = split_line(line, delimiter)
-        if not parts:
+    start = 1 if has_header else 0
+
+    for line in itertools.chain(sample[start:], line_iter):
+        record = parse_delimited_line(line, delimiter, headers)
+        if not row_is_valid(record):
             continue
 
-        if headers:
-            raw = {}
-            for index, header in enumerate(headers):
-                if not header:
-                    continue
-                raw[header] = parts[index] if index < len(parts) else ""
-            record = map_row(raw)
-        else:
-            record = map_row_positional(parts)
-
-        parsed += 1
-        if row_is_valid(record):
-            valid += 1
-            if parsed <= 3:
-                print(
-                    f"  Sample row {parsed}: {record.get('first_name', '')} {record.get('last_name', '')} {record.get('phone', '')}",
-                    flush=True,
-                )
-            if valid % PROGRESS_EVERY == 0:
-                print(f"  Indexed {valid} rows from {path.name}...", flush=True)
-            yield record
-        elif parsed <= 3:
-            print(f"  Skipped row {parsed}: {parts[:6]}", flush=True)
+        valid += 1
+        if valid <= 3:
+            print(
+                f"  Sample row {valid}: {record.get('first_name', '')} {record.get('last_name', '')} {record.get('phone', '') or record.get('identity_number', '')}",
+                flush=True,
+            )
+        if valid % progress_every == 0:
+            print(f"  Indexed {valid} rows from {path.name}...", flush=True)
+        yield record
 
     if valid == 0:
-        print(f"  No valid rows loaded from {path.name}. First line: {lines[0][:200]}", flush=True)
+        print(f"  No valid rows loaded from {path.name}. First line: {sample[0][:200]}", flush=True)
 
 
 def read_xlsx_rows(path: Path) -> list[dict]:
@@ -750,6 +772,7 @@ def ensure_index_schema(conn: sqlite3.Connection) -> None:
 
 
 def record_to_row(record: dict) -> tuple:
+    extra = record.get("extra") or {}
     return (
         record["first_name"],
         record["last_name"],
@@ -759,10 +782,10 @@ def record_to_row(record: dict) -> tuple:
         record["city"],
         record["country"],
         record["notes"],
-        json.dumps(record["extra"], ensure_ascii=False),
+        "{}" if not extra else json.dumps(extra, ensure_ascii=False),
         norm_text(record["first_name"]),
         norm_text(record["last_name"]),
-        collect_phone_keys(record),
+        phone_index_fast(record) if not extra else collect_phone_keys(record),
         norm_email(record["email"]),
         norm_text(record["identity_number"]),
     )
@@ -881,26 +904,28 @@ def rebuild_index() -> dict:
     if temp_db.exists():
         temp_db.unlink()
 
-    sources = source_files()
+    sources = sorted(source_files(), key=lambda item: item.stat().st_size)
     loaded_files = []
     total_records = 0
 
     conn = sqlite3.connect(temp_db)
     try:
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
+        tune_sqlite_for_bulk(conn)
         ensure_index_schema(conn)
         for path in sources:
             try:
+                conn.execute("BEGIN IMMEDIATE")
                 count = index_file(conn, path)
+                conn.commit()
             except Exception as error:
+                conn.execute("ROLLBACK")
                 print(f"Failed to load {path.name}: {error}", flush=True)
                 continue
             if count:
                 loaded_files.append(path.name)
                 total_records += count
                 print(f"Loaded {count} records from {path.name}", flush=True)
-        conn.commit()
+        restore_sqlite_settings(conn)
     finally:
         conn.close()
 
