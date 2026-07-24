@@ -1,11 +1,12 @@
 import csv
+import json
 import re
 import sqlite3
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import Response
 
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_DIR = BASE_DIR / "databases"
@@ -35,6 +36,11 @@ COLUMN_MAP = {
     "identity number": "identity_number",
     "id number": "identity_number",
     "tc": "identity_number",
+    "city": "city",
+    "country": "country",
+    "source": "source",
+    "notes": "notes",
+    "ip": "notes",
 }
 
 
@@ -61,39 +67,51 @@ def norm_email(value: str | None) -> str:
     return str(value or "").strip().casefold()
 
 
-def map_row(raw: dict) -> dict[str, str]:
+def map_row(raw: dict) -> dict:
     mapped = {
         "first_name": "",
         "last_name": "",
         "phone": "",
         "email": "",
         "identity_number": "",
+        "city": "",
+        "country": "",
+        "notes": "",
+        "extra": {},
     }
 
     for key, value in raw.items():
         header = clean_header(key)
-        field = COLUMN_MAP.get(header)
-        if not field:
-            continue
         text = str(value or "").strip()
         if text.lower() in {"x", "none", "null", "nan", ""}:
             continue
-        mapped[field] = text
+
+        field = COLUMN_MAP.get(header)
+        if field == "notes" and mapped["notes"]:
+            mapped["notes"] = f"{mapped['notes']} | {text}"
+        elif field:
+            mapped[field] = text
+        elif header:
+            mapped["extra"][header] = text
 
     return mapped
 
 
-def row_is_valid(record: dict[str, str]) -> bool:
+def row_is_valid(record: dict) -> bool:
     return any([
         record["first_name"],
         record["last_name"],
         record["phone"],
         record["email"],
         record["identity_number"],
+        record["city"],
+        record["country"],
+        record["notes"],
+        record["extra"],
     ])
 
 
-def read_csv_rows(path: Path) -> list[dict[str, str]]:
+def read_csv_rows(path: Path) -> list[dict]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         sample = handle.read(4096)
         handle.seek(0)
@@ -102,7 +120,7 @@ def read_csv_rows(path: Path) -> list[dict[str, str]]:
         return [map_row(row) for row in reader]
 
 
-def read_xlsx_rows(path: Path) -> list[dict[str, str]]:
+def read_xlsx_rows(path: Path) -> list[dict]:
     from openpyxl import load_workbook
 
     workbook = load_workbook(path, read_only=True, data_only=True)
@@ -123,11 +141,11 @@ def read_xlsx_rows(path: Path) -> list[dict[str, str]]:
     return mapped_rows
 
 
-def read_db_rows(path: Path) -> list[dict[str, str]]:
+def read_db_rows(path: Path) -> list[dict]:
     if path.resolve() == INDEX_DB.resolve():
         return []
 
-    rows: list[dict[str, str]] = []
+    rows: list[dict] = []
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     try:
@@ -136,16 +154,20 @@ def read_db_rows(path: Path) -> list[dict[str, str]]:
         ).fetchall()
         if not tables:
             return rows
-        for row in conn.execute(
-            "SELECT first_name, last_name, phone, email, identity_number FROM people"
-        ):
-            rows.append({
-                "first_name": str(row["first_name"] or "").strip(),
-                "last_name": str(row["last_name"] or "").strip(),
-                "phone": str(row["phone"] or "").strip(),
-                "email": str(row["email"] or "").strip(),
-                "identity_number": str(row["identity_number"] or "").strip(),
-            })
+        for row in conn.execute("SELECT * FROM people"):
+            record = {
+                "first_name": str(row["first_name"] or "").strip() if "first_name" in row.keys() else "",
+                "last_name": str(row["last_name"] or "").strip() if "last_name" in row.keys() else "",
+                "phone": str(row["phone"] or "").strip() if "phone" in row.keys() else "",
+                "email": str(row["email"] or "").strip() if "email" in row.keys() else "",
+                "identity_number": str(row["identity_number"] or "").strip() if "identity_number" in row.keys() else "",
+                "city": str(row["city"] or "").strip() if "city" in row.keys() else "",
+                "country": str(row["country"] or "").strip() if "country" in row.keys() else "",
+                "notes": str(row["notes"] or "").strip() if "notes" in row.keys() else "",
+                "extra": {},
+            }
+            if record["first_name"] or record["last_name"] or record["phone"] or record["email"]:
+                rows.append(record)
     finally:
         conn.close()
     return rows
@@ -180,6 +202,10 @@ def ensure_index_schema(conn: sqlite3.Connection) -> None:
             phone TEXT NOT NULL DEFAULT '',
             email TEXT NOT NULL DEFAULT '',
             identity_number TEXT NOT NULL DEFAULT '',
+            city TEXT NOT NULL DEFAULT '',
+            country TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
+            extra_json TEXT NOT NULL DEFAULT '{}',
             first_name_n TEXT NOT NULL DEFAULT '',
             last_name_n TEXT NOT NULL DEFAULT '',
             phone_n TEXT NOT NULL DEFAULT '',
@@ -190,13 +216,14 @@ def ensure_index_schema(conn: sqlite3.Connection) -> None:
     )
 
 
-def insert_record(conn: sqlite3.Connection, record: dict[str, str]) -> None:
+def insert_record(conn: sqlite3.Connection, record: dict) -> None:
     conn.execute(
         """
         INSERT INTO people (
             first_name, last_name, phone, email, identity_number,
+            city, country, notes, extra_json,
             first_name_n, last_name_n, phone_n, email_n, identity_number_n
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             record["first_name"],
@@ -204,6 +231,10 @@ def insert_record(conn: sqlite3.Connection, record: dict[str, str]) -> None:
             record["phone"],
             record["email"],
             record["identity_number"],
+            record["city"],
+            record["country"],
+            record["notes"],
+            json.dumps(record["extra"], ensure_ascii=False),
             norm_text(record["first_name"]),
             norm_text(record["last_name"]),
             norm_phone(record["phone"]),
@@ -213,7 +244,7 @@ def insert_record(conn: sqlite3.Connection, record: dict[str, str]) -> None:
     )
 
 
-def load_file_records(path: Path) -> list[dict[str, str]]:
+def load_file_records(path: Path) -> list[dict]:
     suffix = path.suffix.lower()
     if suffix in {".xlsx", ".xlsm"}:
         records = read_xlsx_rows(path)
@@ -265,17 +296,25 @@ def count_records() -> int:
 
 
 def format_result(row: sqlite3.Row) -> dict:
+    extra = {}
+    try:
+        extra = json.loads(row["extra_json"] or "{}")
+    except json.JSONDecodeError:
+        extra = {}
+
     result = {
         "first_name": row["first_name"],
         "last_name": row["last_name"],
         "full_name": f"{row['first_name']} {row['last_name']}".strip(),
+        "phone": row["phone"],
+        "email": row["email"],
+        "identity_number": row["identity_number"],
+        "city": row["city"],
+        "country": row["country"],
+        "notes": row["notes"],
     }
-    if row["phone"]:
-        result["phone"] = row["phone"]
-    if row["email"]:
-        result["email"] = row["email"]
-    if row["identity_number"]:
-        result["identity_number"] = row["identity_number"]
+    if extra:
+        result["extra"] = extra
     return result
 
 
@@ -315,7 +354,9 @@ def search(
         ensure_index_schema(conn)
         rows = conn.execute(
             f"""
-            SELECT first_name, last_name, phone, email, identity_number
+            SELECT
+                first_name, last_name, phone, email, identity_number,
+                city, country, notes, extra_json
             FROM people
             WHERE {' AND '.join(clauses)}
             LIMIT ?
@@ -334,141 +375,12 @@ def search(
     }
 
 
-def api_payload(**data) -> dict:
-    return {"credit": CREDIT, **data}
-
-
-def wants_html(request: Request) -> bool:
-    accept = request.headers.get("accept", "")
-    return "text/html" in accept and "application/json" not in accept.split(",")[0]
-
-
-def render_search_page(results: list[dict], query: dict, total: int, ms: float) -> str:
-    cards = []
-    for item in results:
-        rows = []
-        if item.get("full_name"):
-            rows.append(f'<div class="name">{item["full_name"]}</div>')
-        if item.get("phone"):
-            rows.append(f'<div class="field"><span>Phone</span>{item["phone"]}</div>')
-        if item.get("email"):
-            rows.append(f'<div class="field"><span>Email</span>{item["email"]}</div>')
-        if item.get("identity_number"):
-            rows.append(f'<div class="field"><span>ID</span>{item["identity_number"]}</div>')
-        cards.append(f'<article class="card">{"".join(rows)}</article>')
-
-    if not cards:
-        body = '<div class="empty">No results found.</div>'
-    else:
-        body = "".join(cards)
-
-    active = [f"{key.replace('_', ' ').title()}: {value}" for key, value in query.items() if value]
-    query_line = " · ".join(active) if active else "Search"
-
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Search Results</title>
-  <style>
-    :root {{
-      color-scheme: dark;
-      --bg: #0b0f17;
-      --panel: #121826;
-      --line: #243044;
-      --text: #eef2ff;
-      --muted: #94a3b8;
-      --accent: #60a5fa;
-    }}
-    * {{ box-sizing: border-box; }}
-    body {{
-      margin: 0;
-      font-family: Inter, Segoe UI, Roboto, sans-serif;
-      background: linear-gradient(180deg, #0b0f17 0%, #111827 100%);
-      color: var(--text);
-      min-height: 100vh;
-    }}
-    .wrap {{
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 32px 20px 48px;
-    }}
-    .top {{
-      margin-bottom: 24px;
-    }}
-    .eyebrow {{
-      color: var(--accent);
-      font-size: 12px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      margin-bottom: 8px;
-    }}
-    h1 {{
-      margin: 0 0 8px;
-      font-size: 28px;
-      font-weight: 700;
-    }}
-    .meta {{
-      color: var(--muted);
-      font-size: 14px;
-    }}
-    .grid {{
-      display: grid;
-      gap: 14px;
-    }}
-    .card {{
-      background: rgba(18, 24, 38, 0.92);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 18px 20px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
-    }}
-    .name {{
-      font-size: 20px;
-      font-weight: 700;
-      margin-bottom: 10px;
-    }}
-    .field {{
-      display: flex;
-      gap: 12px;
-      padding: 8px 0;
-      border-top: 1px solid rgba(36, 48, 68, 0.7);
-      font-size: 15px;
-    }}
-    .field span {{
-      width: 64px;
-      color: var(--muted);
-      flex-shrink: 0;
-    }}
-    .empty {{
-      background: var(--panel);
-      border: 1px dashed var(--line);
-      border-radius: 16px;
-      padding: 28px;
-      text-align: center;
-      color: var(--muted);
-    }}
-    .footer {{
-      margin-top: 28px;
-      text-align: center;
-      color: var(--muted);
-      font-size: 13px;
-    }}
-  </style>
-</head>
-<body>
-  <main class="wrap">
-    <section class="top">
-      <div class="eyebrow">People Search</div>
-      <h1>{total} result{"s" if total != 1 else ""}</h1>
-      <div class="meta">{query_line} · {ms:.0f} ms</div>
-    </section>
-    <section class="grid">{body}</section>
-    <footer class="footer">{CREDIT}</footer>
-  </main>
-</body>
-</html>"""
+def raw_json(**data) -> Response:
+    payload = {"credit": CREDIT, **data}
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False, indent=2),
+        media_type="application/json; charset=utf-8",
+    )
 
 
 @app.on_event("startup")
@@ -478,38 +390,32 @@ def startup() -> None:
 
 
 @app.get("/api/health")
-def health() -> dict:
-    return api_payload(ok=True, records=count_records())
+def health() -> Response:
+    return raw_json(ok=True, records=count_records())
 
 
 @app.get("/api/search")
 def api_search(
-    request: Request,
     phone: str | None = Query(default=None),
     email: str | None = Query(default=None),
     first_name: str | None = Query(default=None),
     last_name: str | None = Query(default=None),
     identity_number: str | None = Query(default=None),
     limit: int = Query(default=25, ge=1, le=100),
-):
+) -> Response:
     started = time.perf_counter()
     try:
         results, query = search(phone, email, first_name, last_name, identity_number, limit)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
-    ms = round((time.perf_counter() - started) * 1000, 2)
-
-    if wants_html(request):
-        return HTMLResponse(render_search_page(results, query, len(results), ms))
-
-    return JSONResponse(api_payload(
+    return raw_json(
         success=True,
         query=query,
         total=len(results),
         results=results,
-        ms=ms,
-    ))
+        ms=round((time.perf_counter() - started) * 1000, 2),
+    )
 
 
 if __name__ == "__main__":
