@@ -1,22 +1,24 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
 APP_DIR="/root/search-api"
 SERVICE_NAME="search-api"
 
-echo "Deploying People Search API"
-echo "==========================="
+cd "$APP_DIR"
+
+echo "Deploying People Search API..."
 
 if [ ! -f ".env" ]; then
   cp .env.example .env
 fi
 
-python3 -m venv venv 2>/dev/null || {
-  apt-get update -qq && apt-get install -y -qq python3-venv python3-pip
+if ! python3 -m venv venv 2>/dev/null; then
+  apt-get update -qq
+  apt-get install -y -qq python3-venv python3-pip
   python3 -m venv venv
-}
-./venv/bin/pip install -r requirements.txt
+fi
 
+./venv/bin/pip install -r requirements.txt
 mkdir -p data
 
 cat > /etc/systemd/system/${SERVICE_NAME}.service <<EOF
@@ -39,20 +41,12 @@ EOF
 systemctl daemon-reload
 systemctl enable ${SERVICE_NAME}
 systemctl restart ${SERVICE_NAME}
-
 sleep 2
 
 if systemctl is-active --quiet ${SERVICE_NAME}; then
-  echo ""
-  echo "API is running on port 8080"
-  echo ""
-  echo "Health:"
-  echo "  curl http://127.0.0.1:8080/api/health"
-  echo ""
-  echo "Search example:"
-  echo "  curl \"http://YOUR_SERVER_IP:8080/api/search?first_name=Ege&last_name=Tevkir\""
+  echo "OK - API running on port 8080"
+  echo "Test: curl http://127.0.0.1:8080/api/health"
 else
-  echo "Service failed to start. Check logs:"
-  echo "  journalctl -u ${SERVICE_NAME} -n 50 --no-pager"
+  echo "FAILED - check: journalctl -u ${SERVICE_NAME} -n 50 --no-pager"
   exit 1
 fi

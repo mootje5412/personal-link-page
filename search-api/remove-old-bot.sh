@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 echo "Removing old FindNow Telegram bot from server..."

@@ -1,16 +1,24 @@
 # People Search API — Server Commands
 
-## Install
+## Install (Termius / phone — copy all lines)
 
 ```bash
-rm -rf ~/search-api /tmp/personal-link-page
+rm -rf /tmp/personal-link-page
 mkdir -p ~/search-api
 cd /tmp
 git clone https://github.com/mootje5412/personal-link-page.git
 cp -r personal-link-page/search-api/* ~/search-api/
 cd ~/search-api
-chmod +x deploy.sh
-./deploy.sh
+sed -i 's/\r$//' deploy.sh install.sh remove-old-bot.sh 2>/dev/null || true
+chmod +x deploy.sh install.sh remove-old-bot.sh
+bash install.sh
+```
+
+If `./deploy.sh` says "required file not found", run:
+
+```bash
+sed -i 's/\r$//' ~/search-api/*.sh
+bash ~/search-api/install.sh
 ```
 
 ## Import your XLSX or CSV
