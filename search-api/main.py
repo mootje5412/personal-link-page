@@ -20,13 +20,14 @@ DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
 SCHEMA_VERSION = 9
 PORT = 8080
-API_VERSION = "2026-07-24-pg-sql"
+API_VERSION = "2026-07-24-pg-fix"
 CREDIT = "api made by Ami.192 on signal"
 AUTO_REBUILD = os.environ.get("AUTO_REBUILD", "0") == "1"
 API_USAGE = {
     "status": "/api",
     "stats": "/api/stats",
     "rebuild": "/api/rebuild",
+    "reimport": "/api/reimport",
     "name": "/api?q=Mootje bicep",
     "phone": "/api?q=905544784243",
     "email": "/api?q=email@example.com",
@@ -53,7 +54,7 @@ TABLE_NAME_HINTS = {
 }
 
 PG_COPY_RE = re.compile(
-    r"^COPY\s+(?:public\.)?(\w+)\s*\(([^)]+)\)\s+FROM\s+stdin\s*;",
+    r'^COPY\s+(?:[\w.]+\.)?(?:"([^"]+)"|(\w+))\s*\(([^)]+)\)\s+FROM\s+stdin\s*;?\s*$',
     re.IGNORECASE,
 )
 PG_NULLS = {"\\N", "<NULL>", "NULL", "null", "None"}
@@ -837,10 +838,22 @@ def file_stats(path: Path) -> dict:
 
 def collect_stats(count_lines: bool = False) -> dict:
     files = source_files()
+    indexed_meta: dict[str, dict] = {}
+    if INDEX_DB.exists():
+        try:
+            conn = sqlite3.connect(INDEX_DB)
+            try:
+                indexed_meta = load_indexed_sources(conn)
+            finally:
+                conn.close()
+        except sqlite3.Error:
+            indexed_meta = {}
+
     file_rows = []
     for path in files:
         stat = path.stat()
         suffix = path.suffix.lower()
+        meta = indexed_meta.get(path.name, {})
         row = {
             "file": path.name,
             "type": suffix.lstrip(".") or "unknown",
@@ -848,6 +861,8 @@ def collect_stats(count_lines: bool = False) -> dict:
             "size_mb": round(stat.st_size / (1024 * 1024), 2),
             "lines": None,
             "data_lines": None,
+            "indexed_records": meta.get("records"),
+            "needs_import": file_needs_import(path, indexed_meta) if indexed_meta else True,
         }
         if count_lines:
             lines = count_file_lines(path)
@@ -1004,24 +1019,56 @@ def list_data_tables(conn: sqlite3.Connection) -> list[str]:
     return sorted(tables, key=sort_key)
 
 
-def load_indexed_sources(conn: sqlite3.Connection) -> dict[str, float]:
+def load_indexed_sources(conn: sqlite3.Connection) -> dict[str, dict]:
     row = conn.execute(
         "SELECT value FROM meta WHERE key = ?", (SOURCE_META_KEY,)
     ).fetchone()
     if not row:
         return {}
     try:
-        data = json.loads(row[0] or "{}")
-        return {str(key): float(value) for key, value in data.items()}
+        raw = json.loads(row[0] or "{}")
+        normalized: dict[str, dict] = {}
+        for key, value in raw.items():
+            if isinstance(value, dict):
+                normalized[str(key)] = {
+                    "mtime": float(value.get("mtime", 0)),
+                    "records": int(value.get("records", 0)),
+                }
+            else:
+                normalized[str(key)] = {"mtime": float(value), "records": 0}
+        return normalized
     except (json.JSONDecodeError, TypeError, ValueError):
         return {}
 
 
-def save_indexed_sources(conn: sqlite3.Connection, sources: dict[str, float]) -> None:
+def save_indexed_sources(conn: sqlite3.Connection, sources: dict[str, dict]) -> None:
     conn.execute(
         "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
         (SOURCE_META_KEY, json.dumps(sources, ensure_ascii=False)),
     )
+
+
+def source_is_importable(path: Path) -> bool:
+    return path.suffix.lower() in {".sql", ".db"}
+
+
+def file_needs_import(path: Path, indexed: dict[str, dict]) -> bool:
+    mtime = path.stat().st_mtime
+    entry = indexed.get(path.name)
+
+    if entry is None:
+        return True
+
+    if source_is_importable(path):
+        if entry.get("records", 0) <= 0:
+            return True
+        return entry.get("mtime") != mtime
+
+    if entry.get("records", 0) == -1 and entry.get("mtime") == mtime:
+        return False
+    if entry.get("mtime") != mtime:
+        return True
+    return entry.get("records", 0) <= 0
 
 
 def import_database_path(conn: sqlite3.Connection, path: Path, label: str) -> int:
@@ -1143,6 +1190,30 @@ def pg_copy_record(columns: list[str], parts: list[str]) -> dict | None:
     return record
 
 
+def parse_pg_copy_header(line: str) -> tuple[str, list[str]] | None:
+    stripped = line.strip()
+    lowered = stripped.lower()
+    if not lowered.startswith("copy ") or "from stdin" not in lowered:
+        return None
+
+    match = PG_COPY_RE.match(stripped)
+    if match:
+        table = match.group(1) or match.group(2) or "unknown"
+        columns = [part.strip().strip('"') for part in match.group(3).split(",")]
+        return table, columns
+
+    col_start = stripped.find("(")
+    col_end = stripped.rfind(")")
+    if col_start == -1 or col_end <= col_start:
+        return None
+
+    columns = [part.strip().strip('"') for part in stripped[col_start + 1 : col_end].split(",")]
+    head = stripped[:col_start].strip()
+    table_token = head[4:].strip().split()[-1]
+    table = table_token.split(".")[-1].strip('"')
+    return table, columns
+
+
 def iter_postgresql_copy_rows(path: Path):
     columns: list[str] = []
     table = ""
@@ -1152,15 +1223,14 @@ def iter_postgresql_copy_rows(path: Path):
         for line in handle:
             stripped = line.strip()
             if not in_copy:
-                match = PG_COPY_RE.match(stripped)
-                if match:
-                    table = match.group(1)
-                    columns = [part.strip().strip('"') for part in match.group(2).split(",")]
+                parsed = parse_pg_copy_header(line)
+                if parsed:
+                    table, columns = parsed
                     in_copy = True
                     print(f"  PostgreSQL COPY {table} ({len(columns)} columns)", flush=True)
                 continue
 
-            if stripped == "\\.":
+            if stripped == "\\." or stripped.startswith("\\."):
                 in_copy = False
                 columns = []
                 table = ""
@@ -1355,17 +1425,24 @@ def index_is_stale() -> bool:
     return False
 
 
-def bootstrap_source_meta(conn: sqlite3.Connection) -> dict[str, float]:
+def bootstrap_source_meta(conn: sqlite3.Connection) -> dict[str, dict]:
     indexed = load_indexed_sources(conn)
     if indexed:
         return indexed
-    meta = {path.name: path.stat().st_mtime for path in source_files()}
-    save_indexed_sources(conn, meta)
-    print(
-        f"Marked {len(meta)} existing file(s) as indexed. New SQL/DB files will auto-import.",
-        flush=True,
-    )
-    return meta
+
+    meta: dict[str, dict] = {}
+    for path in source_files():
+        if source_is_importable(path):
+            continue
+        meta[path.name] = {"mtime": path.stat().st_mtime, "records": -1}
+
+    if meta:
+        save_indexed_sources(conn, meta)
+        print(
+            f"Marked {len(meta)} existing data file(s). SQL/DB files will import on startup.",
+            flush=True,
+        )
+    return load_indexed_sources(conn)
 
 
 def index_pending_sources(conn: sqlite3.Connection) -> int:
@@ -1374,16 +1451,16 @@ def index_pending_sources(conn: sqlite3.Connection) -> int:
     updated = dict(indexed)
 
     for path in source_files():
-        mtime = path.stat().st_mtime
-        if path.name in indexed and indexed[path.name] == mtime:
+        if not file_needs_import(path, indexed):
             continue
         try:
             added = index_file(conn, path)
-            updated[path.name] = mtime
+            updated[path.name] = {"mtime": path.stat().st_mtime, "records": added}
             total_added += added
             print(f"Indexed {added} records from {path.name}", flush=True)
         except Exception as error:
             print(f"Failed to index {path.name}: {error}", flush=True)
+            updated[path.name] = {"mtime": path.stat().st_mtime, "records": 0}
 
     save_indexed_sources(conn, updated)
     return total_added
@@ -1475,6 +1552,7 @@ def rebuild_index() -> dict:
 
     sources = sorted(source_files(), key=lambda item: (0 if item.suffix.lower() == ".sql" else 1, item.stat().st_size))
     loaded_files = []
+    file_counts: dict[str, int] = {}
     total_records = 0
 
     conn = sqlite3.connect(temp_db)
@@ -1489,13 +1567,21 @@ def rebuild_index() -> dict:
             except Exception as error:
                 conn.execute("ROLLBACK")
                 print(f"Failed to load {path.name}: {error}", flush=True)
+                file_counts[path.name] = 0
                 continue
+            file_counts[path.name] = count
             if count:
                 loaded_files.append(path.name)
                 total_records += count
                 print(f"Loaded {count} records from {path.name}", flush=True)
         restore_sqlite_settings(conn)
-        save_indexed_sources(conn, {path.name: path.stat().st_mtime for path in sources})
+        save_indexed_sources(
+            conn,
+            {
+                path.name: {"mtime": path.stat().st_mtime, "records": file_counts.get(path.name, 0)}
+                for path in sources
+            },
+        )
         conn.commit()
     finally:
         conn.close()
@@ -1506,7 +1592,13 @@ def rebuild_index() -> dict:
 
     final_conn = sqlite3.connect(INDEX_DB)
     try:
-        save_indexed_sources(final_conn, {path.name: path.stat().st_mtime for path in sources})
+        save_indexed_sources(
+            final_conn,
+            {
+                path.name: {"mtime": path.stat().st_mtime, "records": file_counts.get(path.name, 0)}
+                for path in sources
+            },
+        )
         final_conn.commit()
     finally:
         final_conn.close()
@@ -1679,6 +1771,56 @@ def api_stats(
         ok=True,
         stats=collect_stats(count_lines=count_lines),
         ms=round((time.perf_counter() - started) * 1000, 2),
+    )
+
+
+@app.get("/api/reimport")
+def api_reimport() -> Response:
+    if not INDEX_DB.exists() or not index_usable():
+        rebuild_index_async(force=True)
+        return raw_json(
+            ok=True,
+            rebuilding=True,
+            message="No index yet. Full rebuild started.",
+        )
+
+    if INDEX_BUILDING.is_set():
+        return raw_json(ok=True, rebuilding=True, message="Import already running")
+
+    def worker() -> None:
+        global INDEX_ERROR
+        INDEX_BUILDING.set()
+        INDEX_ERROR = None
+        try:
+            conn = sqlite3.connect(INDEX_DB)
+            try:
+                tune_sqlite_for_bulk(conn)
+                ensure_index_schema(conn)
+                indexed = load_indexed_sources(conn)
+                for path in source_files():
+                    if source_is_importable(path):
+                        indexed.pop(path.name, None)
+                save_indexed_sources(conn, indexed)
+                conn.commit()
+                added = index_pending_sources(conn)
+                conn.commit()
+                restore_sqlite_settings(conn)
+                print(f"Reimport added {added} records", flush=True)
+            finally:
+                conn.close()
+        except Exception as error:
+            INDEX_ERROR = str(error)
+            print(f"Reimport failed: {error}", flush=True)
+        finally:
+            INDEX_BUILDING.clear()
+            INDEX_READY.set()
+
+    INDEX_BUILDING.set()
+    threading.Thread(target=worker, daemon=True).start()
+    return raw_json(
+        ok=True,
+        rebuilding=True,
+        message="Reimporting SQL/DB files in background. Check /api/stats for indexed_records.",
     )
 
 
