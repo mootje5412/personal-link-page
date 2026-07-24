@@ -20,7 +20,7 @@ DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
 SCHEMA_VERSION = 9
 PORT = 8080
-API_VERSION = "2026-07-24-sql-search"
+API_VERSION = "2026-07-24-pg-sql"
 CREDIT = "api made by Ami.192 on signal"
 AUTO_REBUILD = os.environ.get("AUTO_REBUILD", "0") == "1"
 API_USAGE = {
@@ -52,6 +52,13 @@ TABLE_NAME_HINTS = {
     "records", "record", "data", "clients", "client", "kisi", "kisiler",
 }
 
+PG_COPY_RE = re.compile(
+    r"^COPY\s+(?:public\.)?(\w+)\s*\(([^)]+)\)\s+FROM\s+stdin\s*;",
+    re.IGNORECASE,
+)
+PG_NULLS = {"\\N", "<NULL>", "NULL", "null", "None"}
+PG_PROGRESS_EVERY = 500_000
+
 INSERT_SQL = """
 INSERT INTO people (
     first_name, last_name, phone, email, identity_number,
@@ -75,12 +82,14 @@ COLUMN_MAP = {
     "first_name": "first_name",
     "firstname": "first_name",
     "ad": "first_name",
+    "first": "first_name",
     "isim": "first_name",
     "musteri adi": "first_name",
     "surname": "last_name",
     "last_name": "last_name",
     "lastname": "last_name",
     "soyad": "last_name",
+    "last": "last_name",
     "soyisim": "last_name",
     "soyadi": "last_name",
     "phone": "phone",
@@ -128,7 +137,10 @@ COLUMN_MAP = {
     "kimlik numarasi": "identity_number",
     "id no": "identity_number",
     "national id": "identity_number",
+    "national_identifier": "identity_number",
     "id": "identity_number",
+    "birth_city": "city",
+    "address_city": "city",
     "dogum yeri": "city",
     "dogum_yeri": "city",
     "il": "city",
@@ -1071,12 +1083,135 @@ def import_database_path(conn: sqlite3.Connection, path: Path, label: str) -> in
     return after - before
 
 
+def is_postgresql_dump(path: Path) -> bool:
+    with path.open("r", encoding="utf-8", errors="replace") as handle:
+        sample = handle.read(16384)
+    lowered = sample.lower()
+    return (
+        "postgresql database dump" in lowered
+        or ("copy " in lowered and "from stdin" in lowered)
+        or "pg_catalog" in lowered
+    )
+
+
+def pg_clean_value(value: str) -> str:
+    text = str(value or "").strip()
+    if text in PG_NULLS:
+        return ""
+    return text
+
+
+def pg_copy_record(columns: list[str], parts: list[str]) -> dict | None:
+    raw: dict[str, str] = {}
+    for index, column in enumerate(columns):
+        raw[column] = pg_clean_value(parts[index] if index < len(parts) else "")
+
+    record = {field: "" for field in IMPORT_FIELDS}
+    record["extra"] = {}
+
+    for column, value in raw.items():
+        if not value:
+            continue
+        header = clean_header(column)
+        field = COLUMN_MAP.get(header)
+        if field in IMPORT_FIELDS and not record[field]:
+            record[field] = value
+        else:
+            record["extra"][header] = value
+
+    if not record["city"]:
+        for key in ("address_city", "birth_city", "id_registration_city"):
+            city = record["extra"].get(key, "")
+            if city:
+                record["city"] = city
+                break
+
+    note_bits = []
+    for key in (
+        "address_district", "address_neighborhood", "street_address",
+        "door_or_entrance_number", "mother_first", "father_first",
+        "date_of_birth", "gender", "misc",
+    ):
+        value = record["extra"].get(key, "")
+        if value:
+            note_bits.append(value)
+    if note_bits and not record["notes"]:
+        record["notes"] = " | ".join(note_bits)
+
+    if not row_is_valid(record):
+        return None
+    return record
+
+
+def iter_postgresql_copy_rows(path: Path):
+    columns: list[str] = []
+    table = ""
+    in_copy = False
+
+    with path.open("r", encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if not in_copy:
+                match = PG_COPY_RE.match(stripped)
+                if match:
+                    table = match.group(1)
+                    columns = [part.strip().strip('"') for part in match.group(2).split(",")]
+                    in_copy = True
+                    print(f"  PostgreSQL COPY {table} ({len(columns)} columns)", flush=True)
+                continue
+
+            if stripped == "\\.":
+                in_copy = False
+                columns = []
+                table = ""
+                continue
+
+            if not columns:
+                continue
+
+            parts = line.rstrip("\n\r").split("\t")
+            record = pg_copy_record(columns, parts)
+            if record is not None:
+                yield table, record
+
+
+def import_postgresql_dump(conn: sqlite3.Connection, path: Path) -> int:
+    print(f"  PostgreSQL dump detected in {path.name}", flush=True)
+    before = conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
+    batch: list[tuple] = []
+    total = 0
+    started = time.perf_counter()
+
+    for _table, record in iter_postgresql_copy_rows(path):
+        batch.append(record_to_row(record))
+        total += 1
+        if len(batch) >= BATCH_SIZE:
+            conn.executemany(INSERT_SQL, batch)
+            batch.clear()
+        if total % PG_PROGRESS_EVERY == 0:
+            elapsed = max(time.perf_counter() - started, 0.001)
+            print(f"  Imported {total} PostgreSQL rows ({int(total / elapsed)}/sec)...", flush=True)
+
+    if batch:
+        conn.executemany(INSERT_SQL, batch)
+
+    if total == 0:
+        raise RuntimeError(f"No COPY data rows found in PostgreSQL dump {path.name}")
+
+    after = conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
+    print(f"  PostgreSQL import done: {after - before} records from {path.name}", flush=True)
+    return after - before
+
+
 def import_sql_file(conn: sqlite3.Connection, path: Path) -> int:
+    if is_postgresql_dump(path):
+        return import_postgresql_dump(conn, path)
+
     db_path = db_file_path(conn)
     if not db_path:
         raise RuntimeError("sql import needs a file-backed database")
 
-    print(f"  Importing SQL {path.name}...", flush=True)
+    print(f"  SQLite SQL import for {path.name}...", flush=True)
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         import_db = Path(tmp_dir) / "import.db"
