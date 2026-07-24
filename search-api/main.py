@@ -8,6 +8,7 @@ import threading
 import time
 import tempfile
 from contextlib import asynccontextmanager
+from io import StringIO
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
@@ -16,9 +17,9 @@ from fastapi.responses import Response
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 PORT = 8080
-API_VERSION = "2026-07-24-7z-fix"
+API_VERSION = "2026-07-24-txt-support"
 CREDIT = "api made by Ami.192 on signal"
 API_USAGE = {
     "status": "/api",
@@ -31,7 +32,7 @@ INDEX_LOCK = threading.Lock()
 INDEX_READY = threading.Event()
 INDEX_ERROR: str | None = None
 BATCH_SIZE = 2000
-DATA_SUFFIXES = {".xlsx", ".xlsm", ".csv", ".tsv", ".db"}
+DATA_SUFFIXES = {".xlsx", ".xlsm", ".csv", ".tsv", ".txt", ".db"}
 ARCHIVE_SUFFIXES = {".7z"}
 
 INSERT_SQL = """
@@ -287,13 +288,36 @@ def row_is_valid(record: dict) -> bool:
     ])
 
 
+def detect_delimiter(sample: str, suffix: str = ".csv") -> str:
+    if suffix == ".tsv":
+        return "\t"
+    options = ["\t", ",", ";", "|"]
+    best = max(options, key=lambda item: sample.count(item))
+    if sample.count(best) > 0:
+        return best
+    return ","
+
+
+def read_text_content(path: Path) -> str:
+    raw = path.read_bytes()
+    for encoding in ("utf-8-sig", "utf-8", "cp1254", "latin-1"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
+def read_delimited_rows(path: Path, suffix: str = ".csv") -> list[dict]:
+    text = read_text_content(path)
+    sample = text[:4096]
+    delimiter = detect_delimiter(sample, suffix)
+    reader = csv.DictReader(StringIO(text), delimiter=delimiter)
+    return [map_row(row) for row in reader]
+
+
 def read_csv_rows(path: Path, suffix: str = ".csv") -> list[dict]:
-    with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        sample = handle.read(4096)
-        handle.seek(0)
-        delimiter = "\t" if suffix == ".tsv" or sample.count("\t") > sample.count(",") else ","
-        reader = csv.DictReader(handle, delimiter=delimiter)
-        return [map_row(row) for row in reader]
+    return read_delimited_rows(path, suffix)
 
 
 def read_xlsx_rows(path: Path) -> list[dict]:
@@ -534,8 +558,8 @@ def load_file_records(path: Path) -> list[dict]:
     suffix = path.suffix.lower()
     if suffix in {".xlsx", ".xlsm"}:
         records = read_xlsx_rows(path)
-    elif suffix in {".csv", ".tsv"}:
-        records = read_csv_rows(path, suffix)
+    elif suffix in {".csv", ".tsv", ".txt"}:
+        records = read_delimited_rows(path, suffix)
     elif suffix == ".db":
         records = read_db_rows(path)
     elif suffix == ".7z":
