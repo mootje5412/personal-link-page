@@ -1,6 +1,20 @@
 .pricing {
   background: var(--bg-primary);
   border-top: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.pricing::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 400px;
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.04) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .pricing-grid {
@@ -8,22 +22,34 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 1.25rem;
   margin-bottom: 2rem;
+  perspective: 1200px;
+  align-items: center;
 }
 
 .pricing-card {
-  background: var(--bg-card);
+  background: linear-gradient(165deg, #161616 0%, #0e0e0e 100%);
   border: 1px solid var(--border);
   border-radius: 1rem;
   padding: 1.75rem;
   display: flex;
   flex-direction: column;
   position: relative;
-  transition: border-color 0.3s;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s, box-shadow 0.35s;
+  transform-style: preserve-3d;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 10px 30px rgba(0, 0, 0, 0.4);
 }
 
 .pricing-card-featured {
   border-color: var(--text-primary);
-  background: var(--bg-elevated);
+  background: linear-gradient(165deg, #1e1e1e 0%, #121212 100%);
+  transform: scale(1.04) translateZ(20px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 24px 48px rgba(0, 0, 0, 0.6),
+    0 0 60px rgba(255, 255, 255, 0.03);
+  z-index: 2;
 }
 
 .pricing-tag {
@@ -40,6 +66,7 @@
   padding: 0.3rem 0.85rem;
   border-radius: 100px;
   white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
 .pricing-card-header {
@@ -71,6 +98,10 @@
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.03em;
+  background: linear-gradient(180deg, #fff 30%, #888 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .price-currency {
@@ -117,28 +148,33 @@
   font-weight: 600;
   border-radius: 0.6rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: transform 0.15s, box-shadow 0.15s;
   background: transparent;
   color: var(--text-primary);
   border: 1px solid var(--border-light);
   min-height: 48px;
-  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.4);
 }
 
 .pricing-button:active {
-  background: var(--bg-elevated);
-  border-color: var(--text-primary);
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
 }
 
 .pricing-button-primary {
   background: var(--text-primary);
   color: var(--bg-primary);
   border-color: var(--text-primary);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.3) inset,
+    0 4px 0 #737373,
+    0 8px 20px rgba(0, 0, 0, 0.4);
 }
 
 .pricing-button-primary:active {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.2) inset,
+    0 1px 0 #737373;
 }
 
 .pricing-note {
@@ -146,7 +182,8 @@
   padding: 1.25rem 1rem;
   border: 1px solid var(--border);
   border-radius: 0.75rem;
-  background: var(--bg-secondary);
+  background: linear-gradient(160deg, #111 0%, #0a0a0a 100%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 .pricing-note p {
@@ -158,31 +195,42 @@
 @media (max-width: 968px) {
   .pricing-grid {
     grid-template-columns: 1fr;
-    gap: 1rem;
+    gap: 1.25rem;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .pricing-card-featured {
     order: -1;
+    transform: none;
   }
+}
 
+@media (max-width: 768px) {
   .pricing-card {
     padding: 1.5rem;
   }
 }
 
 @media (min-width: 769px) {
-  .pricing-card:hover {
+  .pricing-card:not(.pricing-card-featured):hover {
     border-color: var(--border-light);
-    transform: translateY(-3px);
+    transform: translateY(-4px) rotateX(3deg);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.06) inset,
+      0 16px 36px rgba(0, 0, 0, 0.5);
+  }
+
+  .pricing-card-featured:hover {
+    transform: scale(1.06) translateZ(30px) translateY(-4px);
   }
 
   .pricing-button:hover {
-    background: var(--bg-elevated);
     border-color: var(--text-primary);
   }
 
   .pricing-button-primary:hover {
     background: var(--accent-hover);
-    border-color: var(--accent-hover);
   }
 }

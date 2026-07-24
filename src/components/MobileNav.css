@@ -46,10 +46,15 @@
     background: var(--text-primary);
     color: var(--bg-primary);
     border-radius: 0.75rem;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.3) inset,
+      0 3px 0 #737373;
   }
 
   .mobile-nav-cta:active {
     background: var(--accent-hover);
     color: var(--bg-primary);
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 #737373;
   }
 }

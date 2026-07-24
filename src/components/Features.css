@@ -1,38 +1,71 @@
 .features {
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.features::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 300px;
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.03) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .features-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
+  gap: 1.25rem;
   margin-bottom: 2.5rem;
+  perspective: 1200px;
 }
 
 .feature-card {
   padding: 1.75rem;
-  background: var(--bg-card);
+  background: linear-gradient(160deg, #181818 0%, #111111 100%);
   border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  transition: border-color 0.3s;
+  border-radius: 0.85rem;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s, box-shadow 0.35s;
+  transform-style: preserve-3d;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 8px 24px rgba(0, 0, 0, 0.4);
+  position: relative;
+}
+
+.feature-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, transparent 50%);
+  pointer-events: none;
 }
 
 .feature-card:active {
-  border-color: var(--border-light);
+  transform: translateY(2px);
 }
 
 .feature-icon {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
+  background: linear-gradient(145deg, #222 0%, #111 100%);
+  border: 1px solid var(--border-light);
+  border-radius: 0.6rem;
   color: var(--text-primary);
   margin-bottom: 1rem;
+  box-shadow:
+    0 4px 0 rgba(0, 0, 0, 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.08) inset;
+  transform: translateZ(12px);
 }
 
 .feature-icon svg {
@@ -54,13 +87,19 @@
 
 .feature-content {
   min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .features-showcase {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
+  background: linear-gradient(160deg, #161616 0%, #0d0d0d 100%);
+  border: 1px solid var(--border-light);
+  border-radius: 0.85rem;
   padding: 2rem;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 16px 40px rgba(0, 0, 0, 0.45);
+  transform: perspective(800px) rotateX(2deg);
 }
 
 .showcase-item h3 {
@@ -82,11 +121,18 @@
   gap: 0.6rem;
   padding: 0.85rem 0.9rem;
   min-height: 48px;
-  background: var(--bg-secondary);
+  background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border);
   border-radius: 0.5rem;
   font-weight: 500;
   font-size: 0.875rem;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.showcase-feature:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
 }
 
 .showcase-feature svg {
@@ -98,6 +144,10 @@
 @media (max-width: 968px) {
   .features-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .features-showcase {
+    transform: none;
   }
 }
 
@@ -118,8 +168,9 @@
   .feature-icon {
     margin-bottom: 0;
     flex-shrink: 0;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
+    transform: none;
   }
 
   .feature-content {
@@ -149,6 +200,15 @@
 
 @media (min-width: 769px) {
   .feature-card:hover {
+    border-color: var(--border-light);
+    transform: translateY(-6px) rotateX(4deg);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.08) inset,
+      0 20px 40px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+
+  .showcase-feature:hover {
     border-color: var(--border-light);
     transform: translateY(-2px);
   }
