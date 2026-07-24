@@ -26,8 +26,6 @@ dist-ssr
 
 # Search API
 search-api/venv/
-search-api/data/
 search-api/databases/*
 !search-api/databases/.gitkeep
 search-api/__pycache__/
-**/__pycache__/
