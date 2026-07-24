@@ -56,8 +56,7 @@ const Pricing = () => {
             <span>Fiyatlandırma</span>
           </div>
           <h2 className="section-title">
-            Uygun Fiyatlar,<br />
-            <span className="title-3d">Tam Erişim</span>
+            Uygun Fiyatlar, Tam Erişim
           </h2>
           <p className="section-description">
             Gizli ücret yok. İhtiyacınıza uygun paketi seçin, hemen kullanmaya başlayın.
