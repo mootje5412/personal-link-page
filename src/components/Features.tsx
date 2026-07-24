@@ -8,8 +8,8 @@ const Features = () => {
           <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       ),
-      title: 'Lightning Fast',
-      description: 'Sub-50ms response times with globally distributed infrastructure. Get breach intelligence instantly.'
+      title: 'Hızlı Arama',
+      description: 'Milisaniyeler içinde sonuç alın. Güçlü altyapı ile anında veri sorgulama.'
     },
     {
       icon: (
@@ -18,8 +18,8 @@ const Features = () => {
           <path d="M12 6V12L16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
         </svg>
       ),
-      title: 'Real-Time Updates',
-      description: 'Access the latest breach data as soon as it becomes available. Stay ahead of threats.'
+      title: 'Güncel Veriler',
+      description: 'Sürekli güncellenen veri tabanı ile en güncel bilgilere erişin.'
     },
     {
       icon: (
@@ -28,8 +28,8 @@ const Features = () => {
           <path d="M7 11V7C7 4.79086 8.79086 3 11 3H13C15.2091 3 17 4.79086 17 7V11" stroke="currentColor" strokeWidth="2"/>
         </svg>
       ),
-      title: 'Enterprise Security',
-      description: 'Bank-grade encryption, OAuth 2.0, and comprehensive audit logs. Your data stays secure.'
+      title: 'Güvenli Platform',
+      description: 'Şifreli bağlantı ve güvenli veri aktarımı. Verileriniz koruma altında.'
     },
     {
       icon: (
@@ -38,8 +38,8 @@ const Features = () => {
           <path d="M3 10H21" stroke="currentColor" strokeWidth="2"/>
         </svg>
       ),
-      title: 'Comprehensive Coverage',
-      description: '700B+ records from verified breach sources. Most extensive database available.'
+      title: 'Geniş Kapsam',
+      description: 'Milyonlarca kayıt içeren kapsamlı veri tabanı ile detaylı sorgulama.'
     },
     {
       icon: (
@@ -49,8 +49,8 @@ const Features = () => {
           <path d="M14 4L10 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
         </svg>
       ),
-      title: 'Developer Friendly',
-      description: 'RESTful API, comprehensive docs, and client libraries for all major languages.'
+      title: 'Kolay Kullanım',
+      description: 'Kullanıcı dostu arayüz ile hızlı ve kolay arama yapın.'
     },
     {
       icon: (
@@ -58,8 +58,8 @@ const Features = () => {
           <path d="M3 13H7L10 21L14 3L17 13H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       ),
-      title: '99.9% Uptime',
-      description: 'Industry-leading reliability with automatic failover and redundant systems.'
+      title: 'Kesintisiz Hizmet',
+      description: 'Yüksek çalışma süresi garantisi ile 7/24 erişilebilir platform.'
     }
   ]
 
@@ -68,15 +68,15 @@ const Features = () => {
       <div className="container">
         <div className="section-header">
           <div className="section-badge">
-            <span>Why Choose Us</span>
+            <span>Neden Apex Panel</span>
           </div>
           <h2 className="section-title">
-            Built for Security<br />
-            <span className="gradient-text">Professionals</span>
+            Profesyonel Arama<br />
+            <span className="gradient-text">Yetenekleri</span>
           </h2>
           <p className="section-description">
-            Everything you need to integrate breach intelligence into your security workflow.
-            Purpose-built for OSINT professionals and security teams.
+            Kapsamlı veri sorgulama için ihtiyacınız olan her şey. 
+            Profesyonel kullanım için tasarlanmış güçlü arama sistemi.
           </p>
         </div>
 
@@ -94,43 +94,43 @@ const Features = () => {
 
         <div className="features-showcase">
           <div className="showcase-item">
-            <h3>Powerful Query Capabilities</h3>
+            <h3>Arama Yetenekleri</h3>
             <div className="showcase-features">
               <div className="showcase-feature">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                   <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span>Email lookups</span>
+                <span>TC Kimlik Sorgulama</span>
               </div>
               <div className="showcase-feature">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                   <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span>Domain searches</span>
+                <span>İsim Arama</span>
               </div>
               <div className="showcase-feature">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                   <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span>Password hash checks</span>
+                <span>Adres Sorgulama</span>
               </div>
               <div className="showcase-feature">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                   <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span>Batch operations</span>
+                <span>Aile Bireyleri</span>
               </div>
               <div className="showcase-feature">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                   <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span>Advanced filtering</span>
+                <span>IP Adresi Arama</span>
               </div>
               <div className="showcase-feature">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                   <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span>Real-time webhooks</span>
+                <span>E-posta Sorgulama</span>
               </div>
             </div>
           </div>
