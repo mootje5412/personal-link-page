@@ -40,6 +40,23 @@
     background: var(--surface-hover);
   }
 
+  .mobile-nav-login {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    flex: 1.15;
+  }
+
+  .mobile-nav-login:active {
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+  }
+
   .mobile-nav-accent {
     color: #000;
     background: #fff;

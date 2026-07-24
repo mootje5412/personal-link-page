@@ -31,14 +31,17 @@ const SiteHeader = () => {
               </button>
             </>
           ) : (
-            <>
-              <Link to="/giris" className="btn btn-ghost header-auth-btn">
+            <div className="header-auth-group">
+              <Link to="/giris" className="header-login">
+                <svg className="header-login-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
                 Giriş
               </Link>
               <Link to="/kayit" className="header-cta">
                 Kayıt ol
               </Link>
-            </>
+            </div>
           )}
         </div>
       </div>
