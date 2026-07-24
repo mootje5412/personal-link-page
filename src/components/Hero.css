@@ -1,79 +1,72 @@
 .site-header {
-  border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
-  background: var(--bg);
   z-index: 10;
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
 }
 
-.header-row {
+.header-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: var(--header-h);
-  gap: 16px;
 }
 
 .logo {
   font-weight: 600;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .nav a {
   color: var(--muted);
   font-size: 14px;
-  margin-left: 20px;
+  margin-left: 28px;
 }
 
 .nav a:hover {
   color: var(--text);
 }
 
-.header-btn {
+.header-cta {
   font-size: 14px;
-  padding: 8px 14px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
+  padding: 8px 16px;
+  background: #fff;
+  color: #000;
+  border-radius: 6px;
+  font-weight: 500;
 }
 
-.header-btn:hover {
-  border-color: var(--text);
+.header-cta:hover {
+  opacity: 0.9;
 }
 
 .hero {
-  padding: 64px 0 48px;
+  padding: 80px 0 64px;
 }
 
 .hero h1 {
-  font-size: 28px;
+  font-size: clamp(32px, 5vw, 44px);
   font-weight: 600;
-  letter-spacing: -0.02em;
-  margin-bottom: 12px;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-bottom: 16px;
+  max-width: 560px;
 }
 
-.hero p {
+.hero-lead {
   color: var(--muted);
-  margin-bottom: 8px;
+  font-size: 17px;
+  line-height: 1.65;
+  max-width: 480px;
+  margin-bottom: 32px;
 }
 
-.hero-types {
-  color: var(--muted);
-  font-size: 14px;
-  margin: 20px 0 28px;
-}
-
-.hero-link {
-  display: inline-block;
-  padding: 10px 18px;
-  background: var(--text);
-  color: var(--bg);
-  font-size: 14px;
-  font-weight: 500;
-  border-radius: 4px;
-}
-
-.hero-link:hover {
-  opacity: 0.9;
+.hero-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 768px) {
@@ -82,16 +75,20 @@
   }
 
   .hero {
-    padding: 40px 0 32px;
+    padding: 48px 0 40px;
   }
 
-  .hero h1 {
-    font-size: 24px;
+  .hero-actions {
+    flex-direction: column;
+  }
+
+  .hero-actions .btn {
+    text-align: center;
   }
 }
 
 @media (min-width: 769px) {
-  .container {
-    max-width: 720px;
+  .hero-actions .btn-outline {
+    padding: 12px 24px;
   }
 }
