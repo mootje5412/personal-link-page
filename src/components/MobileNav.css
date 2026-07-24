@@ -5,14 +5,20 @@
 @media (max-width: 768px) {
   .mobile-nav {
     display: flex;
+    align-items: center;
+    gap: 6px;
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     height: var(--nav-h);
-    background: #000;
+    background: rgba(5, 5, 5, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border-top: 1px solid var(--line);
+    padding: 0 12px;
     padding-bottom: env(safe-area-inset-bottom, 0);
+    z-index: 100;
   }
 
   .mobile-nav a {
@@ -20,16 +26,28 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    height: 42px;
     font-size: 14px;
+    font-weight: 500;
     color: var(--muted);
+    border-radius: var(--radius-sm);
+    transition: color 0.2s ease, background 0.2s ease;
+  }
+
+  .mobile-nav a:active {
+    background: var(--surface-2);
+    color: var(--text);
   }
 
   .mobile-nav-accent {
     color: #000;
     background: #fff;
-    font-weight: 500;
-    margin: 8px;
-    border-radius: 6px;
-    flex: 1.2;
+    font-weight: 600;
+    flex: 1.3;
+  }
+
+  .mobile-nav-accent:active {
+    background: #e5e5e5;
+    color: #000;
   }
 }
