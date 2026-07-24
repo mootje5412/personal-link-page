@@ -71,8 +71,7 @@ const Features = () => {
             <span>Neden Apex Panel</span>
           </div>
           <h2 className="section-title">
-            Profesyonel Arama<br />
-            <span className="title-3d">Yetenekleri</span>
+            Profesyonel Arama
           </h2>
           <p className="section-description">
             Kapsamlı veri sorgulama için ihtiyacınız olan her şey. 

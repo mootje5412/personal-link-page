@@ -20,8 +20,8 @@
 .section-badge {
   display: inline-block;
   padding: 0.4rem 0.9rem;
-  background: rgba(20, 20, 20, 0.9);
-  border: 1px solid var(--border-light);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
   border-radius: 100px;
   font-size: 0.8rem;
   color: var(--text-secondary);
@@ -29,7 +29,6 @@
   margin-bottom: 1.25rem;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 .section-title {
