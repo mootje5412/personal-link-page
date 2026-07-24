@@ -4,7 +4,9 @@ import re
 import sqlite3
 import threading
 import time
+import tempfile
 from contextlib import asynccontextmanager
+from io import StringIO
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
@@ -13,7 +15,7 @@ from fastapi.responses import Response
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 PORT = 8080
 CREDIT = "api made by Ami.192 on signal"
 API_USAGE = {
@@ -27,6 +29,8 @@ INDEX_LOCK = threading.Lock()
 INDEX_READY = threading.Event()
 INDEX_ERROR: str | None = None
 BATCH_SIZE = 2000
+DATA_SUFFIXES = {".xlsx", ".xlsm", ".csv", ".tsv", ".db"}
+ARCHIVE_SUFFIXES = {".7z"}
 
 INSERT_SQL = """
 INSERT INTO people (
@@ -281,19 +285,28 @@ def row_is_valid(record: dict) -> bool:
     ])
 
 
-def read_csv_rows(path: Path) -> list[dict]:
-    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+def read_csv_rows(source: Path | bytes, suffix: str = ".csv") -> list[dict]:
+    if isinstance(source, bytes):
+        text = source.decode("utf-8-sig", errors="replace")
+        handle = StringIO(text)
+    else:
+        handle = source.open("r", encoding="utf-8-sig", newline="")
+
+    with handle:
         sample = handle.read(4096)
         handle.seek(0)
-        delimiter = "\t" if sample.count("\t") > sample.count(",") else ","
+        delimiter = "\t" if suffix == ".tsv" or sample.count("\t") > sample.count(",") else ","
         reader = csv.DictReader(handle, delimiter=delimiter)
         return [map_row(row) for row in reader]
 
 
-def read_xlsx_rows(path: Path) -> list[dict]:
+def read_xlsx_rows(source: Path | bytes) -> list[dict]:
     from openpyxl import load_workbook
 
-    workbook = load_workbook(path, read_only=True, data_only=True)
+    if isinstance(source, bytes):
+        workbook = load_workbook(BytesIO(source), read_only=True, data_only=True)
+    else:
+        workbook = load_workbook(source, read_only=True, data_only=True)
     sheet = workbook.active
     rows = sheet.iter_rows(values_only=True)
 
@@ -352,6 +365,35 @@ def read_db_rows(path: Path) -> list[dict]:
     return rows
 
 
+def read_7z_records(path: Path) -> list[dict]:
+    import py7zr
+
+    records: list[dict] = []
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        with py7zr.SevenZipFile(path, mode="r") as archive:
+            targets = [
+                name for name in archive.getnames()
+                if not name.endswith("/") and Path(name).suffix.lower() in DATA_SUFFIXES
+            ]
+            if not targets:
+                return records
+            archive.extract(path=tmp_path, targets=targets)
+
+        for name in targets:
+            file_path = tmp_path / name
+            if not file_path.is_file():
+                continue
+            try:
+                file_records = load_file_records(file_path)
+                records.extend(file_records)
+                print(f"  Loaded {len(file_records)} records from {name}", flush=True)
+            except Exception as error:
+                print(f"  Failed {name} in {path.name}: {error}", flush=True)
+
+    return records
+
+
 def source_files() -> list[Path]:
     files: list[Path] = []
     if not DATABASE_DIR.exists():
@@ -360,7 +402,7 @@ def source_files() -> list[Path]:
         if not path.is_file():
             continue
         suffix = path.suffix.lower()
-        if suffix in {".xlsx", ".xlsm", ".csv", ".tsv", ".db"}:
+        if suffix in DATA_SUFFIXES or suffix in ARCHIVE_SUFFIXES:
             files.append(path)
     return files
 
@@ -438,9 +480,11 @@ def load_file_records(path: Path) -> list[dict]:
     if suffix in {".xlsx", ".xlsm"}:
         records = read_xlsx_rows(path)
     elif suffix in {".csv", ".tsv"}:
-        records = read_csv_rows(path)
+        records = read_csv_rows(path, suffix)
     elif suffix == ".db":
         records = read_db_rows(path)
+    elif suffix == ".7z":
+        records = read_7z_records(path)
     else:
         records = []
     return [record for record in records if row_is_valid(record)]
