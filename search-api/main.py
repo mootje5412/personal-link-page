@@ -16,6 +16,13 @@ INDEX_DB = BASE_DIR / ".search_index.db"
 SCHEMA_VERSION = 3
 PORT = 8080
 CREDIT = "api made by Ami.192 on signal"
+API_USAGE = {
+    "status": "/api",
+    "name": "/api?q=Mootje bicep",
+    "phone": "/api?q=905331657436",
+    "email": "/api?q=email@example.com",
+    "id": "/api?q=12345678901",
+}
 INDEX_LOCK = threading.Lock()
 INDEX_READY = threading.Event()
 INDEX_ERROR: str | None = None
@@ -71,6 +78,14 @@ COLUMN_MAP = {
     "identity number": "identity_number",
     "id number": "identity_number",
     "tc": "identity_number",
+    "tc kimlik": "identity_number",
+    "tc kimlik no": "identity_number",
+    "tc no": "identity_number",
+    "kimlik no": "identity_number",
+    "kimlik numarasi": "identity_number",
+    "id no": "identity_number",
+    "national id": "identity_number",
+    "id": "identity_number",
     "city": "city",
     "country": "country",
     "source": "source",
@@ -149,6 +164,9 @@ def phone_index_value(value: str | None) -> str:
 
 PHONE_DIGITS_SQL = (
     "replace(replace(replace(replace(replace(replace(phone, ' ', ''), '-', ''), '+', ''), '(', ''), ')', ''), '.', '')"
+)
+IDENTITY_DIGITS_SQL = (
+    "replace(replace(replace(identity_number, ' ', ''), '-', ''), '.', '')"
 )
 
 
@@ -523,17 +541,28 @@ def parse_search_query(q: str | None) -> dict:
     if not text:
         return {}
 
-    lowered = text.casefold()
     if "@" in text and "." in text.split("@", 1)[-1]:
         return {"type": "email", "email": text, "q": text}
 
     digits = phone_digits(text)
-    digit_ratio = len(digits) / max(len(re.sub(r"\s+", "", text)), 1)
-    if len(digits) >= 7 and digit_ratio >= 0.7:
-        return {"type": "phone", "phone": text, "q": text}
+    compact = re.sub(r"\s+", "", text)
 
-    if text.isdigit() and len(text) >= 7:
-        return {"type": "phone", "phone": text, "q": text}
+    if digits:
+        if len(digits) == 11 and digits.startswith("0"):
+            return {"type": "phone", "phone": text, "q": text}
+
+        if len(digits) == 12 and digits.startswith("90"):
+            return {"type": "phone", "phone": text, "q": text}
+
+        if len(digits) == 10 and digits.startswith("5"):
+            return {"type": "phone", "phone": text, "q": text}
+
+        if len(digits) == 11 and not digits.startswith("0"):
+            return {"type": "identity_number", "identity_number": digits, "q": text}
+
+        digit_ratio = len(digits) / max(len(compact), 1)
+        if len(digits) >= 7 and digit_ratio >= 0.7:
+            return {"type": "phone", "phone": text, "q": text}
 
     parts = text.split(" ")
     if len(parts) == 1:
@@ -599,8 +628,14 @@ def search(
         params.extend([f"%{needle}%", f"%{needle}%", f"%{needle}%"])
 
     if identity_number:
-        clauses.append("identity_number_n LIKE ?")
-        params.append(f"%{norm_text(identity_number)}%")
+        id_digits = phone_digits(identity_number)
+        id_parts = ["identity_number_n LIKE ?"]
+        id_params = [f"%{norm_text(identity_number)}%"]
+        if id_digits:
+            id_parts.append(f"{IDENTITY_DIGITS_SQL} LIKE ?")
+            id_params.append(f"%{id_digits}%")
+        clauses.append(f"({' OR '.join(id_parts)})")
+        params.extend(id_params)
 
     params.append(min(max(limit, 1), 100))
 
@@ -632,7 +667,7 @@ def raw_json(**data) -> Response:
 
 @app.get("/api")
 def api(
-    q: str | None = Query(default=None, description="Name, phone, or email"),
+    q: str | None = Query(default=None, description="Name, phone, email, or ID number"),
     limit: int = Query(default=25, ge=1, le=100),
 ) -> Response:
     started = time.perf_counter()
@@ -644,14 +679,14 @@ def api(
                 ready=False,
                 status="indexing",
                 records=0,
-                usage="Search: /api?q=Mootje bicep",
+                usage=API_USAGE,
             )
         return raw_json(
             ok=True,
             ready=True,
             status="ready",
             records=count_records(),
-            usage="Search: /api?q=Mootje bicep",
+            usage=API_USAGE,
         )
 
     try:
