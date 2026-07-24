@@ -20,7 +20,7 @@ DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
 SCHEMA_VERSION = 9
 PORT = 8080
-API_VERSION = "2026-07-24-telegram-fix2"
+API_VERSION = "2026-07-24-instant-search-v2"
 CREDIT = "api made by Ami.192 on signal"
 AUTO_REBUILD = os.environ.get("AUTO_REBUILD", "0") == "1"
 API_USAGE = {
@@ -532,6 +532,7 @@ def insert_record_batch(conn: sqlite3.Connection, batch: list[tuple]) -> None:
     if batch:
         conn.executemany(INSERT_SQL, batch)
         batch.clear()
+        maybe_signal_search_ready()
 
 
 def stream_records(conn: sqlite3.Connection, path: Path, records) -> int:
@@ -884,14 +885,10 @@ def collect_stats(count_lines: bool = False) -> dict:
         "total_size_bytes": sum(row["size_bytes"] for row in file_rows),
         "total_size_mb": round(sum(row["size_bytes"] for row in file_rows) / (1024 * 1024), 2),
         "free_disk_mb": free_disk_bytes() // (1024 * 1024),
-        "index_ready": INDEX_READY.is_set(),
+        "index_ready": search_is_ready(),
         "index_building": INDEX_BUILDING.is_set(),
         "auto_rebuild": AUTO_REBUILD,
-        "indexed_records": (
-            count_records()
-            if INDEX_READY.is_set() and INDEX_DB.exists() and not INDEX_BUILDING.is_set()
-            else 0
-        ),
+        "indexed_records": count_records() if search_is_ready() else 0,
         "sources": file_rows,
     }
 
@@ -1073,6 +1070,15 @@ def save_indexed_sources(conn: sqlite3.Connection, sources: dict[str, dict]) -> 
 
 def source_is_importable(path: Path) -> bool:
     return path.suffix.lower() in {".sql", ".db"}
+
+
+def is_large_source(path: Path) -> bool:
+    if path.suffix.lower() not in {".txt", ".csv", ".tsv"}:
+        return False
+    try:
+        return path.stat().st_size >= LARGE_FILE_BYTES
+    except OSError:
+        return False
 
 
 def file_needs_import(path: Path, indexed: dict[str, dict]) -> bool:
@@ -1281,6 +1287,7 @@ def import_postgresql_dump(conn: sqlite3.Connection, path: Path) -> int:
         if len(batch) >= BATCH_SIZE:
             conn.executemany(INSERT_SQL, batch)
             batch.clear()
+            maybe_signal_search_ready()
         if total % PG_PROGRESS_EVERY == 0:
             elapsed = max(time.perf_counter() - started, 0.001)
             print(f"  Imported {total} PostgreSQL rows ({int(total / elapsed)}/sec)...", flush=True)
@@ -1453,6 +1460,9 @@ def bootstrap_source_meta(conn: sqlite3.Connection) -> dict[str, dict]:
     if indexed:
         return indexed
 
+    if count_records() <= 0:
+        return {}
+
     meta: dict[str, dict] = {}
     for path in source_files():
         if source_is_importable(path):
@@ -1468,13 +1478,22 @@ def bootstrap_source_meta(conn: sqlite3.Connection) -> dict[str, dict]:
     return load_indexed_sources(conn)
 
 
-def index_pending_sources(conn: sqlite3.Connection, sql_db_only: bool = True) -> int:
+def index_pending_sources(
+    conn: sqlite3.Connection,
+    sql_db_only: bool = True,
+    skip_large: bool = False,
+    large_only: bool = False,
+) -> int:
     indexed = bootstrap_source_meta(conn)
     total_added = 0
     updated = dict(indexed)
 
     for path in source_files():
         if sql_db_only and not source_is_importable(path):
+            continue
+        if skip_large and is_large_source(path):
+            continue
+        if large_only and not is_large_source(path):
             continue
         if not file_needs_import(path, indexed):
             continue
@@ -1540,7 +1559,8 @@ def rebuild_index_async(force: bool = True) -> bool:
     def worker() -> None:
         global INDEX_ERROR
         INDEX_BUILDING.set()
-        INDEX_READY.clear()
+        if not search_is_ready():
+            INDEX_READY.clear()
         INDEX_ERROR = None
         try:
             ensure_index(force=force)
@@ -1555,16 +1575,105 @@ def rebuild_index_async(force: bool = True) -> bool:
     return True
 
 
-def build_index_background() -> None:
-    global INDEX_ERROR
-    INDEX_BUILDING.set()
+def search_is_ready() -> bool:
+    if not INDEX_DB.exists() or not index_usable():
+        return False
+    try:
+        return count_records() > 0
+    except sqlite3.Error:
+        return False
+
+
+def maybe_signal_search_ready() -> None:
+    if INDEX_READY.is_set() and not INDEX_BUILDING.is_set():
+        return
+    if not search_is_ready():
+        return
+    INDEX_BUILDING.clear()
+    INDEX_READY.set()
+    print(
+        f"Search now available ({count_records()} records, import may still continue)...",
+        flush=True,
+    )
+
+
+def background_sql_import() -> int:
+    conn = connect_index()
+    try:
+        tune_sqlite_for_bulk(conn)
+        ensure_index_schema_if_needed(conn)
+        added = index_pending_sources(conn, sql_db_only=True)
+        conn.commit()
+        restore_sqlite_settings(conn)
+        return added
+    finally:
+        conn.close()
+
+
+def background_large_import() -> None:
     try:
         with INDEX_LOCK:
-            if INDEX_DB.exists() and index_usable():
-                ensure_index(force=False)
-            else:
-                print("No index found, building once in background...", flush=True)
-                ensure_index(force=True)
+            conn = connect_index()
+            try:
+                tune_sqlite_for_bulk(conn)
+                ensure_index_schema_if_needed(conn)
+                added = index_pending_sources(conn, sql_db_only=False, large_only=True)
+                conn.commit()
+                restore_sqlite_settings(conn)
+                if added:
+                    print(f"Large file import added {added} records", flush=True)
+            finally:
+                conn.close()
+    except Exception as error:
+        print(f"Large file import failed: {error}", flush=True)
+
+
+def build_index_background() -> None:
+    global INDEX_ERROR
+    try:
+        if search_is_ready():
+            INDEX_READY.set()
+            print(
+                f"Search ready instantly ({count_records()} records). "
+                "SQL/DB import runs in background.",
+                flush=True,
+            )
+            try:
+                with INDEX_LOCK:
+                    added = background_sql_import()
+                if added:
+                    print(f"Background SQL/DB import added {added} records", flush=True)
+            except Exception as error:
+                print(f"Background SQL/DB import failed: {error}", flush=True)
+            threading.Thread(target=background_large_import, daemon=True).start()
+            return
+
+        DATABASE_DIR.mkdir(parents=True, exist_ok=True)
+        INDEX_BUILDING.set()
+        print("Building search index (fast sources first)...", flush=True)
+        with INDEX_LOCK:
+            conn = connect_index()
+            try:
+                tune_sqlite_for_bulk(conn)
+                ensure_index_schema(conn)
+                added = index_pending_sources(conn, sql_db_only=False, skip_large=True)
+                conn.commit()
+                restore_sqlite_settings(conn)
+                if added:
+                    print(f"Fast import added {added} records", flush=True)
+            finally:
+                conn.close()
+
+        maybe_signal_search_ready()
+        if search_is_ready():
+            threading.Thread(target=background_large_import, daemon=True).start()
+            return
+
+        with INDEX_LOCK:
+            print("Fast import empty, running full rebuild...", flush=True)
+            ensure_index(force=True)
+        maybe_signal_search_ready()
+        threading.Thread(target=background_large_import, daemon=True).start()
     except Exception as error:
         INDEX_ERROR = str(error)
         print(f"Index build failed: {error}", flush=True)
@@ -1574,12 +1683,26 @@ def build_index_background() -> None:
 
 
 def wait_for_index() -> None:
-    if not INDEX_READY.wait(timeout=None):
-        raise HTTPException(status_code=503, detail="Index is still building, try again in a few minutes")
-    if INDEX_BUILDING.is_set():
-        raise HTTPException(status_code=503, detail="Index rebuild in progress, try again in a few minutes")
-    if INDEX_ERROR and not (index_usable() and count_records() > 0):
-        raise HTTPException(status_code=500, detail=INDEX_ERROR)
+    if search_is_ready():
+        return
+
+    deadline = time.time() + 120
+    while time.time() < deadline:
+        if search_is_ready():
+            return
+        if INDEX_READY.wait(timeout=1):
+            if search_is_ready():
+                return
+        if not INDEX_BUILDING.is_set() and INDEX_READY.is_set() and not search_is_ready():
+            break
+
+    if search_is_ready():
+        return
+
+    raise HTTPException(
+        status_code=503,
+        detail="Index is still building, try again in a few minutes",
+    )
 
 
 def rebuild_index() -> dict:
@@ -1880,20 +2003,13 @@ def api(
     started = time.perf_counter()
 
     if not q or not q.strip():
-        if not INDEX_READY.is_set() or INDEX_BUILDING.is_set():
-            return raw_json(
-                ok=True,
-                ready=False,
-                status="indexing" if INDEX_BUILDING.is_set() else "starting",
-                records=count_records() if INDEX_DB.exists() and not INDEX_BUILDING.is_set() else 0,
-                free_disk_mb=free_disk_bytes() // (1024 * 1024),
-                usage=API_USAGE,
-            )
+        ready = search_is_ready()
         return raw_json(
             ok=True,
-            ready=True,
-            status="ready",
-            records=count_records(),
+            ready=ready,
+            status="ready" if ready else ("indexing" if INDEX_BUILDING.is_set() else "starting"),
+            records=count_records() if ready else 0,
+            free_disk_mb=free_disk_bytes() // (1024 * 1024),
             usage=API_USAGE,
         )
 
@@ -1910,7 +2026,7 @@ def api(
 
     return raw_json(
         ok=True,
-        ready=INDEX_READY.is_set(),
+        ready=search_is_ready(),
         success=True,
         query=query,
         found=len(results),
