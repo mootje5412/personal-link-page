@@ -1,6 +1,7 @@
 import csv
 import itertools
 import json
+import os
 import re
 import shutil
 import sqlite3
@@ -19,11 +20,13 @@ DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
 SCHEMA_VERSION = 9
 PORT = 8080
-API_VERSION = "2026-07-24-stats"
+API_VERSION = "2026-07-24-no-scan"
 CREDIT = "api made by Ami.192 on signal"
+AUTO_REBUILD = os.environ.get("AUTO_REBUILD", "0") == "1"
 API_USAGE = {
     "status": "/api",
     "stats": "/api/stats",
+    "rebuild": "/api/rebuild",
     "name": "/api?q=Mootje bicep",
     "phone": "/api?q=905544784243",
     "email": "/api?q=email@example.com",
@@ -31,11 +34,12 @@ API_USAGE = {
 }
 INDEX_LOCK = threading.Lock()
 INDEX_READY = threading.Event()
+INDEX_BUILDING = threading.Event()
 INDEX_ERROR: str | None = None
 BATCH_SIZE = 20000
 PROGRESS_EVERY = 50000
 LARGE_FILE_BYTES = 100_000_000
-DATA_SUFFIXES = {".xlsx", ".xlsm", ".csv", ".tsv", ".txt", ".db"}
+DATA_SUFFIXES = {".xlsx", ".xlsm", ".csv", ".tsv", ".txt", ".db", ".sql"}
 ARCHIVE_SUFFIXES = {".7z"}
 
 INSERT_SQL = """
@@ -726,6 +730,13 @@ def free_disk_bytes(path: Path | None = None) -> int:
     return shutil.disk_usage(target).free
 
 
+def db_file_path(conn: sqlite3.Connection) -> Path | None:
+    row = conn.execute("PRAGMA database_list").fetchone()
+    if row and row[2]:
+        return Path(row[2])
+    return None
+
+
 def count_text_lines(path: Path) -> int:
     wc = shutil.which("wc")
     if wc:
@@ -823,18 +834,40 @@ def file_stats(path: Path) -> dict:
     }
 
 
-def collect_stats() -> dict:
+def collect_stats(count_lines: bool = False) -> dict:
     files = source_files()
-    file_rows = [file_stats(path) for path in files]
+    file_rows = []
+    for path in files:
+        stat = path.stat()
+        suffix = path.suffix.lower()
+        row = {
+            "file": path.name,
+            "type": suffix.lstrip(".") or "unknown",
+            "size_bytes": stat.st_size,
+            "size_mb": round(stat.st_size / (1024 * 1024), 2),
+            "lines": None,
+            "data_lines": None,
+        }
+        if count_lines:
+            lines = count_file_lines(path)
+            row["lines"] = lines
+            if lines is not None:
+                row["data_lines"] = (
+                    max(lines - 1, 0) if file_has_header(path) and lines > 0 else lines
+                )
+        file_rows.append(row)
+
     line_counts = [row["lines"] for row in file_rows if isinstance(row["lines"], int)]
 
     stats = {
         "files": len(file_rows),
-        "total_lines": sum(line_counts),
+        "total_lines": sum(line_counts) if count_lines else None,
         "total_size_bytes": sum(row["size_bytes"] for row in file_rows),
         "total_size_mb": round(sum(row["size_bytes"] for row in file_rows) / (1024 * 1024), 2),
         "free_disk_mb": free_disk_bytes() // (1024 * 1024),
         "index_ready": INDEX_READY.is_set(),
+        "index_building": INDEX_BUILDING.is_set(),
+        "auto_rebuild": AUTO_REBUILD,
         "indexed_records": count_records() if INDEX_READY.is_set() and INDEX_DB.exists() else 0,
         "sources": file_rows,
     }
@@ -927,6 +960,57 @@ def insert_records(conn: sqlite3.Connection, records: list[dict]) -> None:
         conn.executemany(INSERT_SQL, batch)
 
 
+def import_sql_file(conn: sqlite3.Connection, path: Path) -> int:
+    db_path = db_file_path(conn)
+    if not db_path:
+        raise RuntimeError("sql import needs a file-backed database")
+
+    before = conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
+    print(f"  Importing SQL {path.name}...", flush=True)
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        import_db = Path(tmp_dir) / "import.db"
+        script = f".read {path.resolve()}"
+        result = subprocess.run(
+            ["sqlite3", str(import_db)],
+            input=script,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "sql import failed")
+
+        imp_conn = sqlite3.connect(import_db)
+        try:
+            tables = {
+                row[0]
+                for row in imp_conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            if "people" in tables:
+                imp_cols = [row[1] for row in imp_conn.execute("PRAGMA table_info(people)")]
+                our_cols = [row[1] for row in conn.execute("PRAGMA table_info(people)")]
+                shared = [col for col in our_cols if col in imp_cols and col != "id"]
+                if not shared:
+                    raise RuntimeError(f"No matching columns in {path.name}")
+                col_list = ", ".join(shared)
+                conn.execute("ATTACH ? AS impdb", (str(import_db),))
+                conn.execute(
+                    f"INSERT INTO people ({col_list}) SELECT {col_list} FROM impdb.people"
+                )
+                conn.execute("DETACH impdb")
+            else:
+                raise RuntimeError(f"No people table found in {path.name}")
+        finally:
+            imp_conn.close()
+
+    after = conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
+    added = after - before
+    print(f"  SQL import added {added} records from {path.name}", flush=True)
+    return added
+
+
 def load_file_records(path: Path) -> list[dict]:
     suffix = path.suffix.lower()
     if suffix in {".xlsx", ".xlsm"}:
@@ -935,6 +1019,8 @@ def load_file_records(path: Path) -> list[dict]:
         records = list(iter_delimited_records(path, suffix))
     elif suffix == ".db":
         records = read_db_rows(path)
+    elif suffix == ".sql":
+        return []
     elif suffix == ".7z":
         records = read_7z_records(path)
     else:
@@ -946,6 +1032,8 @@ def index_file(conn: sqlite3.Connection, path: Path) -> int:
     suffix = path.suffix.lower()
     print(f"Loading {path.name}...", flush=True)
 
+    if suffix == ".sql":
+        return import_sql_file(conn, path)
     if suffix in {".xlsx", ".xlsm"}:
         return stream_records(conn, path, iter_xlsx_records(path))
     if suffix in {".csv", ".tsv", ".txt"}:
@@ -956,8 +1044,31 @@ def index_file(conn: sqlite3.Connection, path: Path) -> int:
     return len(records)
 
 
-def index_schema_ok() -> bool:
+def index_usable() -> bool:
     if not INDEX_DB.exists():
+        return False
+
+    conn = sqlite3.connect(INDEX_DB)
+    try:
+        tables = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='people'"
+        ).fetchone()
+        if not tables:
+            return False
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(people)")}
+        required = {
+            "first_name", "last_name", "phone", "email", "identity_number",
+            "city", "country", "notes", "extra_json", "phone_n",
+        }
+        return required.issubset(columns)
+    except sqlite3.Error:
+        return False
+    finally:
+        conn.close()
+
+
+def index_schema_ok() -> bool:
+    if not index_usable():
         return False
 
     conn = sqlite3.connect(INDEX_DB)
@@ -971,12 +1082,7 @@ def index_schema_ok() -> bool:
         if not stored or int(stored[0]) != SCHEMA_VERSION:
             return False
 
-        columns = {row[1] for row in conn.execute("PRAGMA table_info(people)")}
-        required = {
-            "first_name", "last_name", "phone", "email", "identity_number",
-            "city", "country", "notes", "extra_json", "phone_n",
-        }
-        return required.issubset(columns)
+        return True
     except (sqlite3.Error, ValueError, TypeError):
         return False
     finally:
@@ -995,20 +1101,57 @@ def index_is_stale() -> bool:
     return False
 
 
-def ensure_index() -> None:
+def ensure_index(force: bool = False) -> None:
     with INDEX_LOCK:
-        if index_is_stale():
-            info = rebuild_index()
-            print(
-                f"Loaded {info['records']} records from {len(info['sources'])} file(s)",
-                flush=True,
-            )
+        if not force and index_usable():
+            if AUTO_REBUILD and index_is_stale():
+                print("AUTO_REBUILD=1: rebuilding stale index...", flush=True)
+            else:
+                records = count_records()
+                print(
+                    f"Using existing index ({records} records). "
+                    "Rebuild manually: GET /api/rebuild",
+                    flush=True,
+                )
+                return
+
+        info = rebuild_index()
+        print(
+            f"Loaded {info['records']} records from {len(info['sources'])} file(s)",
+            flush=True,
+        )
+
+
+def rebuild_index_async(force: bool = True) -> bool:
+    if INDEX_BUILDING.is_set():
+        return False
+
+    def worker() -> None:
+        global INDEX_ERROR
+        INDEX_BUILDING.set()
+        INDEX_READY.clear()
+        INDEX_ERROR = None
+        try:
+            ensure_index(force=force)
+        except Exception as error:
+            INDEX_ERROR = str(error)
+            print(f"Index build failed: {error}", flush=True)
+        finally:
+            INDEX_BUILDING.clear()
+            INDEX_READY.set()
+
+    threading.Thread(target=worker, daemon=True).start()
+    return True
 
 
 def build_index_background() -> None:
     global INDEX_ERROR
     try:
-        ensure_index()
+        if INDEX_DB.exists() and index_usable():
+            ensure_index(force=False)
+        else:
+            print("No index found, building once in background...", flush=True)
+            ensure_index(force=True)
     except Exception as error:
         INDEX_ERROR = str(error)
         print(f"Index build failed: {error}", flush=True)
@@ -1017,9 +1160,11 @@ def build_index_background() -> None:
 
 
 def wait_for_index() -> None:
-    if not INDEX_READY.wait(timeout=7200):
+    if not INDEX_READY.wait(timeout=None):
         raise HTTPException(status_code=503, detail="Index is still building, try again in a few minutes")
-    if INDEX_ERROR:
+    if INDEX_BUILDING.is_set():
+        raise HTTPException(status_code=503, detail="Index rebuild in progress, try again in a few minutes")
+    if INDEX_ERROR and not (index_usable() and count_records() > 0):
         raise HTTPException(status_code=500, detail=INDEX_ERROR)
 
 
@@ -1029,7 +1174,7 @@ def rebuild_index() -> dict:
     if temp_db.exists():
         temp_db.unlink()
 
-    sources = sorted(source_files(), key=lambda item: item.stat().st_size)
+    sources = sorted(source_files(), key=lambda item: (0 if item.suffix.lower() == ".sql" else 1, item.stat().st_size))
     loaded_files = []
     total_records = 0
 
@@ -1218,12 +1363,26 @@ def raw_json(**data) -> Response:
 
 
 @app.get("/api/stats")
-def api_stats() -> Response:
+def api_stats(
+    count_lines: bool = Query(default=False, description="Scan files to count lines (slow on big files)"),
+) -> Response:
     started = time.perf_counter()
     return raw_json(
         ok=True,
-        stats=collect_stats(),
+        stats=collect_stats(count_lines=count_lines),
         ms=round((time.perf_counter() - started) * 1000, 2),
+    )
+
+
+@app.get("/api/rebuild")
+def api_rebuild() -> Response:
+    if INDEX_BUILDING.is_set():
+        return raw_json(ok=True, rebuilding=True, message="Rebuild already running")
+    rebuild_index_async(force=True)
+    return raw_json(
+        ok=True,
+        rebuilding=True,
+        message="Rebuild started in background. Check /api for ready status.",
     )
 
 
@@ -1234,12 +1393,13 @@ def api(
     started = time.perf_counter()
 
     if not q or not q.strip():
-        if not INDEX_READY.is_set():
+        if not INDEX_READY.is_set() or INDEX_BUILDING.is_set():
             return raw_json(
                 ok=True,
                 ready=False,
-                status="indexing",
-                records=0,
+                status="indexing" if INDEX_BUILDING.is_set() else "starting",
+                records=count_records() if INDEX_DB.exists() else 0,
+                free_disk_mb=free_disk_bytes() // (1024 * 1024),
                 usage=API_USAGE,
             )
         return raw_json(
