@@ -1,6 +1,8 @@
 import csv
+import fcntl
 import itertools
 import json
+import os
 import re
 import shutil
 import sqlite3
@@ -17,9 +19,9 @@ from fastapi.responses import Response
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 11
 PORT = 8080
-API_VERSION = "2026-07-24-fast-import"
+API_VERSION = "2026-07-24-disk-safe"
 CREDIT = "api made by Ami.192 on signal"
 API_USAGE = {
     "status": "/api",
@@ -32,8 +34,15 @@ INDEX_LOCK = threading.Lock()
 INDEX_READY = threading.Event()
 INDEX_ERROR: str | None = None
 BATCH_SIZE = 20000
+TURBO_BATCH_SIZE = 250000
 PROGRESS_EVERY = 50000
 LARGE_FILE_BYTES = 100_000_000
+MEGA_FILE_BYTES = 10_000_000
+TURBO_PROGRESS_EVERY = 500000
+STAGING_TABLE = "_import_staging"
+BUILD_LOCK_FILE = BASE_DIR / ".index-build.lock"
+BULK_TRANSFORM_CHUNK = 1_000_000
+DISK_BUFFER_BYTES = 500_000_000
 DATA_SUFFIXES = {".xlsx", ".xlsm", ".csv", ".tsv", ".txt", ".db"}
 ARCHIVE_SUFFIXES = {".7z"}
 
@@ -103,7 +112,13 @@ COLUMN_MAP = {
     "tc": "identity_number",
     "tc kimlik": "identity_number",
     "tc kimlik no": "identity_number",
+    "tc_kimlik_no": "identity_number",
     "tc no": "identity_number",
+    "tcno": "identity_number",
+    "kimlik": "identity_number",
+    "dogum yeri": "city",
+    "il": "city",
+    "ilce": "notes",
     "kimlik no": "identity_number",
     "kimlik numarasi": "identity_number",
     "id no": "identity_number",
@@ -459,6 +474,391 @@ def parse_delimited_line(line: str, delimiter: str, headers: list[str]) -> dict:
     return map_row_positional(parts)
 
 
+def free_disk_bytes(path: Path | None = None) -> int:
+    target = path or BASE_DIR
+    return shutil.disk_usage(target).free
+
+
+def bulk_import_fits(path: Path) -> bool:
+    file_size = path.stat().st_size
+    needed = file_size * 25 // 10 + DISK_BUFFER_BYTES
+    return free_disk_bytes(path.parent) >= needed
+
+
+def cleanup_sqlite_sidecars(db_path: Path | None = None) -> None:
+    paths = {db_path or INDEX_DB, INDEX_DB, BASE_DIR / ".search_index.building.db"}
+    for target in paths:
+        if target is None:
+            continue
+        for suffix in ("-wal", "-shm", "-journal"):
+            sidecar = Path(str(target) + suffix)
+            if sidecar.exists():
+                try:
+                    sidecar.unlink()
+                except OSError:
+                    pass
+        if target.exists() and target.name == ".search_index.building.db":
+            try:
+                target.unlink()
+            except OSError:
+                pass
+
+
+def try_acquire_build_lock():
+    BUILD_LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    handle = open(BUILD_LOCK_FILE, "w", encoding="utf-8")
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        handle.write(str(os.getpid()))
+        handle.flush()
+        return handle
+    except BlockingIOError:
+        handle.close()
+        return None
+
+
+def source_sort_key(path: Path) -> tuple[int, int]:
+    size = path.stat().st_size
+    mega_txt = path.suffix.lower() == ".txt" and size >= MEGA_FILE_BYTES
+    return (0 if mega_txt else 1, size)
+
+
+def norm_text_fast(value: str) -> str:
+    return value.strip().lower()
+
+
+def db_file_path(conn: sqlite3.Connection) -> Path | None:
+    row = conn.execute("PRAGMA database_list").fetchone()
+    if row and row[2]:
+        return Path(row[2])
+    return None
+
+
+def indexes_mapped(indexes: dict[str, int | None]) -> bool:
+    return sum(1 for value in indexes.values() if value is not None) >= 2
+
+
+def txt_has_header(headers: list[str]) -> bool:
+    if line_is_header(headers):
+        return True
+    return any(COLUMN_MAP.get(header) for header in headers)
+
+
+def read_txt_header_info(path: Path) -> tuple[bytes, list[str], int, bool] | None:
+    with path.open("rb", buffering=8 * 1024 * 1024) as handle:
+        header_line = handle.readline()
+    if not header_line:
+        return None
+
+    delimiter = detect_binary_delimiter(header_line)
+    header_parts = header_line.rstrip(b"\r\n").split(delimiter)
+    headers = [clean_header(decode_part(part)) for part in header_parts]
+    has_header = txt_has_header(headers)
+    return delimiter, headers, len(header_parts), has_header
+
+
+def sql_col(index: int | None, default: str = "''") -> str:
+    if index is None:
+        return default
+    return f"trim(COALESCE(col{index}, ''))"
+
+
+def sql_lower(expr: str) -> str:
+    if expr == "''":
+        return "''"
+    return f"lower({expr})"
+
+
+def build_bulk_insert_select(indexes: dict[str, int | None]) -> str:
+    if indexes_mapped(indexes):
+        first = sql_col(indexes["first_name"])
+        last = sql_col(indexes["last_name"])
+        phone = sql_col(indexes["phone"])
+        email = sql_col(indexes["email"])
+        identity = sql_col(indexes["identity_number"])
+        city = sql_col(indexes["city"])
+        country = sql_col(indexes["country"])
+        notes = sql_col(indexes["notes"])
+    else:
+        tc_first = "length(replace(trim(COALESCE(col0,'')),' ','')) = 11"
+        first = f"CASE WHEN {tc_first} THEN trim(COALESCE(col1,'')) ELSE trim(COALESCE(col0,'')) END"
+        last = f"CASE WHEN {tc_first} THEN trim(COALESCE(col2,'')) ELSE trim(COALESCE(col1,'')) END"
+        identity = f"CASE WHEN {tc_first} THEN trim(COALESCE(col0,'')) ELSE trim(COALESCE(col2,'')) END"
+        phone = f"CASE WHEN {tc_first} THEN trim(COALESCE(col3,'')) ELSE trim(COALESCE(col2,'')) END"
+        email = f"CASE WHEN {tc_first} THEN trim(COALESCE(col4,'')) ELSE trim(COALESCE(col3,'')) END"
+        city = sql_col(indexes["city"])
+        country = "''"
+        notes = sql_col(indexes["notes"])
+
+    return f"""
+        SELECT
+            {first},
+            {last},
+            {phone},
+            {email},
+            {identity},
+            {city},
+            {country},
+            {notes},
+            '{{}}',
+            {sql_lower(first)},
+            {sql_lower(last)},
+            {sql_lower(phone)},
+            {sql_lower(email)},
+            {sql_lower(identity)}
+        FROM {STAGING_TABLE}
+    """
+
+
+def sqlite_import_mode(delimiter: bytes) -> list[str]:
+    if delimiter == b"\t":
+        return [".mode tabs"]
+    if delimiter == b",":
+        return [".mode csv"]
+    token = delimiter.decode("latin-1", errors="ignore")
+    return [f".separator {token}"]
+
+
+def stream_txt_bulk_import(conn: sqlite3.Connection, path: Path) -> int:
+    if not shutil.which("sqlite3"):
+        raise RuntimeError("sqlite3 CLI not found")
+
+    db_path = db_file_path(conn)
+    if not db_path:
+        raise RuntimeError("bulk import needs a file-backed database")
+
+    header_info = read_txt_header_info(path)
+    if not header_info:
+        return 0
+
+    delimiter, headers, num_cols, has_header = header_info
+    indexes = build_field_indexes(headers)
+    skip_rows = 1 if has_header else 0
+    size_mb = path.stat().st_size // (1024 * 1024)
+
+    print(
+        f"  Fast bulk import for {path.name} ({size_mb} MB, ~49M lines in 1-3 min)...",
+        flush=True,
+    )
+    print(f"  Headers: {headers[:12]}", flush=True)
+
+    conn.execute(f"DROP TABLE IF EXISTS {STAGING_TABLE}")
+    staging_cols = ", ".join(f"col{index} TEXT" for index in range(num_cols))
+    conn.execute(f"CREATE TABLE {STAGING_TABLE} ({staging_cols})")
+    conn.commit()
+
+    import_script = "\n".join(
+        sqlite_import_mode(delimiter)
+        + [f".import --skip {skip_rows} {path.resolve()} {STAGING_TABLE}"]
+    )
+
+    started = time.perf_counter()
+    result = subprocess.run(
+        ["sqlite3", str(db_path)],
+        input=import_script,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        conn.execute(f"DROP TABLE IF EXISTS {STAGING_TABLE}")
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "sqlite3 import failed")
+
+    imported = conn.execute(f"SELECT COUNT(*) FROM {STAGING_TABLE}").fetchone()[0]
+    elapsed = time.perf_counter() - started
+    rate = int(imported / elapsed) if elapsed > 0 else imported
+    print(
+        f"  Imported {imported} rows in {elapsed:.1f}s ({rate}/sec), transforming...",
+        flush=True,
+    )
+
+    transform_started = time.perf_counter()
+    transformed = 0
+    insert_sql = f"""
+        INSERT INTO people (
+            first_name, last_name, phone, email, identity_number,
+            city, country, notes, extra_json,
+            first_name_n, last_name_n, phone_n, email_n, identity_number_n
+        )
+        {build_bulk_insert_select(indexes)}
+        LIMIT {BULK_TRANSFORM_CHUNK}
+    """
+    delete_sql = f"""
+        DELETE FROM {STAGING_TABLE} WHERE rowid IN (
+            SELECT rowid FROM {STAGING_TABLE} LIMIT {BULK_TRANSFORM_CHUNK}
+        )
+    """
+
+    while True:
+        remaining = conn.execute(f"SELECT COUNT(*) FROM {STAGING_TABLE}").fetchone()[0]
+        if remaining == 0:
+            break
+        conn.execute(insert_sql)
+        conn.execute(delete_sql)
+        conn.commit()
+        transformed += min(BULK_TRANSFORM_CHUNK, remaining)
+        if transformed % 2_000_000 == 0 or remaining <= BULK_TRANSFORM_CHUNK:
+            print(f"  Transformed {transformed}/{imported} rows...", flush=True)
+
+    conn.execute(f"DROP TABLE IF EXISTS {STAGING_TABLE}")
+    conn.commit()
+    print(
+        f"  Done {path.name}: {imported} rows total in {time.perf_counter() - started:.1f}s "
+        f"(transform {time.perf_counter() - transform_started:.1f}s)",
+        flush=True,
+    )
+    return imported
+
+
+def stream_txt_fast(conn: sqlite3.Connection, path: Path) -> int:
+    free_mb = free_disk_bytes(path.parent) // (1024 * 1024)
+    file_mb = path.stat().st_size // (1024 * 1024)
+
+    if bulk_import_fits(path) and shutil.which("sqlite3"):
+        try:
+            return stream_txt_bulk_import(conn, path)
+        except (sqlite3.OperationalError, OSError, RuntimeError) as error:
+            message = str(error).lower()
+            cleanup_sqlite_sidecars(db_file_path(conn))
+            if "disk" in message or "i/o" in message or "full" in message:
+                print(
+                    f"  Bulk import hit disk limit ({error}), switching to turbo...",
+                    flush=True,
+                )
+            else:
+                print(f"  Bulk import failed ({error}), using turbo fallback...", flush=True)
+    else:
+        print(
+            f"  Using turbo for {path.name} ({file_mb} MB file, {free_mb} MB free disk)...",
+            flush=True,
+        )
+
+    return stream_txt_turbo(conn, path)
+
+
+def build_field_indexes(headers: list[str]) -> dict[str, int | None]:
+    indexes: dict[str, int | None] = {
+        "first_name": None,
+        "last_name": None,
+        "phone": None,
+        "email": None,
+        "identity_number": None,
+        "city": None,
+        "country": None,
+        "notes": None,
+    }
+    for index, header in enumerate(headers):
+        field = COLUMN_MAP.get(header)
+        if field in indexes and indexes[field] is None:
+            indexes[field] = index
+    return indexes
+
+
+def decode_part(part: bytes) -> str:
+    return part.decode("utf-8", errors="ignore").strip()
+
+
+def turbo_tuple_from_parts(parts: list[bytes], indexes: dict[str, int | None]) -> tuple | None:
+    def get(field: str) -> str:
+        idx = indexes.get(field)
+        if idx is None or idx >= len(parts):
+            return ""
+        return decode_part(parts[idx])
+
+    first = get("first_name")
+    last = get("last_name")
+    phone = phone_digits(get("phone"))
+    email = get("email").lower()
+    identity = get("identity_number")
+    city = get("city")
+    country = get("country")
+    notes = get("notes")
+
+    if not any([first, last, phone, email, identity, city, country, notes]):
+        if len(parts) >= 3:
+            vals = [decode_part(part) for part in parts]
+            if len(phone_digits(vals[0])) == 11:
+                identity, first, last = vals[0], vals[1], vals[2]
+                phone = phone_digits(vals[3]) if len(vals) > 3 else ""
+                email = vals[4].lower() if len(vals) > 4 else ""
+            elif len(parts) >= 4:
+                first, last, identity = vals[0], vals[1], vals[2]
+                phone = phone_digits(vals[3])
+            else:
+                first, last = vals[0], vals[1]
+                identity = vals[2] if len(vals) > 2 else ""
+        else:
+            return None
+
+    if not any([first, last, phone, email, identity, city, country, notes]):
+        return None
+
+    return (
+        first,
+        last,
+        phone,
+        email,
+        identity,
+        city,
+        country,
+        notes,
+        "{}",
+        norm_text_fast(first),
+        norm_text_fast(last),
+        phone[-10:] if len(phone) >= 10 else phone,
+        email,
+        norm_text_fast(identity),
+    )
+
+
+def detect_binary_delimiter(header_line: bytes) -> bytes:
+    for delimiter in (b"\t", b"|", b";", b","):
+        if delimiter in header_line:
+            return delimiter
+    return b"\t"
+
+
+def stream_txt_turbo(conn: sqlite3.Connection, path: Path) -> int:
+    size_mb = path.stat().st_size // (1024 * 1024)
+    print(f"  Turbo fallback for {path.name} ({size_mb} MB)...", flush=True)
+
+    batch: list[tuple] = []
+    total = 0
+    started = time.perf_counter()
+
+    with path.open("rb", buffering=16 * 1024 * 1024) as handle:
+        header_line = handle.readline()
+        if not header_line:
+            return 0
+
+        delimiter = detect_binary_delimiter(header_line)
+        header_parts = header_line.rstrip(b"\r\n").split(delimiter)
+        headers = [clean_header(decode_part(part)) for part in header_parts]
+        indexes = build_field_indexes(headers)
+        print(f"  Turbo headers: {headers[:12]}", flush=True)
+
+        for line in handle:
+            if not line.strip():
+                continue
+            parts = line.rstrip(b"\r\n").split(delimiter)
+            row = turbo_tuple_from_parts(parts, indexes)
+            if row is None:
+                continue
+            batch.append(row)
+            total += 1
+            if len(batch) >= TURBO_BATCH_SIZE:
+                insert_record_batch(conn, batch)
+            if total % TURBO_PROGRESS_EVERY == 0:
+                elapsed = max(time.perf_counter() - started, 0.001)
+                rate = int(total / elapsed)
+                print(
+                    f"  Indexed {total} rows from {path.name} ({rate}/sec)...",
+                    flush=True,
+                )
+
+    insert_record_batch(conn, batch)
+    return total
+
+
 def phone_index_fast(record: dict) -> str:
     phone = record.get("phone", "")
     if not phone:
@@ -468,10 +868,21 @@ def phone_index_fast(record: dict) -> str:
 
 
 def tune_sqlite_for_bulk(conn: sqlite3.Connection) -> None:
-    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA journal_mode=DELETE")
     conn.execute("PRAGMA synchronous=OFF")
     conn.execute("PRAGMA temp_store=MEMORY")
-    conn.execute("PRAGMA cache_size=-500000")
+    conn.execute("PRAGMA cache_size=-1000000")
+    conn.execute("PRAGMA mmap_size=268435456")
+
+
+def finalize_index_db(db_path: Path) -> None:
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def restore_sqlite_settings(conn: sqlite3.Connection) -> None:
@@ -824,6 +1235,8 @@ def index_file(conn: sqlite3.Connection, path: Path) -> int:
     if suffix in {".xlsx", ".xlsm"}:
         return stream_records(conn, path, iter_xlsx_records(path))
     if suffix in {".csv", ".tsv", ".txt"}:
+        if suffix == ".txt" and path.stat().st_size >= MEGA_FILE_BYTES:
+            return stream_txt_fast(conn, path)
         return stream_records(conn, path, iter_delimited_records(path, suffix))
 
     records = load_file_records(path)
@@ -872,12 +1285,25 @@ def index_is_stale() -> bool:
 
 def ensure_index() -> None:
     with INDEX_LOCK:
-        if index_is_stale():
+        if not index_is_stale():
+            return
+
+        lock_handle = try_acquire_build_lock()
+        if lock_handle is None:
+            print("Another index build is already running, keeping current index", flush=True)
+            return
+
+        try:
+            free_mb = free_disk_bytes() // (1024 * 1024)
+            print(f"Building search index ({free_mb} MB free disk)...", flush=True)
             info = rebuild_index()
             print(
                 f"Loaded {info['records']} records from {len(info['sources'])} file(s)",
                 flush=True,
             )
+        finally:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+            lock_handle.close()
 
 
 def build_index_background() -> None:
@@ -887,12 +1313,21 @@ def build_index_background() -> None:
     except Exception as error:
         INDEX_ERROR = str(error)
         print(f"Index build failed: {error}", flush=True)
+        cleanup_sqlite_sidecars()
+        if INDEX_DB.exists() and index_schema_ok():
+            try:
+                records = count_records()
+            except sqlite3.Error:
+                records = 0
+            if records > 0:
+                INDEX_ERROR = None
+                print(f"Keeping previous index with {records} records for searches", flush=True)
     finally:
         INDEX_READY.set()
 
 
 def wait_for_index() -> None:
-    if not INDEX_READY.wait(timeout=7200):
+    if not INDEX_READY.wait(timeout=None):
         raise HTTPException(status_code=503, detail="Index is still building, try again in a few minutes")
     if INDEX_ERROR:
         raise HTTPException(status_code=500, detail=INDEX_ERROR)
@@ -901,10 +1336,11 @@ def wait_for_index() -> None:
 def rebuild_index() -> dict:
     DATABASE_DIR.mkdir(parents=True, exist_ok=True)
     temp_db = BASE_DIR / ".search_index.building.db"
+    cleanup_sqlite_sidecars(temp_db)
     if temp_db.exists():
         temp_db.unlink()
 
-    sources = sorted(source_files(), key=lambda item: item.stat().st_size)
+    sources = sorted(source_files(), key=source_sort_key)
     loaded_files = []
     total_records = 0
 
@@ -914,24 +1350,35 @@ def rebuild_index() -> dict:
         ensure_index_schema(conn)
         for path in sources:
             try:
-                conn.execute("BEGIN IMMEDIATE")
                 count = index_file(conn, path)
-                conn.commit()
+            except (sqlite3.OperationalError, OSError) as error:
+                print(f"Failed to load {path.name}: {error}", flush=True)
+                cleanup_sqlite_sidecars(db_file_path(conn))
+                if "disk" in str(error).lower() or "i/o" in str(error).lower():
+                    raise RuntimeError(
+                        f"Disk full while loading {path.name}. "
+                        f"Free space: {free_disk_bytes() // (1024 * 1024)} MB. "
+                        "Delete old files or use turbo-only mode."
+                    ) from error
+                continue
             except Exception as error:
-                conn.execute("ROLLBACK")
                 print(f"Failed to load {path.name}: {error}", flush=True)
                 continue
             if count:
                 loaded_files.append(path.name)
                 total_records += count
                 print(f"Loaded {count} records from {path.name}", flush=True)
+        conn.commit()
         restore_sqlite_settings(conn)
     finally:
         conn.close()
 
+    cleanup_sqlite_sidecars(INDEX_DB)
     if INDEX_DB.exists():
         INDEX_DB.unlink()
     temp_db.replace(INDEX_DB)
+    cleanup_sqlite_sidecars(INDEX_DB)
+    finalize_index_db(INDEX_DB)
 
     return {
         "sources": loaded_files,
@@ -1105,6 +1552,7 @@ def api(
                 ready=False,
                 status="indexing",
                 records=0,
+                free_disk_mb=free_disk_bytes() // (1024 * 1024),
                 usage=API_USAGE,
             )
         return raw_json(
