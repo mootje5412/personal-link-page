@@ -1,6 +1,8 @@
 import csv
+import fcntl
 import itertools
 import json
+import os
 import re
 import shutil
 import sqlite3
@@ -19,7 +21,7 @@ DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
 SCHEMA_VERSION = 11
 PORT = 8080
-API_VERSION = "2026-07-24-bulk-49m"
+API_VERSION = "2026-07-24-disk-safe"
 CREDIT = "api made by Ami.192 on signal"
 API_USAGE = {
     "status": "/api",
@@ -38,6 +40,9 @@ LARGE_FILE_BYTES = 100_000_000
 MEGA_FILE_BYTES = 10_000_000
 TURBO_PROGRESS_EVERY = 500000
 STAGING_TABLE = "_import_staging"
+BUILD_LOCK_FILE = BASE_DIR / ".index-build.lock"
+BULK_TRANSFORM_CHUNK = 1_000_000
+DISK_BUFFER_BYTES = 500_000_000
 DATA_SUFFIXES = {".xlsx", ".xlsm", ".csv", ".tsv", ".txt", ".db"}
 ARCHIVE_SUFFIXES = {".7z"}
 
@@ -469,6 +474,55 @@ def parse_delimited_line(line: str, delimiter: str, headers: list[str]) -> dict:
     return map_row_positional(parts)
 
 
+def free_disk_bytes(path: Path | None = None) -> int:
+    target = path or BASE_DIR
+    return shutil.disk_usage(target).free
+
+
+def bulk_import_fits(path: Path) -> bool:
+    file_size = path.stat().st_size
+    needed = file_size * 25 // 10 + DISK_BUFFER_BYTES
+    return free_disk_bytes(path.parent) >= needed
+
+
+def cleanup_sqlite_sidecars(db_path: Path | None = None) -> None:
+    paths = {db_path or INDEX_DB, INDEX_DB, BASE_DIR / ".search_index.building.db"}
+    for target in paths:
+        if target is None:
+            continue
+        for suffix in ("-wal", "-shm", "-journal"):
+            sidecar = Path(str(target) + suffix)
+            if sidecar.exists():
+                try:
+                    sidecar.unlink()
+                except OSError:
+                    pass
+        if target.exists() and target.name == ".search_index.building.db":
+            try:
+                target.unlink()
+            except OSError:
+                pass
+
+
+def try_acquire_build_lock():
+    BUILD_LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    handle = open(BUILD_LOCK_FILE, "w", encoding="utf-8")
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        handle.write(str(os.getpid()))
+        handle.flush()
+        return handle
+    except BlockingIOError:
+        handle.close()
+        return None
+
+
+def source_sort_key(path: Path) -> tuple[int, int]:
+    size = path.stat().st_size
+    mega_txt = path.suffix.lower() == ".txt" and size >= MEGA_FILE_BYTES
+    return (0 if mega_txt else 1, size)
+
+
 def norm_text_fast(value: str) -> str:
     return value.strip().lower()
 
@@ -618,16 +672,33 @@ def stream_txt_bulk_import(conn: sqlite3.Connection, path: Path) -> int:
     )
 
     transform_started = time.perf_counter()
-    conn.execute(
-        f"""
+    transformed = 0
+    insert_sql = f"""
         INSERT INTO people (
             first_name, last_name, phone, email, identity_number,
             city, country, notes, extra_json,
             first_name_n, last_name_n, phone_n, email_n, identity_number_n
         )
         {build_bulk_insert_select(indexes)}
-        """
-    )
+        LIMIT {BULK_TRANSFORM_CHUNK}
+    """
+    delete_sql = f"""
+        DELETE FROM {STAGING_TABLE} WHERE rowid IN (
+            SELECT rowid FROM {STAGING_TABLE} LIMIT {BULK_TRANSFORM_CHUNK}
+        )
+    """
+
+    while True:
+        remaining = conn.execute(f"SELECT COUNT(*) FROM {STAGING_TABLE}").fetchone()[0]
+        if remaining == 0:
+            break
+        conn.execute(insert_sql)
+        conn.execute(delete_sql)
+        conn.commit()
+        transformed += min(BULK_TRANSFORM_CHUNK, remaining)
+        if transformed % 2_000_000 == 0 or remaining <= BULK_TRANSFORM_CHUNK:
+            print(f"  Transformed {transformed}/{imported} rows...", flush=True)
+
     conn.execute(f"DROP TABLE IF EXISTS {STAGING_TABLE}")
     conn.commit()
     print(
@@ -639,11 +710,29 @@ def stream_txt_bulk_import(conn: sqlite3.Connection, path: Path) -> int:
 
 
 def stream_txt_fast(conn: sqlite3.Connection, path: Path) -> int:
-    try:
-        return stream_txt_bulk_import(conn, path)
-    except Exception as error:
-        print(f"  Bulk import failed ({error}), using turbo fallback...", flush=True)
-        return stream_txt_turbo(conn, path)
+    free_mb = free_disk_bytes(path.parent) // (1024 * 1024)
+    file_mb = path.stat().st_size // (1024 * 1024)
+
+    if bulk_import_fits(path) and shutil.which("sqlite3"):
+        try:
+            return stream_txt_bulk_import(conn, path)
+        except (sqlite3.OperationalError, OSError, RuntimeError) as error:
+            message = str(error).lower()
+            cleanup_sqlite_sidecars(db_file_path(conn))
+            if "disk" in message or "i/o" in message or "full" in message:
+                print(
+                    f"  Bulk import hit disk limit ({error}), switching to turbo...",
+                    flush=True,
+                )
+            else:
+                print(f"  Bulk import failed ({error}), using turbo fallback...", flush=True)
+    else:
+        print(
+            f"  Using turbo for {path.name} ({file_mb} MB file, {free_mb} MB free disk)...",
+            flush=True,
+        )
+
+    return stream_txt_turbo(conn, path)
 
 
 def build_field_indexes(headers: list[str]) -> dict[str, int | None]:
@@ -779,11 +868,21 @@ def phone_index_fast(record: dict) -> str:
 
 
 def tune_sqlite_for_bulk(conn: sqlite3.Connection) -> None:
-    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA journal_mode=DELETE")
     conn.execute("PRAGMA synchronous=OFF")
     conn.execute("PRAGMA temp_store=MEMORY")
     conn.execute("PRAGMA cache_size=-1000000")
     conn.execute("PRAGMA mmap_size=268435456")
+
+
+def finalize_index_db(db_path: Path) -> None:
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def restore_sqlite_settings(conn: sqlite3.Connection) -> None:
@@ -1186,12 +1285,25 @@ def index_is_stale() -> bool:
 
 def ensure_index() -> None:
     with INDEX_LOCK:
-        if index_is_stale():
+        if not index_is_stale():
+            return
+
+        lock_handle = try_acquire_build_lock()
+        if lock_handle is None:
+            print("Another index build is already running, keeping current index", flush=True)
+            return
+
+        try:
+            free_mb = free_disk_bytes() // (1024 * 1024)
+            print(f"Building search index ({free_mb} MB free disk)...", flush=True)
             info = rebuild_index()
             print(
                 f"Loaded {info['records']} records from {len(info['sources'])} file(s)",
                 flush=True,
             )
+        finally:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+            lock_handle.close()
 
 
 def build_index_background() -> None:
@@ -1201,6 +1313,15 @@ def build_index_background() -> None:
     except Exception as error:
         INDEX_ERROR = str(error)
         print(f"Index build failed: {error}", flush=True)
+        cleanup_sqlite_sidecars()
+        if INDEX_DB.exists() and index_schema_ok():
+            try:
+                records = count_records()
+            except sqlite3.Error:
+                records = 0
+            if records > 0:
+                INDEX_ERROR = None
+                print(f"Keeping previous index with {records} records for searches", flush=True)
     finally:
         INDEX_READY.set()
 
@@ -1215,10 +1336,11 @@ def wait_for_index() -> None:
 def rebuild_index() -> dict:
     DATABASE_DIR.mkdir(parents=True, exist_ok=True)
     temp_db = BASE_DIR / ".search_index.building.db"
+    cleanup_sqlite_sidecars(temp_db)
     if temp_db.exists():
         temp_db.unlink()
 
-    sources = sorted(source_files(), key=lambda item: item.stat().st_size)
+    sources = sorted(source_files(), key=source_sort_key)
     loaded_files = []
     total_records = 0
 
@@ -1229,6 +1351,16 @@ def rebuild_index() -> dict:
         for path in sources:
             try:
                 count = index_file(conn, path)
+            except (sqlite3.OperationalError, OSError) as error:
+                print(f"Failed to load {path.name}: {error}", flush=True)
+                cleanup_sqlite_sidecars(db_file_path(conn))
+                if "disk" in str(error).lower() or "i/o" in str(error).lower():
+                    raise RuntimeError(
+                        f"Disk full while loading {path.name}. "
+                        f"Free space: {free_disk_bytes() // (1024 * 1024)} MB. "
+                        "Delete old files or use turbo-only mode."
+                    ) from error
+                continue
             except Exception as error:
                 print(f"Failed to load {path.name}: {error}", flush=True)
                 continue
@@ -1241,9 +1373,12 @@ def rebuild_index() -> dict:
     finally:
         conn.close()
 
+    cleanup_sqlite_sidecars(INDEX_DB)
     if INDEX_DB.exists():
         INDEX_DB.unlink()
     temp_db.replace(INDEX_DB)
+    cleanup_sqlite_sidecars(INDEX_DB)
+    finalize_index_db(INDEX_DB)
 
     return {
         "sources": loaded_files,
@@ -1417,6 +1552,7 @@ def api(
                 ready=False,
                 status="indexing",
                 records=0,
+                free_disk_mb=free_disk_bytes() // (1024 * 1024),
                 usage=API_USAGE,
             )
         return raw_json(
