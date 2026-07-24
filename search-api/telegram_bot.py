@@ -1,6 +1,7 @@
 import asyncio
 import os
 import threading
+import time
 
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
@@ -62,6 +63,21 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+async def wait_for_search_ready(timeout: float = 60.0) -> bool:
+    from main import search_is_ready
+
+    if search_is_ready():
+        return True
+
+    loop = asyncio.get_running_loop()
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if await loop.run_in_executor(None, search_is_ready):
+            return True
+        await asyncio.sleep(1)
+    return search_is_ready()
+
+
 async def handle_search_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.message.text:
         return
@@ -70,12 +86,13 @@ async def handle_search_message(update: Update, context: ContextTypes.DEFAULT_TY
     if not query or query.startswith("/"):
         return
 
-    from fastapi import HTTPException
+    from main import HTTPException as FastAPIHTTPException
+    from main import search
 
-    from main import INDEX_BUILDING, INDEX_READY, search
-
-    if INDEX_BUILDING.is_set() or not INDEX_READY.is_set():
-        await update.message.reply_text("Database is still loading. Try again in a few minutes.")
+    if not await wait_for_search_ready():
+        await update.message.reply_text(
+            "Index is still building. First batch usually ready within a minute — try again shortly."
+        )
         return
 
     await update.message.reply_chat_action("typing")
@@ -83,7 +100,7 @@ async def handle_search_message(update: Update, context: ContextTypes.DEFAULT_TY
 
     try:
         results, _parsed = await loop.run_in_executor(None, lambda: search(query))
-    except HTTPException as error:
+    except FastAPIHTTPException as error:
         await update.message.reply_text(str(error.detail))
         return
     except ValueError as error:
