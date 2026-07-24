@@ -96,12 +96,23 @@ async def handle_search_message(update: Update, context: ContextTypes.DEFAULT_TY
     await update.message.reply_text(format_results_message(query, results))
 
 
+async def run_bot(application: Application) -> None:
+    async with application:
+        await application.start()
+        await application.updater.start_polling(
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES,
+        )
+        await asyncio.Event().wait()
+
+
 def run_bot_polling() -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     if not token:
         print("Telegram bot disabled: set TELEGRAM_BOT_TOKEN in telegram.env", flush=True)
         return
 
+    asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -110,7 +121,9 @@ def run_bot_polling() -> None:
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_search_message))
     print("Telegram bot started (send /start)", flush=True)
     try:
-        application.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
+        loop.run_until_complete(run_bot(application))
+    except Exception as error:
+        print(f"Telegram bot error: {error}", flush=True)
     finally:
         loop.close()
 

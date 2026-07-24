@@ -20,7 +20,7 @@ DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
 SCHEMA_VERSION = 9
 PORT = 8080
-API_VERSION = "2026-07-24-telegram-fix"
+API_VERSION = "2026-07-24-telegram-fix2"
 CREDIT = "api made by Ami.192 on signal"
 AUTO_REBUILD = os.environ.get("AUTO_REBUILD", "0") == "1"
 API_USAGE = {
