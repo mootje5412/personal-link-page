@@ -10,7 +10,7 @@ const searchTypes = [
 ]
 
 const highlights = [
-  { title: 'Hızlı', desc: 'Sonuçlar saniyeler içinde' },
+  { title: 'Hızlı', desc: 'Saniyeler içinde sonuç' },
   { title: 'Güncel', desc: 'Düzenli güncellenen veri' },
   { title: 'Güvenli', desc: 'Şifreli bağlantı' },
 ]
@@ -20,8 +20,9 @@ const Features = () => {
     <section id="ozellikler" className="section features">
       <div className="container">
         <div className="section-head">
-          <h2>Arama türleri</h2>
-          <p>Panelde kullanabileceğiniz sorgu seçenekleri.</p>
+          <span className="section-label">Özellikler</span>
+          <h2>Ne arayabilirsin?</h2>
+          <p>Panelde kullanabileceğin tüm sorgu türleri.</p>
         </div>
 
         <div className="search-grid">

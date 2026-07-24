@@ -10,7 +10,7 @@ const plans = [
   {
     name: 'Standart',
     price: '79',
-    note: 'Çoğu kullanıcı bunu alır',
+    note: 'En popüler',
     items: ['200 arama / ay', 'Tüm arama türleri', 'Öncelikli destek'],
     featured: true,
   },
@@ -27,8 +27,9 @@ const Pricing = () => {
     <section id="fiyatlar" className="section pricing">
       <div className="container">
         <div className="section-head">
-          <h2>Fiyatlar</h2>
-          <p>Aylık paketler. İstediğin zaman iptal edebilirsin.</p>
+          <span className="section-label">Fiyatlandırma</span>
+          <h2>Paketler</h2>
+          <p>Aylık abonelik. İstediğin zaman iptal.</p>
         </div>
 
         <div className="plans">
@@ -42,7 +43,8 @@ const Pricing = () => {
                 <p className="plan-note">{plan.note}</p>
               </div>
               <p className="plan-price">
-                {plan.price} <span>₺/ay</span>
+                <span className="plan-amount">{plan.price}</span>
+                <span className="plan-currency">₺/ay</span>
               </p>
               <ul>
                 {plan.items.map((item) => (

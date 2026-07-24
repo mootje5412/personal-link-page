@@ -5,28 +5,28 @@
 }
 
 :root {
-  --bg: #050505;
-  --surface: #0f0f0f;
-  --surface-2: #161616;
-  --text: #f5f5f5;
-  --muted: #888;
-  --line: #262626;
-  --line-soft: #1a1a1a;
-  --radius: 12px;
-  --radius-sm: 8px;
-  --shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.55);
-  --header-h: 64px;
-  --nav-h: 58px;
+  --bg: #090909;
+  --surface: rgba(255, 255, 255, 0.03);
+  --surface-hover: rgba(255, 255, 255, 0.06);
+  --glass: rgba(255, 255, 255, 0.04);
+  --text: #fafafa;
+  --muted: #737373;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --radius: 16px;
+  --radius-lg: 20px;
+  --radius-full: 999px;
+  --header-h: 72px;
+  --nav-h: 62px;
 }
 
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: calc(var(--header-h) + 20px);
+  scroll-padding-top: calc(var(--header-h) + 24px);
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
@@ -45,45 +45,41 @@ a {
 }
 
 .container {
-  max-width: 1040px;
+  max-width: 1140px;
   margin: 0 auto;
-  padding: 0 28px;
+  padding: 0 24px;
 }
 
 .section {
-  padding: 88px 0;
-  position: relative;
+  padding: 96px 0;
 }
 
 .section-head {
-  margin-bottom: 48px;
+  margin-bottom: 52px;
+}
+
+.section-label {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
 }
 
 .section-head h2 {
-  font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  margin-bottom: 10px;
-  position: relative;
-  display: inline-block;
-}
-
-.section-head h2::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  bottom: -6px;
-  width: 32px;
-  height: 2px;
-  background: #fff;
-  border-radius: 1px;
+  font-size: clamp(28px, 4vw, 36px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+  margin-bottom: 12px;
 }
 
 .section-head p {
   color: var(--muted);
-  font-size: 16px;
-  max-width: 480px;
-  margin-top: 16px;
+  font-size: 17px;
+  max-width: 440px;
   line-height: 1.65;
 }
 
@@ -91,38 +87,47 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 13px 28px;
+  padding: 14px 28px;
   background: #fff;
   color: #000;
   font-size: 15px;
-  font-weight: 500;
-  border-radius: var(--radius-sm);
+  font-weight: 600;
+  border-radius: var(--radius-full);
   border: none;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-  box-shadow: 0 2px 12px rgba(255, 255, 255, 0.08);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.12);
+  transform: scale(1.02);
+  box-shadow: 0 0 40px rgba(255, 255, 255, 0.15);
 }
 
-.btn:active {
-  transform: translateY(0);
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  box-shadow: none;
+}
+
+.btn-ghost:hover {
+  background: var(--surface-hover);
+  box-shadow: none;
+  transform: none;
 }
 
 .btn-outline {
   background: transparent;
   color: var(--text);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
   box-shadow: none;
 }
 
 .btn-outline:hover {
-  background: var(--surface-2);
-  border-color: #444;
+  background: var(--surface-hover);
   box-shadow: none;
+  transform: none;
 }
 
 @media (max-width: 768px) {
@@ -131,7 +136,7 @@ a {
   }
 
   body {
-    padding-bottom: var(--nav-h);
+    padding-bottom: 88px;
   }
 
   .container {
@@ -139,15 +144,15 @@ a {
   }
 
   .section {
-    padding: 56px 0;
+    padding: 64px 0;
   }
 
   .section-head {
-    margin-bottom: 32px;
+    margin-bottom: 36px;
   }
 
   .section-head h2 {
-    font-size: 22px;
+    font-size: 26px;
   }
 
   .section-head p {
@@ -156,12 +161,13 @@ a {
 
   .btn:hover {
     transform: none;
+    box-shadow: none;
   }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1200px) {
   .container {
-    max-width: 1080px;
-    padding: 0 40px;
+    max-width: 1200px;
+    padding: 0 48px;
   }
 }

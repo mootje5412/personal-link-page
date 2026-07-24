@@ -18,25 +18,32 @@ const Hero = () => {
       </header>
 
       <section className="hero">
-        <div className="hero-bg" aria-hidden="true" />
-        <div className="container hero-wrap">
-          <p className="hero-label">Apex Panel</p>
-          <h1>Türk arama paneli</h1>
-          <p className="hero-lead">
-            TC kimlik, isim, adres, aile bireyleri, IP ve e-posta
-            sorgulama. Tek panelden, hızlı erişim.
-          </p>
-          <div className="hero-chips">
-            <span>TC</span>
-            <span>İsim</span>
-            <span>Adres</span>
-            <span>Aile</span>
-            <span>IP</span>
-            <span>E-posta</span>
+        <div className="hero-bg" aria-hidden="true">
+          <div className="hero-grid-lines" />
+        </div>
+        <div className="container hero-layout">
+          <div className="hero-copy">
+            <p className="hero-label">Türk arama paneli</p>
+            <h1>
+              Veriyi hızlı<br />
+              sorgula
+            </h1>
+            <p className="hero-lead">
+              TC, isim, adres, aile, IP ve e-posta — hepsi tek panelde.
+            </p>
+            <div className="hero-actions">
+              <a href="#fiyatlar" className="btn">Paket seç</a>
+              <a href="#ozellikler" className="btn btn-ghost">Detaylar</a>
+            </div>
           </div>
-          <div className="hero-actions">
-            <a href="#fiyatlar" className="btn">Paket seç</a>
-            <a href="#ozellikler" className="btn btn-outline">Neler var</a>
+
+          <div className="hero-bento" aria-hidden="true">
+            <div className="bento-card bento-main">TC Kimlik</div>
+            <div className="bento-card">İsim</div>
+            <div className="bento-card">Adres</div>
+            <div className="bento-card">Aile</div>
+            <div className="bento-card">IP</div>
+            <div className="bento-card bento-wide">E-posta</div>
           </div>
         </div>
       </section>

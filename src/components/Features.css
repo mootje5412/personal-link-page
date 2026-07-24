@@ -1,82 +1,67 @@
 .features {
-  background: var(--surface);
-  border-top: 1px solid var(--line-soft);
+  border-top: 1px solid var(--line);
 }
 
 .search-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  margin-bottom: 56px;
+  gap: 12px;
+  margin-bottom: 48px;
 }
 
 .search-item {
-  background: var(--bg);
+  background: var(--glass);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 24px;
-  transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+  padding: 28px;
+  backdrop-filter: blur(8px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .search-item:hover {
-  border-color: #3a3a3a;
-  transform: translateY(-3px);
-  box-shadow: var(--shadow);
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
+  transform: translateY(-2px);
 }
 
 .search-item h3 {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
   margin-bottom: 6px;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 .search-item p {
   font-size: 14px;
   color: var(--muted);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .highlights {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  padding-top: 8px;
+  gap: 12px;
 }
 
 .highlight {
-  background: var(--bg);
+  background: var(--glass);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 24px 28px;
+  border-radius: var(--radius-lg);
+  padding: 32px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  position: relative;
-  overflow: hidden;
-}
-
-.highlight::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 3px;
-  height: 100%;
-  background: #fff;
-  opacity: 0.9;
+  gap: 8px;
 }
 
 .highlight strong {
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 .highlight span {
   font-size: 14px;
   color: var(--muted);
-  line-height: 1.5;
 }
 
 @media (max-width: 900px) {
@@ -89,16 +74,15 @@
   .search-grid {
     grid-template-columns: 1fr;
     gap: 10px;
-    margin-bottom: 40px;
+    margin-bottom: 36px;
   }
 
   .search-item {
-    padding: 20px;
+    padding: 22px;
   }
 
   .search-item:hover {
     transform: none;
-    box-shadow: none;
   }
 
   .highlights {
@@ -107,13 +91,10 @@
   }
 
   .highlight {
-    padding: 20px 24px;
+    padding: 24px;
   }
-}
 
-@media (min-width: 769px) {
-  .highlight:hover {
-    border-color: #3a3a3a;
-    box-shadow: var(--shadow);
+  .highlight strong {
+    font-size: 20px;
   }
 }
