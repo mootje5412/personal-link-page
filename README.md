@@ -1,15 +1,15 @@
-# BreachBase.xyz
+# Apex Panel
 
-Professional OSINT intelligence platform for security professionals. Access comprehensive breach data through a powerful API with real-time queries, verified sources, and enterprise-grade reliability.
+Profesyonel Türk arama paneli. TC kimlik, isim, adres, aile bireyleri, IP adresi ve e-posta sorgulamaları için güçlü ve güvenli platform.
 
-## Features
+## Özellikler
 
-- **Lightning Fast**: Sub-100ms response times with globally distributed infrastructure
-- **Real-Time Updates**: Access the latest breach data as it becomes available
-- **Enterprise Security**: Bank-grade encryption, OAuth 2.0, and comprehensive audit logs
-- **Comprehensive Coverage**: 500M+ records from verified breach sources
-- **Developer Friendly**: RESTful API with comprehensive documentation
-- **99.9% Uptime**: Industry-leading reliability with automatic failover
+- **Hızlı Arama**: Milisaniyeler içinde sonuç alın
+- **Güncel Veriler**: Sürekli güncellenen veri tabanı
+- **Güvenli Platform**: Şifreli bağlantı ve güvenli veri aktarımı
+- **Geniş Kapsam**: Milyonlarca kayıt içeren kapsamlı veri tabanı
+- **Kolay Kullanım**: Kullanıcı dostu arayüz
+- **Kesintisiz Hizmet**: 7/24 erişilebilir platform
 
 ## Tech Stack
 
@@ -53,18 +53,15 @@ Built files will be in the `dist/` directory.
 npm run preview
 ```
 
-## Pricing
+## Arama Türleri
 
-Starting at just **€5/month** for 10,000 API calls with full database access.
+- **TC Kimlik Sorgulama**: TC kimlik numarası ile arama
+- **İsim Arama**: Ad ve soyad ile sorgulama
+- **Adres Sorgulama**: Adres bilgisi ile arama
+- **Aile Bireyleri**: Aile üyeleri bilgisi
+- **IP Adresi**: IP adresi sorgulama
+- **E-posta**: E-posta adresi ile arama
 
-- **Starter**: €5/month - 10,000 API calls
-- **Professional**: €49/month - 100,000 API calls with batch operations and webhooks
-- **Enterprise**: Custom pricing for unlimited calls and dedicated infrastructure
+## Lisans
 
-## API Access
-
-Visit [breachbase.xyz](https://breachbase.xyz) to get your API key and start building.
-
-## License
-
-All rights reserved © 2026 BreachBase
+Tüm hakları saklıdır © 2026 Apex Panel
