@@ -20,7 +20,7 @@ DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
 SCHEMA_VERSION = 9
 PORT = 8080
-API_VERSION = "2026-07-24-no-scan"
+API_VERSION = "2026-07-24-sql-search"
 CREDIT = "api made by Ami.192 on signal"
 AUTO_REBUILD = os.environ.get("AUTO_REBUILD", "0") == "1"
 API_USAGE = {
@@ -41,6 +41,16 @@ PROGRESS_EVERY = 50000
 LARGE_FILE_BYTES = 100_000_000
 DATA_SUFFIXES = {".xlsx", ".xlsm", ".csv", ".tsv", ".txt", ".db", ".sql"}
 ARCHIVE_SUFFIXES = {".7z"}
+IMPORT_FIELDS = (
+    "first_name", "last_name", "phone", "email",
+    "identity_number", "city", "country", "notes",
+)
+SOURCE_META_KEY = "indexed_sources"
+TABLE_NAME_HINTS = {
+    "people", "person", "persons", "users", "user", "customers", "customer",
+    "citizens", "citizen", "members", "member", "contacts", "contact",
+    "records", "record", "data", "clients", "client", "kisi", "kisiler",
+}
 
 INSERT_SQL = """
 INSERT INTO people (
@@ -108,12 +118,23 @@ COLUMN_MAP = {
     "tc": "identity_number",
     "tc kimlik": "identity_number",
     "tc kimlik no": "identity_number",
+    "tc_kimlik": "identity_number",
+    "tc_kimlik_no": "identity_number",
+    "tcno": "identity_number",
     "tc no": "identity_number",
+    "kimlik": "identity_number",
+    "kimlik_no": "identity_number",
     "kimlik no": "identity_number",
     "kimlik numarasi": "identity_number",
     "id no": "identity_number",
     "national id": "identity_number",
     "id": "identity_number",
+    "dogum yeri": "city",
+    "dogum_yeri": "city",
+    "il": "city",
+    "ilce": "notes",
+    "gsm_no": "phone",
+    "cep_no": "phone",
     "city": "city",
     "country": "country",
     "source": "source",
@@ -602,38 +623,6 @@ def read_xlsx_rows(path: Path) -> list[dict]:
     return list(iter_xlsx_records(path))
 
 
-def read_db_rows(path: Path) -> list[dict]:
-    if path.resolve() == INDEX_DB.resolve():
-        return []
-
-    rows: list[dict] = []
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
-    try:
-        tables = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='people'"
-        ).fetchall()
-        if not tables:
-            return rows
-        for row in conn.execute("SELECT * FROM people"):
-            record = {
-                "first_name": str(row["first_name"] or "").strip() if "first_name" in row.keys() else "",
-                "last_name": str(row["last_name"] or "").strip() if "last_name" in row.keys() else "",
-                "phone": str(row["phone"] or "").strip() if "phone" in row.keys() else "",
-                "email": str(row["email"] or "").strip() if "email" in row.keys() else "",
-                "identity_number": str(row["identity_number"] or "").strip() if "identity_number" in row.keys() else "",
-                "city": str(row["city"] or "").strip() if "city" in row.keys() else "",
-                "country": str(row["country"] or "").strip() if "country" in row.keys() else "",
-                "notes": str(row["notes"] or "").strip() if "notes" in row.keys() else "",
-                "extra": {},
-            }
-            if record["first_name"] or record["last_name"] or record["phone"] or record["email"]:
-                rows.append(record)
-    finally:
-        conn.close()
-    return rows
-
-
 def iter_extracted_data_files(root: Path):
     for path in root.rglob("*"):
         if not path.is_file():
@@ -960,12 +949,133 @@ def insert_records(conn: sqlite3.Connection, records: list[dict]) -> None:
         conn.executemany(INSERT_SQL, batch)
 
 
+def sql_quote(name: str) -> str:
+    return '"' + str(name).replace('"', '""') + '"'
+
+
+def map_table_columns(column_names: list[str]) -> dict[str, str]:
+    mapping: dict[str, str] = {}
+    for column in column_names:
+        field = COLUMN_MAP.get(clean_header(column))
+        if field in IMPORT_FIELDS and field not in mapping:
+            mapping[field] = column
+    return mapping
+
+
+def table_mapping_score(mapping: dict[str, str]) -> int:
+    score = len(mapping)
+    if "phone" in mapping or "identity_number" in mapping:
+        score += 3
+    if "email" in mapping:
+        score += 2
+    if "first_name" in mapping and "last_name" in mapping:
+        score += 2
+    return score
+
+
+def list_data_tables(conn: sqlite3.Connection) -> list[str]:
+    tables = [
+        row[0]
+        for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        ).fetchall()
+    ]
+
+    def sort_key(name: str) -> tuple[int, int, str]:
+        clean = clean_header(name)
+        if clean == "people":
+            return (0, 0, name)
+        if clean in TABLE_NAME_HINTS:
+            return (1, 0, name)
+        return (2, 0, name)
+
+    return sorted(tables, key=sort_key)
+
+
+def load_indexed_sources(conn: sqlite3.Connection) -> dict[str, float]:
+    row = conn.execute(
+        "SELECT value FROM meta WHERE key = ?", (SOURCE_META_KEY,)
+    ).fetchone()
+    if not row:
+        return {}
+    try:
+        data = json.loads(row[0] or "{}")
+        return {str(key): float(value) for key, value in data.items()}
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return {}
+
+
+def save_indexed_sources(conn: sqlite3.Connection, sources: dict[str, float]) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+        (SOURCE_META_KEY, json.dumps(sources, ensure_ascii=False)),
+    )
+
+
+def import_database_path(conn: sqlite3.Connection, path: Path, label: str) -> int:
+    if path.resolve() == INDEX_DB.resolve():
+        return 0
+
+    before = conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
+    source = sqlite3.connect(path)
+    source.row_factory = sqlite3.Row
+    try:
+        imported_any = False
+        for table in list_data_tables(source):
+            columns = [
+                row[1] for row in source.execute(f"PRAGMA table_info({sql_quote(table)})")
+            ]
+            mapping = map_table_columns(columns)
+            if table_mapping_score(mapping) < 2:
+                continue
+
+            select_parts = []
+            for field in IMPORT_FIELDS:
+                column = mapping.get(field)
+                if column:
+                    select_parts.append(f"{sql_quote(column)} AS {field}")
+                else:
+                    select_parts.append(f"'' AS {field}")
+
+            batch: list[tuple] = []
+            table_count = 0
+            query = f"SELECT {', '.join(select_parts)} FROM {sql_quote(table)}"
+            for row in source.execute(query):
+                record = {field: str(row[field] or "").strip() for field in IMPORT_FIELDS}
+                record["extra"] = {}
+                if not row_is_valid(record):
+                    continue
+                batch.append(record_to_row(record))
+                table_count += 1
+                if len(batch) >= BATCH_SIZE:
+                    conn.executemany(INSERT_SQL, batch)
+                    batch.clear()
+
+            if batch:
+                conn.executemany(INSERT_SQL, batch)
+
+            if table_count:
+                imported_any = True
+                print(f"  Imported {table_count} rows from {label} table {table}", flush=True)
+
+        if not imported_any:
+            tables = list_data_tables(source)
+            raise RuntimeError(
+                f"No searchable columns found in {label}. "
+                f"Tables: {', '.join(tables[:10]) or 'none'}"
+            )
+    finally:
+        source.close()
+
+    after = conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
+    return after - before
+
+
 def import_sql_file(conn: sqlite3.Connection, path: Path) -> int:
     db_path = db_file_path(conn)
     if not db_path:
         raise RuntimeError("sql import needs a file-backed database")
 
-    before = conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
     print(f"  Importing SQL {path.name}...", flush=True)
 
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -979,36 +1089,43 @@ def import_sql_file(conn: sqlite3.Connection, path: Path) -> int:
         )
         if result.returncode != 0:
             raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "sql import failed")
+        return import_database_path(conn, import_db, path.name)
 
-        imp_conn = sqlite3.connect(import_db)
-        try:
-            tables = {
-                row[0]
-                for row in imp_conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                ).fetchall()
-            }
-            if "people" in tables:
-                imp_cols = [row[1] for row in imp_conn.execute("PRAGMA table_info(people)")]
-                our_cols = [row[1] for row in conn.execute("PRAGMA table_info(people)")]
-                shared = [col for col in our_cols if col in imp_cols and col != "id"]
-                if not shared:
-                    raise RuntimeError(f"No matching columns in {path.name}")
-                col_list = ", ".join(shared)
-                conn.execute("ATTACH ? AS impdb", (str(import_db),))
-                conn.execute(
-                    f"INSERT INTO people ({col_list}) SELECT {col_list} FROM impdb.people"
-                )
-                conn.execute("DETACH impdb")
-            else:
-                raise RuntimeError(f"No people table found in {path.name}")
-        finally:
-            imp_conn.close()
 
-    after = conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
-    added = after - before
-    print(f"  SQL import added {added} records from {path.name}", flush=True)
-    return added
+def index_db_file(conn: sqlite3.Connection, path: Path) -> int:
+    print(f"  Importing database {path.name}...", flush=True)
+    return import_database_path(conn, path, path.name)
+
+
+def read_db_rows(path: Path) -> list[dict]:
+    if path.resolve() == INDEX_DB.resolve():
+        return []
+
+    rows: list[dict] = []
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    try:
+        for table in list_data_tables(conn):
+            columns = [row[1] for row in conn.execute(f"PRAGMA table_info({sql_quote(table)})")]
+            mapping = map_table_columns(columns)
+            if table_mapping_score(mapping) < 2:
+                continue
+            select_parts = []
+            for field in IMPORT_FIELDS:
+                column = mapping.get(field)
+                if column:
+                    select_parts.append(f"{sql_quote(column)} AS {field}")
+                else:
+                    select_parts.append(f"'' AS {field}")
+            query = f"SELECT {', '.join(select_parts)} FROM {sql_quote(table)}"
+            for row in conn.execute(query):
+                record = {field: str(row[field] or "").strip() for field in IMPORT_FIELDS}
+                record["extra"] = {}
+                if row_is_valid(record):
+                    rows.append(record)
+    finally:
+        conn.close()
+    return rows
 
 
 def load_file_records(path: Path) -> list[dict]:
@@ -1034,6 +1151,8 @@ def index_file(conn: sqlite3.Connection, path: Path) -> int:
 
     if suffix == ".sql":
         return import_sql_file(conn, path)
+    if suffix == ".db":
+        return index_db_file(conn, path)
     if suffix in {".xlsx", ".xlsm"}:
         return stream_records(conn, path, iter_xlsx_records(path))
     if suffix in {".csv", ".tsv", ".txt"}:
@@ -1101,18 +1220,63 @@ def index_is_stale() -> bool:
     return False
 
 
+def bootstrap_source_meta(conn: sqlite3.Connection) -> dict[str, float]:
+    indexed = load_indexed_sources(conn)
+    if indexed:
+        return indexed
+    meta = {path.name: path.stat().st_mtime for path in source_files()}
+    save_indexed_sources(conn, meta)
+    print(
+        f"Marked {len(meta)} existing file(s) as indexed. New SQL/DB files will auto-import.",
+        flush=True,
+    )
+    return meta
+
+
+def index_pending_sources(conn: sqlite3.Connection) -> int:
+    indexed = bootstrap_source_meta(conn)
+    total_added = 0
+    updated = dict(indexed)
+
+    for path in source_files():
+        mtime = path.stat().st_mtime
+        if path.name in indexed and indexed[path.name] == mtime:
+            continue
+        try:
+            added = index_file(conn, path)
+            updated[path.name] = mtime
+            total_added += added
+            print(f"Indexed {added} records from {path.name}", flush=True)
+        except Exception as error:
+            print(f"Failed to index {path.name}: {error}", flush=True)
+
+    save_indexed_sources(conn, updated)
+    return total_added
+
+
 def ensure_index(force: bool = False) -> None:
     with INDEX_LOCK:
         if not force and index_usable():
             if AUTO_REBUILD and index_is_stale():
                 print("AUTO_REBUILD=1: rebuilding stale index...", flush=True)
             else:
-                records = count_records()
-                print(
-                    f"Using existing index ({records} records). "
-                    "Rebuild manually: GET /api/rebuild",
-                    flush=True,
-                )
+                conn = sqlite3.connect(INDEX_DB)
+                try:
+                    tune_sqlite_for_bulk(conn)
+                    ensure_index_schema(conn)
+                    added = index_pending_sources(conn)
+                    conn.commit()
+                    restore_sqlite_settings(conn)
+                    records = count_records()
+                    if added:
+                        print(f"Added {added} records from new SQL/DB files", flush=True)
+                    print(
+                        f"Search index ready ({records} records). "
+                        "Full rebuild: GET /api/rebuild",
+                        flush=True,
+                    )
+                finally:
+                    conn.close()
                 return
 
         info = rebuild_index()
@@ -1196,12 +1360,21 @@ def rebuild_index() -> dict:
                 total_records += count
                 print(f"Loaded {count} records from {path.name}", flush=True)
         restore_sqlite_settings(conn)
+        save_indexed_sources(conn, {path.name: path.stat().st_mtime for path in sources})
+        conn.commit()
     finally:
         conn.close()
 
     if INDEX_DB.exists():
         INDEX_DB.unlink()
     temp_db.replace(INDEX_DB)
+
+    final_conn = sqlite3.connect(INDEX_DB)
+    try:
+        save_indexed_sources(final_conn, {path.name: path.stat().st_mtime for path in sources})
+        final_conn.commit()
+    finally:
+        final_conn.close()
 
     return {
         "sources": loaded_files,
