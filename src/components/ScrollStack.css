@@ -1,7 +1,7 @@
 :root {
-  --stack-base: 96px;
-  --stack-card-h: 108px;
-  --stack-gap: 48px;
+  --stack-base: 112px;
+  --stack-card-h: 148px;
+  --stack-gap: 56px;
 }
 
 .scroll-stack {
@@ -19,9 +19,9 @@
   position: sticky;
   display: flex;
   align-items: flex-start;
-  gap: 20px;
+  gap: 24px;
   min-height: var(--stack-card-h);
-  padding: 28px 32px;
+  padding: 36px 40px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
@@ -38,25 +38,25 @@
 }
 
 .stack-index {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--muted);
   letter-spacing: 0.05em;
   flex-shrink: 0;
-  padding-top: 2px;
+  padding-top: 4px;
 }
 
 .stack-content h3 {
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.03em;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
 }
 
 .stack-content p {
-  font-size: 14px;
+  font-size: 16px;
   color: var(--muted);
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 .scroll-stack-end {
@@ -66,18 +66,22 @@
 
 @media (max-width: 768px) {
   :root {
-    --stack-base: 72px;
-    --stack-card-h: 96px;
-    --stack-gap: 32px;
+    --stack-base: 88px;
+    --stack-card-h: 128px;
+    --stack-gap: 40px;
   }
 
   .scroll-stack-card {
-    padding: 22px 24px;
-    gap: 16px;
+    padding: 28px 26px;
+    gap: 18px;
   }
 
   .stack-content h3 {
-    font-size: 17px;
+    font-size: 19px;
+  }
+
+  .stack-content p {
+    font-size: 15px;
   }
 
   .scroll-stack-end {

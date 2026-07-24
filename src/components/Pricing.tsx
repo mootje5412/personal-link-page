@@ -1,24 +1,25 @@
+import { Link } from 'react-router-dom'
 import './Pricing.css'
 
 const plans = [
   {
     name: 'Başlangıç',
-    price: '39',
+    price: '59',
     note: 'Denemek için',
-    items: ['50 arama / ay', 'TC ve isim', 'Temel destek'],
+    items: ['75 arama / ay', 'TC ve isim', 'Temel destek'],
   },
   {
     name: 'Standart',
-    price: '79',
+    price: '119',
     note: 'En popüler',
-    items: ['200 arama / ay', 'Tüm arama türleri', 'Öncelikli destek'],
+    items: ['300 arama / ay', 'Tüm arama türleri', 'Öncelikli destek'],
     featured: true,
   },
   {
     name: 'Pro',
-    price: '149',
+    price: '199',
     note: 'Yoğun kullanım',
-    items: ['1000 arama / ay', 'Tüm arama türleri', '7/24 destek'],
+    items: ['1500 arama / ay', 'Tüm arama türleri', '7/24 destek'],
   },
 ]
 
@@ -51,9 +52,9 @@ const Pricing = () => {
                   <li key={item}>{item}</li>
                 ))}
               </ul>
-              <button type="button" className={plan.featured ? 'btn plan-btn' : 'btn btn-outline plan-btn'}>
+              <Link to="/kayit" className={plan.featured ? 'btn plan-btn' : 'btn btn-outline plan-btn'}>
                 Seç
-              </button>
+              </Link>
             </article>
           ))}
         </div>

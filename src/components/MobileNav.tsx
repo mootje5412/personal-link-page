@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import './MobileNav.css'
 
 const MobileNav = () => {
@@ -5,7 +6,7 @@ const MobileNav = () => {
     <nav className="mobile-nav" aria-label="Mobil menü">
       <a href="#ozellikler">Özellikler</a>
       <a href="#fiyatlar">Fiyatlar</a>
-      <a href="#fiyatlar" className="mobile-nav-accent">Başla</a>
+      <Link to="/giris" className="mobile-nav-accent">Giriş</Link>
     </nav>
   )
 }

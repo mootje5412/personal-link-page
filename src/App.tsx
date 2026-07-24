@@ -1,18 +1,20 @@
-import Hero from './components/Hero'
-import Features from './components/Features'
-import Pricing from './components/Pricing'
-import Footer from './components/Footer'
-import MobileNav from './components/MobileNav'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { AuthProvider } from './context/AuthContext'
+import HomePage from './pages/HomePage'
+import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
 
 function App() {
   return (
-    <>
-      <Hero />
-      <Features />
-      <Pricing />
-      <Footer />
-      <MobileNav />
-    </>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/giris" element={<LoginPage />} />
+          <Route path="/kayit" element={<RegisterPage />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }
 

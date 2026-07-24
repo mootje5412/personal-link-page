@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 .env
+server/data/
+server/node_modules/
+server/data/*.db
+server/data/*.db-*
 
 # Editor directories and files
 .vscode/*

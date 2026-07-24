@@ -2,22 +2,7 @@ import './Hero.css'
 
 const Hero = () => {
   return (
-    <>
-      <header className="site-header">
-        <div className="container header-inner">
-          <a href="#" className="logo">
-            <span className="logo-icon">A</span>
-            Apex Panel
-          </a>
-          <nav className="nav">
-            <a href="#ozellikler">Özellikler</a>
-            <a href="#fiyatlar">Fiyatlar</a>
-          </nav>
-          <a href="#fiyatlar" className="header-cta">Başla</a>
-        </div>
-      </header>
-
-      <section className="hero">
+    <section className="hero">
         <div className="hero-bg" aria-hidden="true">
           <div className="hero-grid-lines" />
         </div>
@@ -47,7 +32,6 @@ const Hero = () => {
           </div>
         </div>
       </section>
-    </>
   )
 }
 
