@@ -9,13 +9,6 @@ echo "==========================="
 
 if [ ! -f ".env" ]; then
   cp .env.example .env
-  SECRET=$(python3 - <<'PY'
-import secrets
-print(secrets.token_urlsafe(32))
-PY
-)
-  sed -i "s|change-this-to-a-long-random-secret|${SECRET}|" .env
-  echo "Created .env with a new API key."
 fi
 
 python3 -m venv venv 2>/dev/null || {
@@ -50,19 +43,14 @@ systemctl restart ${SERVICE_NAME}
 sleep 2
 
 if systemctl is-active --quiet ${SERVICE_NAME}; then
-  API_KEY=$(grep '^API_KEY=' .env | cut -d= -f2-)
   echo ""
-  echo "API is running."
+  echo "API is running on port 8080"
   echo ""
   echo "Health:"
   echo "  curl http://127.0.0.1:8080/api/health"
   echo ""
-  echo "Search link example:"
-  echo "  curl \"http://YOUR_SERVER_IP:8080/api/search?first_name=Ege&last_name=Tevkir\" \\"
-  echo "    -H \"X-API-Key: ${API_KEY}\""
-  echo ""
-  echo "Your API key (keep private):"
-  echo "  ${API_KEY}"
+  echo "Search example:"
+  echo "  curl \"http://YOUR_SERVER_IP:8080/api/search?first_name=Ege&last_name=Tevkir\""
 else
   echo "Service failed to start. Check logs:"
   echo "  journalctl -u ${SERVICE_NAME} -n 50 --no-pager"

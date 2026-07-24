@@ -1,12 +1,10 @@
 import time
-from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from config import API_KEY
 from database import ensure_database, search_people
 
 app = FastAPI(
@@ -32,11 +30,6 @@ class SearchBody(BaseModel):
     limit: int = Field(default=25, ge=1, le=100)
 
 
-def require_api_key(x_api_key: Annotated[str | None, Header()] = None) -> None:
-    if not x_api_key or x_api_key != API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
-
-
 def build_response(results: list, query: dict, elapsed_ms: float) -> dict:
     return {
         "success": True,
@@ -59,7 +52,6 @@ def root() -> dict:
         "status": "online",
         "search": "/api/search",
         "method": "GET or POST",
-        "auth": "X-API-Key header required",
     }
 
 
@@ -68,7 +60,7 @@ def health() -> dict:
     return {"success": True, "status": "ok", "timestamp": int(time.time())}
 
 
-@app.get("/api/search", dependencies=[Depends(require_api_key)])
+@app.get("/api/search")
 def search_get(
     phone: str | None = Query(default=None),
     first_name: str | None = Query(default=None),
@@ -92,7 +84,7 @@ def search_get(
     return JSONResponse(build_response(results, query, elapsed_ms))
 
 
-@app.post("/api/search", dependencies=[Depends(require_api_key)])
+@app.post("/api/search")
 def search_post(body: SearchBody) -> JSONResponse:
     started = time.perf_counter()
     try:
