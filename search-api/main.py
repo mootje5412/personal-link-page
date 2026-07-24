@@ -17,9 +17,9 @@ from fastapi.responses import Response
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 PORT = 8080
-API_VERSION = "2026-07-24-large-files"
+API_VERSION = "2026-07-24-txt-fix"
 CREDIT = "api made by Ami.192 on signal"
 API_USAGE = {
     "status": "/api",
@@ -58,9 +58,15 @@ COLUMN_MAP = {
     "name": "first_name",
     "first_name": "first_name",
     "firstname": "first_name",
+    "ad": "first_name",
+    "isim": "first_name",
+    "musteri adi": "first_name",
     "surname": "last_name",
     "last_name": "last_name",
     "lastname": "last_name",
+    "soyad": "last_name",
+    "soyisim": "last_name",
+    "soyadi": "last_name",
     "phone": "phone",
     "phone number": "phone",
     "phone_number": "phone",
@@ -77,11 +83,19 @@ COLUMN_MAP = {
     "mobile phone": "phone",
     "contact phone": "phone",
     "phone no": "phone",
+    "telefon no": "phone",
+    "telefon numarasi": "phone",
+    "tel no": "phone",
+    "numara": "phone",
     "email": "email",
     "e-mail": "email",
     "e-mail contact": "email",
     "e-mail contact ": "email",
+    "e-posta": "email",
+    "eposta": "email",
     "mail": "email",
+    "mail adresi": "email",
+    "email address": "email",
     "identity_number": "identity_number",
     "identity number": "identity_number",
     "id number": "identity_number",
@@ -289,6 +303,130 @@ def row_is_valid(record: dict) -> bool:
     ])
 
 
+HEADER_WORDS = {
+    "name", "surname", "phone", "email", "ad", "soyad", "telefon", "mail",
+    "isim", "soyisim", "gsm", "e-mail", "eposta", "numara", "firstname", "lastname",
+}
+
+
+def non_empty_lines(text: str) -> list[str]:
+    lines = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#"):
+            lines.append(stripped)
+    return lines
+
+
+def split_line(line: str, delimiter: str) -> list[str]:
+    if delimiter == "space":
+        return [part.strip() for part in re.split(r"\s{2,}", line.strip()) if part.strip()]
+    return [part.strip() for part in line.split(delimiter)]
+
+
+def line_is_header(parts: list[str]) -> bool:
+    if len(parts) >= 2:
+        text = clean_header(" ".join(parts))
+        return any(word in HEADER_WORDS for word in text.split())
+
+    single = clean_header(parts[0] if parts else "")
+    for delimiter in ["|", ";", "\t", ","]:
+        if delimiter in parts[0]:
+            return line_is_header(split_line(parts[0], "|" if delimiter == "|" else delimiter))
+    return any(word in HEADER_WORDS for word in single.split())
+
+
+def record_quality(record: dict) -> int:
+    score = 0
+    if record["phone"]:
+        score += 3
+    if record["email"]:
+        score += 3
+    if record["first_name"]:
+        score += 1
+    if record["last_name"]:
+        score += 1
+    if record["identity_number"]:
+        score += 1
+    return score
+
+
+def map_row_positional(parts: list[str]) -> dict:
+    raw: dict = {}
+    if len(parts) >= 5:
+        raw = {
+            "name": parts[0],
+            "surname": parts[1],
+            "phone number": parts[2],
+            "e-mail": parts[3],
+            "identity_number": parts[4],
+        }
+    elif len(parts) >= 4:
+        raw = {
+            "name": parts[0],
+            "surname": parts[1],
+            "phone number": parts[2],
+            "e-mail": parts[3],
+        }
+    elif len(parts) == 3:
+        if "@" in parts[2]:
+            raw = {"name": parts[0], "surname": parts[1], "e-mail": parts[2]}
+        else:
+            raw = {"name": parts[0], "surname": parts[1], "phone number": parts[2]}
+    elif len(parts) == 2:
+        if "@" in parts[1]:
+            raw = {"name": parts[0], "e-mail": parts[1]}
+        else:
+            raw = {"name": parts[0], "phone number": parts[1]}
+    elif len(parts) == 1:
+        raw = {"name": parts[0]}
+    return map_row(raw)
+
+
+def choose_best_delimiter(lines: list[str], suffix: str = ".txt") -> str:
+    if suffix == ".tsv":
+        return "\t"
+
+    options = ["\t", "|", ";", ",", "space"]
+    sample_lines = lines[:100]
+    best = "\t"
+    best_score = -1
+
+    for delimiter in options:
+        column_counts = [len(split_line(line, delimiter)) for line in sample_lines[:20]]
+        avg_columns = sum(column_counts) / max(len(column_counts), 1)
+        if avg_columns < 2:
+            continue
+
+        score = 0
+        first_parts = split_line(sample_lines[0], delimiter)
+        has_header = line_is_header(first_parts)
+        headers = [clean_header(part) for part in first_parts] if has_header else []
+        data_lines = sample_lines[1:] if has_header else sample_lines
+
+        for line in data_lines:
+            parts = split_line(line, delimiter)
+            if len(parts) < 2:
+                continue
+            if headers:
+                raw = {
+                    headers[index]: parts[index] if index < len(parts) else ""
+                    for index in range(len(headers))
+                }
+                record = map_row(raw)
+            else:
+                record = map_row_positional(parts)
+            score += record_quality(record)
+
+        if score > best_score:
+            best_score = score
+            best = delimiter
+
+    if best_score <= 0:
+        return detect_delimiter("\n".join(lines[:20]), suffix)
+    return best
+
+
 def detect_delimiter(sample: str, suffix: str = ".csv") -> str:
     if suffix == ".tsv":
         return "\t"
@@ -301,7 +439,7 @@ def detect_delimiter(sample: str, suffix: str = ".csv") -> str:
 
 def read_text_content(path: Path) -> str:
     raw = path.read_bytes()
-    for encoding in ("utf-8-sig", "utf-8", "cp1254", "latin-1"):
+    for encoding in ("utf-8-sig", "utf-8", "utf-16", "utf-16-le", "utf-16-be", "cp1254", "cp1252", "latin-1"):
         try:
             return raw.decode(encoding)
         except UnicodeDecodeError:
@@ -379,14 +517,58 @@ def iter_xlsx_records(path: Path):
 
 def iter_delimited_records(path: Path, suffix: str = ".csv"):
     text = read_text_content(path)
-    delimiter = detect_delimiter(text[:4096], suffix)
-    reader = csv.DictReader(StringIO(text), delimiter=delimiter)
+    lines = non_empty_lines(text)
+    if not lines:
+        print(f"  {path.name} is empty", flush=True)
+        return
+
+    delimiter = choose_best_delimiter(lines, suffix)
+    print(f"  Delimiter for {path.name}: {repr(delimiter)}", flush=True)
+
+    first_parts = split_line(lines[0], delimiter)
+    has_header = line_is_header(first_parts)
+    if has_header:
+        headers = [clean_header(part) for part in first_parts]
+        print(f"  Headers for {path.name}: {headers[:12]}", flush=True)
+        data_lines = lines[1:]
+    else:
+        headers = []
+        data_lines = lines
+        print(f"  No header row in {path.name}, using positional columns", flush=True)
+
     parsed = 0
-    for row in reader:
+    valid = 0
+    for line in data_lines:
+        parts = split_line(line, delimiter)
+        if not parts:
+            continue
+
+        if headers:
+            raw = {}
+            for index, header in enumerate(headers):
+                if not header:
+                    continue
+                raw[header] = parts[index] if index < len(parts) else ""
+            record = map_row(raw)
+        else:
+            record = map_row_positional(parts)
+
         parsed += 1
-        if parsed % PROGRESS_EVERY == 0:
-            print(f"  Reading row {parsed} from {path.name}...", flush=True)
-        yield map_row(row)
+        if row_is_valid(record):
+            valid += 1
+            if parsed <= 3:
+                print(
+                    f"  Sample row {parsed}: {record.get('first_name', '')} {record.get('last_name', '')} {record.get('phone', '')}",
+                    flush=True,
+                )
+            if valid % PROGRESS_EVERY == 0:
+                print(f"  Indexed {valid} rows from {path.name}...", flush=True)
+            yield record
+        elif parsed <= 3:
+            print(f"  Skipped row {parsed}: {parts[:6]}", flush=True)
+
+    if valid == 0:
+        print(f"  No valid rows loaded from {path.name}. First line: {lines[0][:200]}", flush=True)
 
 
 def read_xlsx_rows(path: Path) -> list[dict]:
