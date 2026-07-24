@@ -19,7 +19,7 @@ DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
 SCHEMA_VERSION = 7
 PORT = 8080
-API_VERSION = "2026-07-24-txt-support"
+API_VERSION = "2026-07-24-large-files"
 CREDIT = "api made by Ami.192 on signal"
 API_USAGE = {
     "status": "/api",
@@ -31,7 +31,8 @@ API_USAGE = {
 INDEX_LOCK = threading.Lock()
 INDEX_READY = threading.Event()
 INDEX_ERROR: str | None = None
-BATCH_SIZE = 2000
+BATCH_SIZE = 5000
+PROGRESS_EVERY = 25000
 DATA_SUFFIXES = {".xlsx", ".xlsm", ".csv", ".tsv", ".txt", ".db"}
 ARCHIVE_SUFFIXES = {".7z"}
 
@@ -320,7 +321,31 @@ def read_csv_rows(path: Path, suffix: str = ".csv") -> list[dict]:
     return read_delimited_rows(path, suffix)
 
 
-def read_xlsx_rows(path: Path) -> list[dict]:
+def insert_record_batch(conn: sqlite3.Connection, batch: list[tuple]) -> None:
+    if batch:
+        conn.executemany(INSERT_SQL, batch)
+        batch.clear()
+
+
+def stream_records(conn: sqlite3.Connection, path: Path, records) -> int:
+    batch: list[tuple] = []
+    total = 0
+
+    for record in records:
+        if not row_is_valid(record):
+            continue
+        batch.append(record_to_row(record))
+        total += 1
+        if len(batch) >= BATCH_SIZE:
+            insert_record_batch(conn, batch)
+        if total % PROGRESS_EVERY == 0:
+            print(f"  Indexed {total} rows from {path.name}...", flush=True)
+
+    insert_record_batch(conn, batch)
+    return total
+
+
+def iter_xlsx_records(path: Path):
     from openpyxl import load_workbook
 
     workbook = load_workbook(path, read_only=True, data_only=True)
@@ -335,19 +360,37 @@ def read_xlsx_rows(path: Path) -> list[dict]:
 
     if not any(headers):
         workbook.close()
-        return []
+        return
 
-    mapped_rows = []
+    parsed = 0
     for row in rows:
         raw = {}
         for index, header in enumerate(headers):
             if not header or index >= len(row):
                 continue
             raw[header] = row[index]
-        mapped_rows.append(map_row(raw))
+        parsed += 1
+        if parsed % PROGRESS_EVERY == 0:
+            print(f"  Reading row {parsed} from {path.name}...", flush=True)
+        yield map_row(raw)
 
     workbook.close()
-    return mapped_rows
+
+
+def iter_delimited_records(path: Path, suffix: str = ".csv"):
+    text = read_text_content(path)
+    delimiter = detect_delimiter(text[:4096], suffix)
+    reader = csv.DictReader(StringIO(text), delimiter=delimiter)
+    parsed = 0
+    for row in reader:
+        parsed += 1
+        if parsed % PROGRESS_EVERY == 0:
+            print(f"  Reading row {parsed} from {path.name}...", flush=True)
+        yield map_row(row)
+
+
+def read_xlsx_rows(path: Path) -> list[dict]:
+    return list(iter_xlsx_records(path))
 
 
 def read_db_rows(path: Path) -> list[dict]:
@@ -557,9 +600,9 @@ def insert_records(conn: sqlite3.Connection, records: list[dict]) -> None:
 def load_file_records(path: Path) -> list[dict]:
     suffix = path.suffix.lower()
     if suffix in {".xlsx", ".xlsm"}:
-        records = read_xlsx_rows(path)
+        records = list(iter_xlsx_records(path))
     elif suffix in {".csv", ".tsv", ".txt"}:
-        records = read_delimited_rows(path, suffix)
+        records = list(iter_delimited_records(path, suffix))
     elif suffix == ".db":
         records = read_db_rows(path)
     elif suffix == ".7z":
@@ -567,6 +610,20 @@ def load_file_records(path: Path) -> list[dict]:
     else:
         records = []
     return [record for record in records if row_is_valid(record)]
+
+
+def index_file(conn: sqlite3.Connection, path: Path) -> int:
+    suffix = path.suffix.lower()
+    print(f"Loading {path.name}...", flush=True)
+
+    if suffix in {".xlsx", ".xlsm"}:
+        return stream_records(conn, path, iter_xlsx_records(path))
+    if suffix in {".csv", ".tsv", ".txt"}:
+        return stream_records(conn, path, iter_delimited_records(path, suffix))
+
+    records = load_file_records(path)
+    insert_records(conn, records)
+    return len(records)
 
 
 def index_schema_ok() -> bool:
@@ -630,8 +687,8 @@ def build_index_background() -> None:
 
 
 def wait_for_index() -> None:
-    if not INDEX_READY.wait(timeout=900):
-        raise HTTPException(status_code=503, detail="Index is still building, try again in a minute")
+    if not INDEX_READY.wait(timeout=7200):
+        raise HTTPException(status_code=503, detail="Index is still building, try again in a few minutes")
     if INDEX_ERROR:
         raise HTTPException(status_code=500, detail=INDEX_ERROR)
 
@@ -652,18 +709,15 @@ def rebuild_index() -> dict:
         conn.execute("PRAGMA synchronous=NORMAL")
         ensure_index_schema(conn)
         for path in sources:
-            records: list[dict] = []
             try:
-                print(f"Loading {path.name}...", flush=True)
-                records = load_file_records(path)
-                insert_records(conn, records)
+                count = index_file(conn, path)
             except Exception as error:
                 print(f"Failed to load {path.name}: {error}", flush=True)
                 continue
-            if records:
+            if count:
                 loaded_files.append(path.name)
-                total_records += len(records)
-                print(f"Loaded {len(records)} records from {path.name}", flush=True)
+                total_records += count
+                print(f"Loaded {count} records from {path.name}", flush=True)
         conn.commit()
     finally:
         conn.close()
