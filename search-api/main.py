@@ -27,6 +27,10 @@ COLUMN_MAP = {
     "phone number": "phone",
     "phone_number": "phone",
     "telephone": "phone",
+    "gsm": "phone",
+    "mobile": "phone",
+    "cell": "phone",
+    "tel": "phone",
     "email": "email",
     "e-mail": "email",
     "e-mail contact": "email",
@@ -48,14 +52,35 @@ def clean_header(value: str) -> str:
     return " ".join(str(value or "").strip().lower().split())
 
 
-def norm_phone(value: str | None) -> str:
-    if not value:
+def clean_value(value) -> str:
+    if value is None:
         return ""
-    digits = re.sub(r"\D+", "", str(value).strip())
-    if digits.startswith("90") and len(digits) >= 12:
-        return digits
-    if digits.startswith("0") and len(digits) >= 10:
-        return "90" + digits[1:]
+    if isinstance(value, float):
+        if value.is_integer():
+            return str(int(value))
+        text = f"{value:.0f}" if abs(value) > 1e9 else str(value)
+        return text.strip()
+    if isinstance(value, int):
+        return str(value)
+    return str(value).strip()
+
+
+def phone_digits(value: str | None) -> str:
+    return re.sub(r"\D+", "", clean_value(value))
+
+
+def norm_phone(value: str | None) -> str:
+    digits = phone_digits(value)
+    if not digits:
+        return ""
+
+    while digits.startswith("90") and len(digits) > 10:
+        digits = digits[2:]
+    while digits.startswith("0") and len(digits) > 10:
+        digits = digits[1:]
+
+    if len(digits) > 10:
+        digits = digits[-10:]
     return digits
 
 
@@ -82,11 +107,13 @@ def map_row(raw: dict) -> dict:
 
     for key, value in raw.items():
         header = clean_header(key)
-        text = str(value or "").strip()
+        text = clean_value(value)
         if text.lower() in {"x", "none", "null", "nan", ""}:
             continue
 
         field = COLUMN_MAP.get(header)
+        if field == "phone":
+            text = phone_digits(text) or text
         if field == "notes" and mapped["notes"]:
             mapped["notes"] = f"{mapped['notes']} | {text}"
         elif field:
@@ -257,6 +284,22 @@ def load_file_records(path: Path) -> list[dict]:
     return [record for record in records if row_is_valid(record)]
 
 
+def index_is_stale() -> bool:
+    if not INDEX_DB.exists():
+        return True
+    index_mtime = INDEX_DB.stat().st_mtime
+    for path in source_files():
+        if path.stat().st_mtime > index_mtime:
+            return True
+    return False
+
+
+def ensure_index() -> None:
+    if index_is_stale():
+        info = rebuild_index()
+        print(f"Loaded {info['records']} records from {len(info['sources'])} file(s)")
+
+
 def rebuild_index() -> dict:
     DATABASE_DIR.mkdir(parents=True, exist_ok=True)
     if INDEX_DB.exists():
@@ -288,6 +331,7 @@ def rebuild_index() -> dict:
 
 
 def count_records() -> int:
+    ensure_index()
     if not INDEX_DB.exists():
         return 0
     with connect_index() as conn:
@@ -326,6 +370,14 @@ def search(
     identity_number: str | None = None,
     limit: int = 25,
 ) -> tuple[list[dict], dict]:
+    ensure_index()
+
+    phone = phone.strip() if phone else None
+    email = email.strip() if email else None
+    first_name = first_name.strip() if first_name else None
+    last_name = last_name.strip() if last_name else None
+    identity_number = identity_number.strip() if identity_number else None
+
     if not any([phone, email, first_name, last_name, identity_number]):
         raise ValueError("Send phone, email, first_name, last_name, or identity_number")
 
@@ -333,8 +385,13 @@ def search(
     params: list = []
 
     if phone:
-        clauses.append("phone_n LIKE ?")
-        params.append(f"%{norm_phone(phone)}%")
+        needle = norm_phone(phone)
+        if needle:
+            clauses.append("phone_n LIKE ?")
+            params.append(f"%{needle}%")
+        else:
+            clauses.append("phone_n LIKE ?")
+            params.append(f"%{phone_digits(phone)}%")
     if email:
         clauses.append("email_n LIKE ?")
         params.append(f"%{norm_email(email)}%")
@@ -385,8 +442,7 @@ def raw_json(**data) -> Response:
 
 @app.on_event("startup")
 def startup() -> None:
-    info = rebuild_index()
-    print(f"Loaded {info['records']} records from {len(info['sources'])} file(s)")
+    ensure_index()
 
 
 @app.get("/api/health")
