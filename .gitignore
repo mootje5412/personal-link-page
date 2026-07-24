@@ -28,4 +28,5 @@ dist-ssr
 search-api/venv/
 search-api/databases/*
 !search-api/databases/.gitkeep
+search-api/.search_index.db
 search-api/__pycache__/
