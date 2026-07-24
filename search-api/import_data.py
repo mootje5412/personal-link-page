@@ -3,33 +3,22 @@ import argparse
 import csv
 from pathlib import Path
 
-from database import connect, ensure_database, insert_person, normalize_email, normalize_phone, normalize_text
+from config import DATABASE_DIR
+from database import connect, ensure_database, insert_person, list_database_files
 
 COLUMN_MAP = {
     "name": "first_name",
     "first_name": "first_name",
-    "firstname": "first_name",
     "surname": "last_name",
     "last_name": "last_name",
-    "lastname": "last_name",
     "phone": "phone",
     "phone number": "phone",
-    "phone_number": "phone",
-    "telephone": "phone",
     "email": "email",
     "e-mail": "email",
     "e-mail contact": "email",
-    "e-mail contact ": "email",
-    "mail": "email",
     "identity_number": "identity_number",
     "identity number": "identity_number",
-    "id number": "identity_number",
     "tc": "identity_number",
-    "city": "city",
-    "country": "country",
-    "source": "source",
-    "notes": "notes",
-    "ip": "notes",
 }
 
 
@@ -38,113 +27,101 @@ def clean_header(value: str) -> str:
 
 
 def map_row(raw: dict) -> dict[str, str]:
-    mapped: dict[str, str] = {
+    record = {
         "first_name": "",
         "last_name": "",
         "phone": "",
         "email": "",
         "identity_number": "",
-        "city": "",
-        "country": "",
-        "source": "",
-        "notes": "",
     }
 
     for key, value in raw.items():
-        header = clean_header(key)
-        field = COLUMN_MAP.get(header)
+        field = COLUMN_MAP.get(clean_header(key))
         if not field:
             continue
         text = str(value or "").strip()
-        if text.lower() in {"x", "none", "null", "nan"}:
+        if text.lower() in {"x", "none", "null", "nan", ""}:
             continue
-        if field == "notes" and mapped["notes"]:
-            mapped["notes"] = f"{mapped['notes']} | {text}"
-        else:
-            mapped[field] = text
+        record[field] = text
 
-    return mapped
+    return record
 
 
-def row_is_valid(record: dict[str, str]) -> bool:
-    return any([
-        record["first_name"],
-        record["last_name"],
-        record["phone"],
-        record["email"],
-        record["identity_number"],
-    ])
+def valid(record: dict[str, str]) -> bool:
+    return any(record.values())
 
 
-def read_csv_rows(path: Path) -> list[dict]:
+def read_csv(path: Path) -> list[dict]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         sample = handle.read(4096)
         handle.seek(0)
         delimiter = "\t" if sample.count("\t") > sample.count(",") else ","
-        reader = csv.DictReader(handle, delimiter=delimiter)
-        return [map_row(row) for row in reader]
+        return [map_row(row) for row in csv.DictReader(handle, delimiter=delimiter)]
 
 
-def read_xlsx_rows(path: Path) -> list[dict]:
+def read_xlsx(path: Path) -> list[dict]:
     from openpyxl import load_workbook
 
     workbook = load_workbook(path, read_only=True, data_only=True)
     sheet = workbook.active
     rows = sheet.iter_rows(values_only=True)
     headers = [clean_header(cell) for cell in next(rows, [])]
+    records = []
 
-    mapped_rows = []
     for row in rows:
-        raw = {}
-        for index, header in enumerate(headers):
-            if not header or index >= len(row):
-                continue
-            raw[header] = row[index]
-        mapped_rows.append(map_row(raw))
+        raw = {headers[i]: row[i] for i in range(min(len(headers), len(row))) if headers[i]}
+        records.append(map_row(raw))
 
     workbook.close()
-    return mapped_rows
+    return records
 
 
-def import_file(path: Path, replace: bool = False) -> int:
-    ensure_database()
-
+def read_file(path: Path) -> list[dict]:
     if path.suffix.lower() in {".xlsx", ".xlsm"}:
-        records = read_xlsx_rows(path)
-    else:
-        records = read_csv_rows(path)
+        return read_xlsx(path)
+    return read_csv(path)
 
-    valid_records = [record for record in records if row_is_valid(record)]
+
+def import_file(path: Path) -> int:
+    records = [row for row in read_file(path) if valid(row)]
+    if not records:
+        return 0
 
     with connect() as conn:
-        if replace:
+        for record in records:
+            insert_person(conn, record)
+
+    return len(records)
+
+
+def import_folder(replace: bool = False) -> int:
+    ensure_database()
+    files = list_database_files()
+
+    if not files:
+        print(f"No files in {DATABASE_DIR}")
+        return 0
+
+    if replace:
+        with connect() as conn:
             conn.execute("DELETE FROM people")
 
-        batch = 0
-        for record in valid_records:
-            insert_person(conn, record)
-            batch += 1
-            if batch % 1000 == 0:
-                print(f"Imported {batch} records...")
+    total = 0
+    for path in files:
+        count = import_file(path)
+        total += count
+        print(f"{path.name}: {count}")
 
-    return len(valid_records)
+    return total
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Import people records into SQLite")
-    parser.add_argument("file", type=Path, help="CSV, TSV, or XLSX file")
-    parser.add_argument(
-        "--replace",
-        action="store_true",
-        help="Clear existing records before import",
-    )
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--replace", action="store_true", help="Clear database first")
     args = parser.parse_args()
 
-    if not args.file.exists():
-        raise SystemExit(f"File not found: {args.file}")
-
-    count = import_file(args.file, replace=args.replace)
-    print(f"Imported {count} records from {args.file.name}.")
+    total = import_folder(replace=args.replace)
+    print(f"Total imported: {total}")
 
 
 if __name__ == "__main__":

@@ -1,10 +1,10 @@
 import re
 import sqlite3
-import time
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any
 
-from config import DATABASE_PATH
+from config import DATABASE_DIR, DATABASE_PATH
 
 
 def normalize_phone(value: str | None) -> str:
@@ -38,51 +38,30 @@ def normalize_identity(value: str | None) -> str:
 
 def ensure_database() -> None:
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    DATABASE_DIR.mkdir(parents=True, exist_ok=True)
 
     with connect() as conn:
         conn.executescript(
             """
             PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = NORMAL;
-            PRAGMA temp_store = MEMORY;
-            PRAGMA mmap_size = 30000000000;
-
             CREATE TABLE IF NOT EXISTS people (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 first_name TEXT NOT NULL DEFAULT '',
                 last_name TEXT NOT NULL DEFAULT '',
                 phone TEXT NOT NULL DEFAULT '',
-                identity_number TEXT NOT NULL DEFAULT '',
                 email TEXT NOT NULL DEFAULT '',
-                city TEXT NOT NULL DEFAULT '',
-                country TEXT NOT NULL DEFAULT '',
-                source TEXT NOT NULL DEFAULT '',
-                notes TEXT NOT NULL DEFAULT '',
+                identity_number TEXT NOT NULL DEFAULT '',
                 phone_norm TEXT NOT NULL DEFAULT '',
                 first_name_norm TEXT NOT NULL DEFAULT '',
                 last_name_norm TEXT NOT NULL DEFAULT '',
-                identity_norm TEXT NOT NULL DEFAULT '',
                 email_norm TEXT NOT NULL DEFAULT '',
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                identity_norm TEXT NOT NULL DEFAULT ''
             );
-            """
-        )
-
-        columns = {row[1] for row in conn.execute("PRAGMA table_info(people)").fetchall()}
-        if "email_norm" not in columns:
-            conn.execute("ALTER TABLE people ADD COLUMN email_norm TEXT NOT NULL DEFAULT ''")
-            conn.execute(
-                "UPDATE people SET email_norm = lower(trim(email)) WHERE email_norm = '' AND email != ''"
-            )
-
-        conn.executescript(
-            """
             CREATE INDEX IF NOT EXISTS idx_people_phone ON people(phone_norm);
             CREATE INDEX IF NOT EXISTS idx_people_email ON people(email_norm);
             CREATE INDEX IF NOT EXISTS idx_people_first_name ON people(first_name_norm);
             CREATE INDEX IF NOT EXISTS idx_people_last_name ON people(last_name_norm);
             CREATE INDEX IF NOT EXISTS idx_people_identity ON people(identity_norm);
-            CREATE INDEX IF NOT EXISTS idx_people_name ON people(first_name_norm, last_name_norm);
             """
         )
 
@@ -100,17 +79,12 @@ def connect():
 
 def row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     return {
-        "id": row["id"],
         "first_name": row["first_name"],
         "last_name": row["last_name"],
         "full_name": f"{row['first_name']} {row['last_name']}".strip(),
         "phone": row["phone"],
-        "identity_number": row["identity_number"],
         "email": row["email"],
-        "city": row["city"],
-        "country": row["country"],
-        "source": row["source"],
-        "notes": row["notes"],
+        "identity_number": row["identity_number"],
     }
 
 
@@ -124,26 +98,21 @@ def insert_person(conn: sqlite3.Connection, record: dict[str, str]) -> None:
     conn.execute(
         """
         INSERT INTO people (
-            first_name, last_name, phone, identity_number, email,
-            city, country, source, notes,
-            phone_norm, first_name_norm, last_name_norm, identity_norm, email_norm
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            first_name, last_name, phone, email, identity_number,
+            phone_norm, first_name_norm, last_name_norm, email_norm, identity_norm
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             first_name,
             last_name,
             phone,
-            identity_number,
             email,
-            record.get("city", ""),
-            record.get("country", ""),
-            record.get("source", ""),
-            record.get("notes", ""),
+            identity_number,
             normalize_phone(phone),
             normalize_text(first_name),
             normalize_text(last_name),
-            normalize_identity(identity_number),
             normalize_email(email),
+            normalize_identity(identity_number),
         ),
     )
 
@@ -164,7 +133,7 @@ def search_people(
     identity_norm = normalize_identity(identity_number)
 
     if not any([phone_norm, email_norm, first_norm, last_norm, identity_norm]):
-        raise ValueError("Provide at least one of: phone, email, first_name, last_name, identity_number")
+        raise ValueError("Send phone, email, first_name, last_name, or identity_number")
 
     clauses = []
     params: list[Any] = []
@@ -172,36 +141,33 @@ def search_people(
     if phone_norm:
         clauses.append("phone_norm LIKE ?")
         params.append(f"%{phone_norm}%")
-
     if email_norm:
         clauses.append("email_norm LIKE ?")
         params.append(f"%{email_norm}%")
-
     if first_norm:
         clauses.append("first_name_norm LIKE ?")
         params.append(f"%{first_norm}%")
-
     if last_norm:
         clauses.append("last_name_norm LIKE ?")
         params.append(f"%{last_norm}%")
-
     if identity_norm:
         clauses.append("identity_norm LIKE ?")
         params.append(f"%{identity_norm}%")
 
-    sql = f"""
-        SELECT *
-        FROM people
-        WHERE {' AND '.join(clauses)}
-        ORDER BY id ASC
-        LIMIT ?
-    """
     params.append(min(max(limit, 1), 100))
 
     with connect() as conn:
-        rows = conn.execute(sql, params).fetchall()
+        rows = conn.execute(
+            f"""
+            SELECT * FROM people
+            WHERE {' AND '.join(clauses)}
+            ORDER BY id ASC
+            LIMIT ?
+            """,
+            params,
+        ).fetchall()
 
-    query = {
+    return [row_to_dict(row) for row in rows], {
         "phone": phone or None,
         "email": email or None,
         "first_name": first_name or None,
@@ -209,9 +175,14 @@ def search_people(
         "identity_number": identity_number or None,
     }
 
-    return [row_to_dict(row) for row in rows], query
-
 
 def count_people() -> int:
     with connect() as conn:
         return conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
+
+
+def list_database_files() -> list[Path]:
+    files = []
+    for pattern in ("*.csv", "*.tsv", "*.xlsx", "*.xlsm"):
+        files.extend(DATABASE_DIR.glob(pattern))
+    return sorted(files)
