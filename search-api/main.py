@@ -6,7 +6,6 @@ import threading
 import time
 import tempfile
 from contextlib import asynccontextmanager
-from io import StringIO
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
@@ -285,14 +284,8 @@ def row_is_valid(record: dict) -> bool:
     ])
 
 
-def read_csv_rows(source: Path | bytes, suffix: str = ".csv") -> list[dict]:
-    if isinstance(source, bytes):
-        text = source.decode("utf-8-sig", errors="replace")
-        handle = StringIO(text)
-    else:
-        handle = source.open("r", encoding="utf-8-sig", newline="")
-
-    with handle:
+def read_csv_rows(path: Path, suffix: str = ".csv") -> list[dict]:
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
         sample = handle.read(4096)
         handle.seek(0)
         delimiter = "\t" if suffix == ".tsv" or sample.count("\t") > sample.count(",") else ","
@@ -300,13 +293,10 @@ def read_csv_rows(source: Path | bytes, suffix: str = ".csv") -> list[dict]:
         return [map_row(row) for row in reader]
 
 
-def read_xlsx_rows(source: Path | bytes) -> list[dict]:
+def read_xlsx_rows(path: Path) -> list[dict]:
     from openpyxl import load_workbook
 
-    if isinstance(source, bytes):
-        workbook = load_workbook(BytesIO(source), read_only=True, data_only=True)
-    else:
-        workbook = load_workbook(source, read_only=True, data_only=True)
+    workbook = load_workbook(path, read_only=True, data_only=True)
     sheet = workbook.active
     rows = sheet.iter_rows(values_only=True)
 
