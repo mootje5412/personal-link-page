@@ -2,7 +2,9 @@ import csv
 import json
 import re
 import sqlite3
+import threading
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
@@ -14,8 +16,28 @@ INDEX_DB = BASE_DIR / ".search_index.db"
 SCHEMA_VERSION = 2
 PORT = 8080
 CREDIT = "api made by Ami.192 on signal"
+INDEX_LOCK = threading.Lock()
+INDEX_READY = threading.Event()
+INDEX_ERROR: str | None = None
+BATCH_SIZE = 2000
 
-app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+INSERT_SQL = """
+INSERT INTO people (
+    first_name, last_name, phone, email, identity_number,
+    city, country, notes, extra_json,
+    first_name_n, last_name_n, phone_n, email_n, identity_number_n
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+"""
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    thread = threading.Thread(target=build_index_background, daemon=True)
+    thread.start()
+    yield
+
+
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 
 COLUMN_MAP = {
     "name": "first_name",
@@ -261,32 +283,34 @@ def ensure_index_schema(conn: sqlite3.Connection) -> None:
     )
 
 
-def insert_record(conn: sqlite3.Connection, record: dict) -> None:
-    conn.execute(
-        """
-        INSERT INTO people (
-            first_name, last_name, phone, email, identity_number,
-            city, country, notes, extra_json,
-            first_name_n, last_name_n, phone_n, email_n, identity_number_n
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            record["first_name"],
-            record["last_name"],
-            record["phone"],
-            record["email"],
-            record["identity_number"],
-            record["city"],
-            record["country"],
-            record["notes"],
-            json.dumps(record["extra"], ensure_ascii=False),
-            norm_text(record["first_name"]),
-            norm_text(record["last_name"]),
-            norm_phone(record["phone"]),
-            norm_email(record["email"]),
-            norm_text(record["identity_number"]),
-        ),
+def record_to_row(record: dict) -> tuple:
+    return (
+        record["first_name"],
+        record["last_name"],
+        record["phone"],
+        record["email"],
+        record["identity_number"],
+        record["city"],
+        record["country"],
+        record["notes"],
+        json.dumps(record["extra"], ensure_ascii=False),
+        norm_text(record["first_name"]),
+        norm_text(record["last_name"]),
+        norm_phone(record["phone"]),
+        norm_email(record["email"]),
+        norm_text(record["identity_number"]),
     )
+
+
+def insert_records(conn: sqlite3.Connection, records: list[dict]) -> None:
+    batch: list[tuple] = []
+    for record in records:
+        batch.append(record_to_row(record))
+        if len(batch) >= BATCH_SIZE:
+            conn.executemany(INSERT_SQL, batch)
+            batch.clear()
+    if batch:
+        conn.executemany(INSERT_SQL, batch)
 
 
 def load_file_records(path: Path) -> list[dict]:
@@ -342,34 +366,68 @@ def index_is_stale() -> bool:
 
 
 def ensure_index() -> None:
-    if index_is_stale():
-        info = rebuild_index()
-        print(f"Loaded {info['records']} records from {len(info['sources'])} file(s)")
+    with INDEX_LOCK:
+        if index_is_stale():
+            info = rebuild_index()
+            print(
+                f"Loaded {info['records']} records from {len(info['sources'])} file(s)",
+                flush=True,
+            )
+
+
+def build_index_background() -> None:
+    global INDEX_ERROR
+    try:
+        ensure_index()
+    except Exception as error:
+        INDEX_ERROR = str(error)
+        print(f"Index build failed: {error}", flush=True)
+    finally:
+        INDEX_READY.set()
+
+
+def wait_for_index() -> None:
+    if not INDEX_READY.wait(timeout=900):
+        raise HTTPException(status_code=503, detail="Index is still building, try again in a minute")
+    if INDEX_ERROR:
+        raise HTTPException(status_code=500, detail=INDEX_ERROR)
 
 
 def rebuild_index() -> dict:
     DATABASE_DIR.mkdir(parents=True, exist_ok=True)
-    if INDEX_DB.exists():
-        INDEX_DB.unlink()
+    temp_db = BASE_DIR / ".search_index.building.db"
+    if temp_db.exists():
+        temp_db.unlink()
 
     sources = source_files()
     loaded_files = []
     total_records = 0
 
-    with connect_index() as conn:
+    conn = sqlite3.connect(temp_db)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
         ensure_index_schema(conn)
         for path in sources:
+            records: list[dict] = []
             try:
+                print(f"Loading {path.name}...", flush=True)
                 records = load_file_records(path)
+                insert_records(conn, records)
             except Exception as error:
-                print(f"Failed to load {path.name}: {error}")
+                print(f"Failed to load {path.name}: {error}", flush=True)
                 continue
-            for record in records:
-                insert_record(conn, record)
             if records:
                 loaded_files.append(path.name)
                 total_records += len(records)
+                print(f"Loaded {len(records)} records from {path.name}", flush=True)
         conn.commit()
+    finally:
+        conn.close()
+
+    if INDEX_DB.exists():
+        INDEX_DB.unlink()
+    temp_db.replace(INDEX_DB)
 
     return {
         "sources": loaded_files,
@@ -378,7 +436,6 @@ def rebuild_index() -> dict:
 
 
 def count_records() -> int:
-    ensure_index()
     if not INDEX_DB.exists():
         return 0
     with connect_index() as conn:
@@ -417,7 +474,7 @@ def search(
     identity_number: str | None = None,
     limit: int = 25,
 ) -> tuple[list[dict], dict]:
-    ensure_index()
+    wait_for_index()
 
     phone = phone.strip() if phone else None
     email = email.strip() if email else None
@@ -485,14 +542,11 @@ def raw_json(**data) -> Response:
     )
 
 
-@app.on_event("startup")
-def startup() -> None:
-    ensure_index()
-
-
 @app.get("/api/health")
 def health() -> Response:
-    return raw_json(ok=True, records=count_records())
+    if not INDEX_READY.is_set():
+        return raw_json(ok=True, ready=False, status="indexing", records=0)
+    return raw_json(ok=True, ready=True, status="ready", records=count_records())
 
 
 @app.get("/api/search")
@@ -509,12 +563,10 @@ def api_search(
         results, query = search(phone, email, first_name, last_name, identity_number, limit)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+    except HTTPException:
+        raise
     except sqlite3.Error as error:
-        ensure_index()
-        try:
-            results, query = search(phone, email, first_name, last_name, identity_number, limit)
-        except Exception as retry_error:
-            raise HTTPException(status_code=500, detail=str(retry_error)) from retry_error
+        raise HTTPException(status_code=500, detail=str(error)) from error
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
 
