@@ -11,5 +11,5 @@ nohup bash run.sh > api.log 2>&1 &
 sleep 2
 
 echo "API starting. Watch progress with: tail -f /root/search-api/api.log"
-curl -s http://127.0.0.1:8080/api/health || true
+curl -s http://127.0.0.1:8080/api || true
 echo ""

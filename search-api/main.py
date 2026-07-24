@@ -13,7 +13,7 @@ from fastapi.responses import Response
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 PORT = 8080
 CREDIT = "api made by Ami.192 on signal"
 INDEX_LOCK = threading.Lock()
@@ -54,6 +54,14 @@ COLUMN_MAP = {
     "mobile": "phone",
     "cell": "phone",
     "tel": "phone",
+    "telefon": "phone",
+    "cep": "phone",
+    "cep telefonu": "phone",
+    "cep no": "phone",
+    "gsm no": "phone",
+    "mobile phone": "phone",
+    "contact phone": "phone",
+    "phone no": "phone",
     "email": "email",
     "e-mail": "email",
     "e-mail contact": "email",
@@ -107,6 +115,43 @@ def norm_phone(value: str | None) -> str:
     return digits
 
 
+def phone_keys(value: str | None) -> set[str]:
+    digits = phone_digits(value)
+    if not digits:
+        return set()
+
+    keys = {digits}
+    core = norm_phone(value)
+    if core:
+        keys.add(core)
+        keys.add("0" + core)
+        keys.add("90" + core)
+
+    if digits.startswith("90") and len(digits) > 2:
+        rest = digits[2:]
+        keys.add(rest)
+        if not rest.startswith("0"):
+            keys.add("0" + rest)
+
+    if digits.startswith("0") and len(digits) > 1:
+        keys.add(digits[1:])
+        keys.add("90" + digits[1:])
+
+    if len(digits) >= 10:
+        keys.add(digits[-10:])
+
+    return {key for key in keys if len(key) >= 7}
+
+
+def phone_index_value(value: str | None) -> str:
+    return "|".join(sorted(phone_keys(value), key=len, reverse=True))
+
+
+PHONE_DIGITS_SQL = (
+    "replace(replace(replace(replace(replace(replace(phone, ' ', ''), '-', ''), '+', ''), '(', ''), ')', ''), '.', '')"
+)
+
+
 def norm_text(value: str | None) -> str:
     return re.sub(r"\s+", " ", str(value or "").strip()).casefold()
 
@@ -143,6 +188,13 @@ def map_row(raw: dict) -> dict:
             mapped[field] = text
         elif header:
             mapped["extra"][header] = text
+
+    if not mapped["phone"]:
+        for value in raw.values():
+            digits = phone_digits(clean_value(value))
+            if len(digits) >= 10:
+                mapped["phone"] = digits
+                break
 
     return mapped
 
@@ -296,7 +348,7 @@ def record_to_row(record: dict) -> tuple:
         json.dumps(record["extra"], ensure_ascii=False),
         norm_text(record["first_name"]),
         norm_text(record["last_name"]),
-        norm_phone(record["phone"]),
+        phone_index_value(record["phone"]),
         norm_email(record["email"]),
         norm_text(record["identity_number"]),
     )
@@ -466,43 +518,86 @@ def format_result(row: sqlite3.Row) -> dict:
     return result
 
 
+def parse_search_query(q: str | None) -> dict:
+    text = re.sub(r"\s+", " ", (q or "").strip())
+    if not text:
+        return {}
+
+    lowered = text.casefold()
+    if "@" in text and "." in text.split("@", 1)[-1]:
+        return {"type": "email", "email": text, "q": text}
+
+    digits = phone_digits(text)
+    digit_ratio = len(digits) / max(len(re.sub(r"\s+", "", text)), 1)
+    if len(digits) >= 7 and digit_ratio >= 0.7:
+        return {"type": "phone", "phone": text, "q": text}
+
+    if text.isdigit() and len(text) >= 7:
+        return {"type": "phone", "phone": text, "q": text}
+
+    parts = text.split(" ")
+    if len(parts) == 1:
+        return {"type": "name", "name": text, "q": text}
+
+    return {
+        "type": "name",
+        "q": text,
+        "first_name": parts[0],
+        "last_name": " ".join(parts[1:]),
+        "full_name": text,
+    }
+
+
 def search(
-    phone: str | None = None,
-    email: str | None = None,
-    first_name: str | None = None,
-    last_name: str | None = None,
-    identity_number: str | None = None,
+    q: str | None = None,
     limit: int = 25,
 ) -> tuple[list[dict], dict]:
     wait_for_index()
 
-    phone = phone.strip() if phone else None
-    email = email.strip() if email else None
-    first_name = first_name.strip() if first_name else None
-    last_name = last_name.strip() if last_name else None
-    identity_number = identity_number.strip() if identity_number else None
+    parsed = parse_search_query(q)
+    if not parsed:
+        raise ValueError("Send q with a name, phone, or email")
 
-    if not any([phone, email, first_name, last_name, identity_number]):
-        raise ValueError("Send phone, email, first_name, last_name, or identity_number")
+    phone = parsed.get("phone")
+    email = parsed.get("email")
+    first_name = parsed.get("first_name")
+    last_name = parsed.get("last_name")
+    name = parsed.get("name")
+    identity_number = parsed.get("identity_number")
 
     clauses = []
     params: list = []
 
     if phone:
-        needle = norm_phone(phone) or phone_digits(phone)
-        if not needle:
+        variants = phone_keys(phone)
+        if not variants:
             raise ValueError("Invalid phone number")
-        clauses.append("phone_n LIKE ?")
-        params.append(f"%{needle}%")
+
+        phone_parts = []
+        for variant in sorted(variants, key=len, reverse=True):
+            phone_parts.append("phone_n LIKE ?")
+            params.append(f"%{variant}%")
+            phone_parts.append(f"{PHONE_DIGITS_SQL} LIKE ?")
+            params.append(f"%{variant}%")
+
+        clauses.append(f"({' OR '.join(phone_parts)})")
+
     if email:
         clauses.append("email_n LIKE ?")
         params.append(f"%{norm_email(email)}%")
-    if first_name:
+
+    if first_name and last_name:
         clauses.append("first_name_n LIKE ?")
         params.append(f"%{norm_text(first_name)}%")
-    if last_name:
         clauses.append("last_name_n LIKE ?")
         params.append(f"%{norm_text(last_name)}%")
+    elif name:
+        needle = norm_text(name)
+        clauses.append(
+            "(first_name_n LIKE ? OR last_name_n LIKE ? OR (first_name_n || ' ' || last_name_n) LIKE ?)"
+        )
+        params.extend([f"%{needle}%", f"%{needle}%", f"%{needle}%"])
+
     if identity_number:
         clauses.append("identity_number_n LIKE ?")
         params.append(f"%{norm_text(identity_number)}%")
@@ -524,14 +619,7 @@ def search(
         ).fetchall()
 
     results = [format_result(row) for row in rows]
-
-    return results, {
-        "phone": phone,
-        "email": email,
-        "first_name": first_name,
-        "last_name": last_name,
-        "identity_number": identity_number,
-    }
+    return results, parsed
 
 
 def raw_json(**data) -> Response:
@@ -542,25 +630,32 @@ def raw_json(**data) -> Response:
     )
 
 
-@app.get("/api/health")
-def health() -> Response:
-    if not INDEX_READY.is_set():
-        return raw_json(ok=True, ready=False, status="indexing", records=0)
-    return raw_json(ok=True, ready=True, status="ready", records=count_records())
-
-
-@app.get("/api/search")
-def api_search(
-    phone: str | None = Query(default=None),
-    email: str | None = Query(default=None),
-    first_name: str | None = Query(default=None),
-    last_name: str | None = Query(default=None),
-    identity_number: str | None = Query(default=None),
+@app.get("/api")
+def api(
+    q: str | None = Query(default=None, description="Name, phone, or email"),
     limit: int = Query(default=25, ge=1, le=100),
 ) -> Response:
     started = time.perf_counter()
+
+    if not q or not q.strip():
+        if not INDEX_READY.is_set():
+            return raw_json(
+                ok=True,
+                ready=False,
+                status="indexing",
+                records=0,
+                usage="Search: /api?q=Mootje bicep",
+            )
+        return raw_json(
+            ok=True,
+            ready=True,
+            status="ready",
+            records=count_records(),
+            usage="Search: /api?q=Mootje bicep",
+        )
+
     try:
-        results, query = search(phone, email, first_name, last_name, identity_number, limit)
+        results, query = search(q, limit)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except HTTPException:
@@ -571,6 +666,8 @@ def api_search(
         raise HTTPException(status_code=500, detail=str(error)) from error
 
     return raw_json(
+        ok=True,
+        ready=INDEX_READY.is_set(),
         success=True,
         query=query,
         total=len(results),
