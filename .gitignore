@@ -33,4 +33,5 @@ search-api/venv/
 search-api/databases/*
 !search-api/databases/.gitkeep
 search-api/.search_index.db
+search-api/telegram.env
 search-api/__pycache__/
