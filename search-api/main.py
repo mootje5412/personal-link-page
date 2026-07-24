@@ -1,7 +1,9 @@
 import csv
 import json
 import re
+import shutil
 import sqlite3
+import subprocess
 import threading
 import time
 import tempfile
@@ -14,9 +16,9 @@ from fastapi.responses import Response
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 PORT = 8080
-API_VERSION = "2026-07-24-all-results"
+API_VERSION = "2026-07-24-7z-fix"
 CREDIT = "api made by Ami.192 on signal"
 API_USAGE = {
     "status": "/api",
@@ -356,31 +358,93 @@ def read_db_rows(path: Path) -> list[dict]:
     return rows
 
 
-def read_7z_records(path: Path) -> list[dict]:
+def iter_extracted_data_files(root: Path):
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        if path.name.startswith("._"):
+            continue
+        if path.suffix.lower() in DATA_SUFFIXES:
+            yield path
+
+
+def load_records_from_extracted(root: Path, source_label: str) -> list[dict]:
+    records: list[dict] = []
+    found_any = False
+
+    for file_path in iter_extracted_data_files(root):
+        found_any = True
+        try:
+            file_records = load_file_records(file_path)
+            records.extend(file_records)
+            print(
+                f"  Loaded {len(file_records)} records from {file_path.name}",
+                flush=True,
+            )
+        except Exception as error:
+            print(f"  Failed {file_path.name} in {source_label}: {error}", flush=True)
+
+    if not found_any:
+        names = [path.name for path in root.rglob("*") if path.is_file()]
+        preview = ", ".join(names[:20]) or "no files"
+        print(f"  No supported files in {source_label}. Found: {preview}", flush=True)
+
+    return records
+
+
+def read_7z_py7zr(path: Path, tmp_path: Path) -> None:
     import py7zr
 
+    with py7zr.SevenZipFile(path, mode="r") as archive:
+        names = [name.replace("\\", "/") for name in archive.getnames() if not name.endswith("/")]
+        print(f"  7z contents: {', '.join(names[:20])}", flush=True)
+        archive.extractall(path=tmp_path)
+
+
+def read_7z_system(path: Path, tmp_path: Path) -> bool:
+    command = shutil.which("7z") or shutil.which("7za")
+    if not command:
+        return False
+
+    result = subprocess.run(
+        [command, "x", "-y", f"-o{tmp_path}", str(path)],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print(f"  7z command failed: {result.stderr.strip() or result.stdout.strip()}", flush=True)
+        return False
+    return True
+
+
+def read_7z_records(path: Path) -> list[dict]:
     records: list[dict] = []
+    py7zr_ok = False
+
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)
-        with py7zr.SevenZipFile(path, mode="r") as archive:
-            targets = [
-                name for name in archive.getnames()
-                if not name.endswith("/") and Path(name).suffix.lower() in DATA_SUFFIXES
-            ]
-            if not targets:
-                return records
-            archive.extract(path=tmp_path, targets=targets)
+        py7zr_ok = False
+        try:
+            read_7z_py7zr(path, tmp_path)
+            py7zr_ok = True
+            records = load_records_from_extracted(tmp_path, path.name)
+        except Exception as error:
+            print(f"  py7zr failed on {path.name}: {error}", flush=True)
 
-        for name in targets:
-            file_path = tmp_path / name
-            if not file_path.is_file():
-                continue
-            try:
-                file_records = load_file_records(file_path)
-                records.extend(file_records)
-                print(f"  Loaded {len(file_records)} records from {name}", flush=True)
-            except Exception as error:
-                print(f"  Failed {name} in {path.name}: {error}", flush=True)
+    if records:
+        return records
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        if read_7z_system(path, tmp_path):
+            records = load_records_from_extracted(tmp_path, path.name)
+            if records:
+                return records
+
+    if not py7zr_ok:
+        raise RuntimeError(
+            f"Could not read {path.name}. Make sure p7zip-full is installed and the archive is not password protected."
+        )
 
     return records
 
