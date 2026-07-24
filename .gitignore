@@ -6,3 +6,5 @@ data/
 search-api/venv/
 search-api/data/
 search-api/.env
+search-api/__pycache__/
+**/__pycache__/
