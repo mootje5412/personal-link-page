@@ -102,11 +102,17 @@ def run_bot_polling() -> None:
         print("Telegram bot disabled: set TELEGRAM_BOT_TOKEN in telegram.env", flush=True)
         return
 
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
     application = Application.builder().token(token).build()
     application.add_handler(CommandHandler("start", cmd_start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_search_message))
     print("Telegram bot started (send /start)", flush=True)
-    application.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
+    try:
+        application.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
+    finally:
+        loop.close()
 
 
 def start_telegram_bot_thread() -> None:
