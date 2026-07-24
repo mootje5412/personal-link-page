@@ -4,8 +4,8 @@ import sqlite3
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_DIR = BASE_DIR / "databases"
@@ -184,20 +184,19 @@ def ensure_index_schema(conn: sqlite3.Connection) -> None:
             last_name_n TEXT NOT NULL DEFAULT '',
             phone_n TEXT NOT NULL DEFAULT '',
             email_n TEXT NOT NULL DEFAULT '',
-            identity_number_n TEXT NOT NULL DEFAULT '',
-            source_file TEXT NOT NULL DEFAULT ''
+            identity_number_n TEXT NOT NULL DEFAULT ''
         );
         """
     )
 
 
-def insert_record(conn: sqlite3.Connection, record: dict[str, str], source_file: str) -> None:
+def insert_record(conn: sqlite3.Connection, record: dict[str, str]) -> None:
     conn.execute(
         """
         INSERT INTO people (
             first_name, last_name, phone, email, identity_number,
-            first_name_n, last_name_n, phone_n, email_n, identity_number_n, source_file
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            first_name_n, last_name_n, phone_n, email_n, identity_number_n
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             record["first_name"],
@@ -210,7 +209,6 @@ def insert_record(conn: sqlite3.Connection, record: dict[str, str], source_file:
             norm_phone(record["phone"]),
             norm_email(record["email"]),
             norm_text(record["identity_number"]),
-            source_file,
         ),
     )
 
@@ -246,7 +244,7 @@ def rebuild_index() -> dict:
                 print(f"Failed to load {path.name}: {error}")
                 continue
             for record in records:
-                insert_record(conn, record, path.name)
+                insert_record(conn, record)
             if records:
                 loaded_files.append(path.name)
                 total_records += len(records)
@@ -264,6 +262,21 @@ def count_records() -> int:
     with connect_index() as conn:
         ensure_index_schema(conn)
         return conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
+
+
+def format_result(row: sqlite3.Row) -> dict:
+    result = {
+        "first_name": row["first_name"],
+        "last_name": row["last_name"],
+        "full_name": f"{row['first_name']} {row['last_name']}".strip(),
+    }
+    if row["phone"]:
+        result["phone"] = row["phone"]
+    if row["email"]:
+        result["email"] = row["email"]
+    if row["identity_number"]:
+        result["identity_number"] = row["identity_number"]
+    return result
 
 
 def search(
@@ -302,7 +315,7 @@ def search(
         ensure_index_schema(conn)
         rows = conn.execute(
             f"""
-            SELECT first_name, last_name, phone, email, identity_number, source_file
+            SELECT first_name, last_name, phone, email, identity_number
             FROM people
             WHERE {' AND '.join(clauses)}
             LIMIT ?
@@ -310,15 +323,7 @@ def search(
             params,
         ).fetchall()
 
-    results = [{
-        "first_name": row["first_name"],
-        "last_name": row["last_name"],
-        "full_name": f"{row['first_name']} {row['last_name']}".strip(),
-        "phone": row["phone"],
-        "email": row["email"],
-        "identity_number": row["identity_number"],
-        "source_file": row["source_file"],
-    } for row in rows]
+    results = [format_result(row) for row in rows]
 
     return results, {
         "phone": phone,
@@ -333,6 +338,139 @@ def api_payload(**data) -> dict:
     return {"credit": CREDIT, **data}
 
 
+def wants_html(request: Request) -> bool:
+    accept = request.headers.get("accept", "")
+    return "text/html" in accept and "application/json" not in accept.split(",")[0]
+
+
+def render_search_page(results: list[dict], query: dict, total: int, ms: float) -> str:
+    cards = []
+    for item in results:
+        rows = []
+        if item.get("full_name"):
+            rows.append(f'<div class="name">{item["full_name"]}</div>')
+        if item.get("phone"):
+            rows.append(f'<div class="field"><span>Phone</span>{item["phone"]}</div>')
+        if item.get("email"):
+            rows.append(f'<div class="field"><span>Email</span>{item["email"]}</div>')
+        if item.get("identity_number"):
+            rows.append(f'<div class="field"><span>ID</span>{item["identity_number"]}</div>')
+        cards.append(f'<article class="card">{"".join(rows)}</article>')
+
+    if not cards:
+        body = '<div class="empty">No results found.</div>'
+    else:
+        body = "".join(cards)
+
+    active = [f"{key.replace('_', ' ').title()}: {value}" for key, value in query.items() if value]
+    query_line = " · ".join(active) if active else "Search"
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Search Results</title>
+  <style>
+    :root {{
+      color-scheme: dark;
+      --bg: #0b0f17;
+      --panel: #121826;
+      --line: #243044;
+      --text: #eef2ff;
+      --muted: #94a3b8;
+      --accent: #60a5fa;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      font-family: Inter, Segoe UI, Roboto, sans-serif;
+      background: linear-gradient(180deg, #0b0f17 0%, #111827 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }}
+    .wrap {{
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }}
+    .top {{
+      margin-bottom: 24px;
+    }}
+    .eyebrow {{
+      color: var(--accent);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }}
+    h1 {{
+      margin: 0 0 8px;
+      font-size: 28px;
+      font-weight: 700;
+    }}
+    .meta {{
+      color: var(--muted);
+      font-size: 14px;
+    }}
+    .grid {{
+      display: grid;
+      gap: 14px;
+    }}
+    .card {{
+      background: rgba(18, 24, 38, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+    }}
+    .name {{
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }}
+    .field {{
+      display: flex;
+      gap: 12px;
+      padding: 8px 0;
+      border-top: 1px solid rgba(36, 48, 68, 0.7);
+      font-size: 15px;
+    }}
+    .field span {{
+      width: 64px;
+      color: var(--muted);
+      flex-shrink: 0;
+    }}
+    .empty {{
+      background: var(--panel);
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
+    }}
+    .footer {{
+      margin-top: 28px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="top">
+      <div class="eyebrow">People Search</div>
+      <h1>{total} result{"s" if total != 1 else ""}</h1>
+      <div class="meta">{query_line} · {ms:.0f} ms</div>
+    </section>
+    <section class="grid">{body}</section>
+    <footer class="footer">{CREDIT}</footer>
+  </main>
+</body>
+</html>"""
+
+
 @app.on_event("startup")
 def startup() -> None:
     info = rebuild_index()
@@ -341,35 +479,36 @@ def startup() -> None:
 
 @app.get("/api/health")
 def health() -> dict:
-    files = source_files()
-    return api_payload(
-        ok=True,
-        records=count_records(),
-        sources=[path.name for path in files],
-    )
+    return api_payload(ok=True, records=count_records())
 
 
 @app.get("/api/search")
 def api_search(
+    request: Request,
     phone: str | None = Query(default=None),
     email: str | None = Query(default=None),
     first_name: str | None = Query(default=None),
     last_name: str | None = Query(default=None),
     identity_number: str | None = Query(default=None),
     limit: int = Query(default=25, ge=1, le=100),
-) -> JSONResponse:
+):
     started = time.perf_counter()
     try:
         results, query = search(phone, email, first_name, last_name, identity_number, limit)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
+    ms = round((time.perf_counter() - started) * 1000, 2)
+
+    if wants_html(request):
+        return HTMLResponse(render_search_page(results, query, len(results), ms))
+
     return JSONResponse(api_payload(
         success=True,
         query=query,
         total=len(results),
         results=results,
-        ms=round((time.perf_counter() - started) * 1000, 2),
+        ms=ms,
     ))
 
 
