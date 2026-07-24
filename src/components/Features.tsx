@@ -72,7 +72,7 @@ const Features = () => {
           </div>
           <h2 className="section-title">
             Profesyonel Arama<br />
-            <span className="gradient-text">Yetenekleri</span>
+            <span className="title-3d">Yetenekleri</span>
           </h2>
           <p className="section-description">
             Kapsamlı veri sorgulama için ihtiyacınız olan her şey. 
