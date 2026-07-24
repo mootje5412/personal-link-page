@@ -1,112 +1,104 @@
 import './Pricing.css'
 
+const plans = [
+  {
+    name: 'Başlangıç',
+    price: '39',
+    period: 'ay',
+    description: 'Denemek isteyenler için',
+    features: [
+      '50 arama hakkı',
+      'TC kimlik sorgulama',
+      'İsim arama',
+      'Temel destek',
+    ],
+    cta: 'Başla',
+    featured: false,
+  },
+  {
+    name: 'Standart',
+    price: '79',
+    period: 'ay',
+    description: 'En çok tercih edilen paket',
+    features: [
+      '200 arama hakkı',
+      'Tüm arama türleri',
+      'Adres ve aile sorgulama',
+      'IP ve e-posta arama',
+      'Öncelikli destek',
+    ],
+    cta: 'Hemen Al',
+    featured: true,
+  },
+  {
+    name: 'Pro',
+    price: '149',
+    period: 'ay',
+    description: 'Yoğun kullanım için',
+    features: [
+      '1000 arama hakkı',
+      'Sınırsız arama türü',
+      'Hızlı yanıt garantisi',
+      '7/24 destek',
+      'Erken erişim özellikleri',
+    ],
+    cta: 'Pro Ol',
+    featured: false,
+  },
+]
+
 const Pricing = () => {
   return (
     <section id="pricing" className="section pricing">
       <div className="container">
         <div className="section-header">
           <div className="section-badge">
-            <span>Unbeatable Value</span>
+            <span>Fiyatlandırma</span>
           </div>
           <h2 className="section-title">
-            Just <span className="gradient-text">€5</span> Per Month
+            Uygun Fiyatlar,<br />
+            <span className="gradient-text">Tam Erişim</span>
           </h2>
           <p className="section-description">
-            Access 700 billion breach records with enterprise-grade infrastructure.
-            Less than a coffee, but with the power to protect millions.
+            Gizli ücret yok. İhtiyacınıza uygun paketi seçin, hemen kullanmaya başlayın.
           </p>
         </div>
 
-        <div className="pricing-hero">
-          <div className="pricing-card-single">
-            <div className="pricing-header">
-              <h3 className="pricing-name">Full Access</h3>
-              <p className="pricing-subtitle">Everything you need to start</p>
+        <div className="pricing-grid">
+          {plans.map((plan) => (
+            <div
+              key={plan.name}
+              className={`pricing-card ${plan.featured ? 'pricing-card-featured' : ''}`}
+            >
+              {plan.featured && <span className="pricing-tag">Popüler</span>}
+              <div className="pricing-card-header">
+                <h3 className="pricing-name">{plan.name}</h3>
+                <p className="pricing-subtitle">{plan.description}</p>
+              </div>
+              <div className="pricing-price">
+                <span className="price-amount">{plan.price}</span>
+                <span className="price-currency">₺</span>
+                <span className="price-period">/{plan.period}</span>
+              </div>
+              <ul className="pricing-features">
+                {plan.features.map((feature) => (
+                  <li key={feature}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+              <button className={`pricing-button ${plan.featured ? 'pricing-button-primary' : ''}`}>
+                {plan.cta}
+              </button>
             </div>
-            <div className="pricing-price-large">
-              <span className="price-currency">€</span>
-              <span className="price-amount">5</span>
-              <span className="price-period">/month</span>
-            </div>
-            <ul className="pricing-features-large">
-              <li>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span><strong>10,000 API calls</strong> per month</span>
-              </li>
-              <li>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span><strong>700B+ records</strong> breach database</span>
-              </li>
-              <li>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span>Email & domain lookups</span>
-              </li>
-              <li>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span>Real-time breach updates</span>
-              </li>
-              <li>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span>99.9% uptime guarantee</span>
-              </li>
-              <li>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span>Full API documentation</span>
-              </li>
-              <li>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span>Professional support</span>
-              </li>
-              <li>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span>Cancel anytime</span>
-              </li>
-            </ul>
-            <button className="pricing-button-large btn-primary">Get Started Now</button>
-          </div>
+          ))}
         </div>
 
-        <div className="value-grid">
-          <div className="value-item">
-            <div className="value-number">€0.0005</div>
-            <div className="value-label">Per API Call</div>
-          </div>
-          <div className="value-item">
-            <div className="value-number">10x</div>
-            <div className="value-label">Cheaper Than Competitors</div>
-          </div>
-          <div className="value-item">
-            <div className="value-number">0€</div>
-            <div className="value-label">Setup Fees</div>
-          </div>
-          <div className="value-item">
-            <div className="value-number">24/7</div>
-            <div className="value-label">Always Available</div>
-          </div>
-        </div>
-
-        <div className="pricing-cta">
-          <h3>The Smart Investment</h3>
-          <p>
-            For less than a coffee, get enterprise-grade OSINT intelligence. 
-            Start protecting your users today with real-time breach data.
-          </p>
+        <div className="pricing-note">
+          <p>Tüm paketlerde güvenli ödeme. İstediğiniz zaman iptal edebilirsiniz.</p>
         </div>
       </div>
     </section>

@@ -6,12 +6,12 @@ const Hero = () => {
       <div className="hero-gradient"></div>
       <div className="container">
         <nav className="navbar">
+          <a href="#" className="nav-brand">Apex Panel</a>
           <div className="nav-links">
             <a href="#features">Özellikler</a>
-            <a href="#about">Hakkında</a>
-            <a href="#contact">İletişim</a>
+            <a href="#pricing">Fiyatlar</a>
           </div>
-          <button className="btn-nav">Erişim Al</button>
+          <a href="#pricing" className="btn-nav">Erişim Al</a>
         </nav>
 
         <div className="hero-content">
@@ -32,15 +32,15 @@ const Hero = () => {
           </p>
 
           <div className="hero-cta">
-            <button className="btn-large btn-primary">
+            <a href="#pricing" className="btn-large btn-primary">
               Aramaya Başla
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M7.5 15L12.5 10L7.5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-            </button>
-            <button className="btn-large btn-secondary">
-              Daha Fazla Bilgi
-            </button>
+            </a>
+            <a href="#features" className="btn-large btn-secondary">
+              Özellikleri Gör
+            </a>
           </div>
 
           <div className="hero-stats">

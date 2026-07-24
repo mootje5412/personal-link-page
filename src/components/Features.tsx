@@ -98,37 +98,37 @@ const Features = () => {
             <div className="showcase-features">
               <div className="showcase-feature">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 <span>TC Kimlik Sorgulama</span>
               </div>
               <div className="showcase-feature">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 <span>İsim Arama</span>
               </div>
               <div className="showcase-feature">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 <span>Adres Sorgulama</span>
               </div>
               <div className="showcase-feature">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 <span>Aile Bireyleri</span>
               </div>
               <div className="showcase-feature">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 <span>IP Adresi Arama</span>
               </div>
               <div className="showcase-feature">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M16.6667 5L7.50004 14.1667L3.33337 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 <span>E-posta Sorgulama</span>
               </div>

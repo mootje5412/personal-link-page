@@ -22,8 +22,7 @@ const Footer = () => {
               <h4>Platform</h4>
               <ul>
                 <li><a href="#features">Özellikler</a></li>
-                <li><a href="#about">Hakkında</a></li>
-                <li><a href="#contact">İletişim</a></li>
+                <li><a href="#pricing">Fiyatlar</a></li>
               </ul>
             </div>
 
