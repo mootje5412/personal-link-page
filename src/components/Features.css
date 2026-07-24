@@ -1,46 +1,53 @@
 .features {
   border-top: 1px solid var(--line);
+  padding-bottom: 96px;
 }
 
-.search-grid {
+.features-layout {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 48px;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 64px;
+  align-items: start;
+  margin-bottom: 72px;
 }
 
-.search-item {
-  background: var(--glass);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 28px;
-  backdrop-filter: blur(8px);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.features-head-sticky {
+  position: sticky;
+  top: calc(var(--header-h) + 24px);
+  padding-top: 8px;
 }
 
-.search-item:hover {
-  border-color: var(--line-strong);
-  background: var(--surface-hover);
-  transform: translateY(-2px);
-}
-
-.search-item h3 {
-  font-size: 17px;
-  font-weight: 700;
-  margin-bottom: 6px;
-  letter-spacing: -0.02em;
-}
-
-.search-item p {
-  font-size: 14px;
+.features-head-sticky .section-label {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--muted);
-  line-height: 1.55;
+  margin-bottom: 12px;
+}
+
+.features-head-sticky h2 {
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.12;
+  margin-bottom: 14px;
+}
+
+.features-head-sticky p {
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.65;
+  max-width: 340px;
 }
 
 .highlights {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
 }
 
 .highlight {
@@ -65,24 +72,44 @@
 }
 
 @media (max-width: 900px) {
-  .search-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .features-layout {
+    grid-template-columns: 1fr;
+    gap: 40px;
+    margin-bottom: 56px;
+  }
+
+  .features-head-sticky {
+    position: static;
+    text-align: center;
+  }
+
+  .features-head-sticky p {
+    max-width: none;
+    margin: 0 auto;
+  }
+
+  .features-head-sticky h2 {
+    font-size: 28px;
   }
 }
 
 @media (max-width: 768px) {
-  .search-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-    margin-bottom: 36px;
+  .features {
+    padding-bottom: 64px;
   }
 
-  .search-item {
-    padding: 22px;
+  .features-layout {
+    gap: 32px;
+    margin-bottom: 48px;
   }
 
-  .search-item:hover {
-    transform: none;
+  .features-head-sticky {
+    text-align: left;
+  }
+
+  .features-head-sticky p {
+    margin: 0;
+    font-size: 15px;
   }
 
   .highlights {
