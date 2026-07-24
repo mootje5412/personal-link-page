@@ -13,13 +13,13 @@ from fastapi.responses import Response
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 PORT = 8080
 CREDIT = "api made by Ami.192 on signal"
 API_USAGE = {
     "status": "/api",
     "name": "/api?q=Mootje bicep",
-    "phone": "/api?q=905331657436",
+    "phone": "/api?q=905544784243",
     "email": "/api?q=email@example.com",
     "id": "/api?q=12345678901",
 }
@@ -102,13 +102,35 @@ def clean_value(value) -> str:
     if value is None:
         return ""
     if isinstance(value, float):
+        if abs(value) >= 1e9:
+            return str(int(round(value)))
         if value.is_integer():
             return str(int(value))
-        text = f"{value:.0f}" if abs(value) > 1e9 else str(value)
-        return text.strip()
+        return f"{value:.0f}".strip()
     if isinstance(value, int):
         return str(value)
     return str(value).strip()
+
+
+def looks_like_tc(digits: str) -> bool:
+    return (
+        len(digits) == 11
+        and not digits.startswith("0")
+        and not digits.startswith("90")
+        and not digits.startswith("5")
+    )
+
+
+def looks_like_phone_digits(digits: str) -> bool:
+    if len(digits) < 7:
+        return False
+    if digits.startswith("90"):
+        return len(digits) >= 11
+    if digits.startswith("0"):
+        return len(digits) >= 10
+    if digits.startswith("5"):
+        return len(digits) >= 10
+    return len(digits) >= 10
 
 
 def phone_digits(value: str | None) -> str:
@@ -158,8 +180,34 @@ def phone_keys(value: str | None) -> set[str]:
     return {key for key in keys if len(key) >= 7}
 
 
-def phone_index_value(value: str | None) -> str:
-    return "|".join(sorted(phone_keys(value), key=len, reverse=True))
+def phone_search_variants(value: str | None) -> set[str]:
+    variants = phone_keys(value)
+    core = norm_phone(value)
+    if core:
+        variants.add(core)
+        for size in (10, 9, 8, 7):
+            if len(core) >= size:
+                variants.add(core[-size:])
+    return {item for item in variants if len(item) >= 7}
+
+
+def collect_phone_keys(record: dict) -> str:
+    keys: set[str] = set()
+
+    for field in ("phone", "notes", "identity_number"):
+        keys.update(phone_keys(str(record.get(field, ""))))
+
+    for value in record.get("extra", {}).values():
+        text = clean_value(value)
+        digits = phone_digits(text)
+        if looks_like_phone_digits(digits):
+            keys.update(phone_keys(text))
+
+    if not keys:
+        for value in record.get("extra", {}).values():
+            keys.update(phone_keys(str(value)))
+
+    return "|".join(sorted(keys, key=len, reverse=True))
 
 
 PHONE_DIGITS_SQL = (
@@ -210,7 +258,9 @@ def map_row(raw: dict) -> dict:
     if not mapped["phone"]:
         for value in raw.values():
             digits = phone_digits(clean_value(value))
-            if len(digits) >= 10:
+            if looks_like_tc(digits):
+                continue
+            if looks_like_phone_digits(digits):
                 mapped["phone"] = digits
                 break
 
@@ -366,7 +416,7 @@ def record_to_row(record: dict) -> tuple:
         json.dumps(record["extra"], ensure_ascii=False),
         norm_text(record["first_name"]),
         norm_text(record["last_name"]),
-        phone_index_value(record["phone"]),
+        collect_phone_keys(record),
         norm_email(record["email"]),
         norm_text(record["identity_number"]),
     )
@@ -548,17 +598,11 @@ def parse_search_query(q: str | None) -> dict:
     compact = re.sub(r"\s+", "", text)
 
     if digits:
-        if len(digits) == 11 and digits.startswith("0"):
-            return {"type": "phone", "phone": text, "q": text}
-
-        if len(digits) == 12 and digits.startswith("90"):
-            return {"type": "phone", "phone": text, "q": text}
-
-        if len(digits) == 10 and digits.startswith("5"):
-            return {"type": "phone", "phone": text, "q": text}
-
-        if len(digits) == 11 and not digits.startswith("0"):
+        if looks_like_tc(digits):
             return {"type": "identity_number", "identity_number": digits, "q": text}
+
+        if looks_like_phone_digits(digits):
+            return {"type": "phone", "phone": text, "q": text}
 
         digit_ratio = len(digits) / max(len(compact), 1)
         if len(digits) >= 7 and digit_ratio >= 0.7:
@@ -598,7 +642,7 @@ def search(
     params: list = []
 
     if phone:
-        variants = phone_keys(phone)
+        variants = phone_search_variants(phone)
         if not variants:
             raise ValueError("Invalid phone number")
 
@@ -607,6 +651,12 @@ def search(
             phone_parts.append("phone_n LIKE ?")
             params.append(f"%{variant}%")
             phone_parts.append(f"{PHONE_DIGITS_SQL} LIKE ?")
+            params.append(f"%{variant}%")
+            phone_parts.append(f"{IDENTITY_DIGITS_SQL} LIKE ?")
+            params.append(f"%{variant}%")
+            phone_parts.append("notes LIKE ?")
+            params.append(f"%{variant}%")
+            phone_parts.append("extra_json LIKE ?")
             params.append(f"%{variant}%")
 
         clauses.append(f"({' OR '.join(phone_parts)})")
