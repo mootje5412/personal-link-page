@@ -16,6 +16,7 @@ DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
 SCHEMA_VERSION = 5
 PORT = 8080
+API_VERSION = "2026-07-24-all-results"
 CREDIT = "api made by Ami.192 on signal"
 API_USAGE = {
     "status": "/api",
@@ -655,10 +656,7 @@ def parse_search_query(q: str | None) -> dict:
     }
 
 
-def search(
-    q: str | None = None,
-    limit: int = 25,
-) -> tuple[list[dict], dict]:
+def search(q: str | None = None) -> tuple[list[dict], dict]:
     wait_for_index()
 
     parsed = parse_search_query(q)
@@ -721,28 +719,24 @@ def search(
         clauses.append(f"({' OR '.join(id_parts)})")
         params.extend(id_params)
 
-    params.append(min(max(limit, 1), 100))
+    query_sql = f"""
+        SELECT
+            first_name, last_name, phone, email, identity_number,
+            city, country, notes, extra_json
+        FROM people
+        WHERE {' AND '.join(clauses)}
+    """
 
     with connect_index() as conn:
         ensure_index_schema(conn)
-        rows = conn.execute(
-            f"""
-            SELECT
-                first_name, last_name, phone, email, identity_number,
-                city, country, notes, extra_json
-            FROM people
-            WHERE {' AND '.join(clauses)}
-            LIMIT ?
-            """,
-            params,
-        ).fetchall()
+        rows = conn.execute(query_sql, params).fetchall()
 
     results = [format_result(row) for row in rows]
     return results, parsed
 
 
 def raw_json(**data) -> Response:
-    payload = {"credit": CREDIT, **data}
+    payload = {"credit": CREDIT, "version": API_VERSION, **data}
     return Response(
         content=json.dumps(payload, ensure_ascii=False, indent=2),
         media_type="application/json; charset=utf-8",
@@ -752,7 +746,6 @@ def raw_json(**data) -> Response:
 @app.get("/api")
 def api(
     q: str | None = Query(default=None, description="Name, phone, email, or ID number"),
-    limit: int = Query(default=25, ge=1, le=100),
 ) -> Response:
     started = time.perf_counter()
 
@@ -774,7 +767,7 @@ def api(
         )
 
     try:
-        results, query = search(q, limit)
+        results, query = search(q)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except HTTPException:
@@ -789,10 +782,37 @@ def api(
         ready=INDEX_READY.is_set(),
         success=True,
         query=query,
-        total=len(results),
+        found=len(results),
+        returned=len(results),
         results=results,
         ms=round((time.perf_counter() - started) * 1000, 2),
     )
+
+
+@app.get("/api/search")
+def api_search_legacy(
+    q: str | None = Query(default=None),
+    phone: str | None = Query(default=None),
+    email: str | None = Query(default=None),
+    first_name: str | None = Query(default=None),
+    last_name: str | None = Query(default=None),
+    identity_number: str | None = Query(default=None),
+) -> Response:
+    if q:
+        return api(q=q)
+    if phone:
+        return api(q=phone)
+    if email:
+        return api(q=email)
+    if first_name and last_name:
+        return api(q=f"{first_name} {last_name}")
+    if first_name:
+        return api(q=first_name)
+    if last_name:
+        return api(q=last_name)
+    if identity_number:
+        return api(q=identity_number)
+    return api()
 
 
 if __name__ == "__main__":
