@@ -1,0 +1,94 @@
+:root {
+  --stack-base: 96px;
+  --stack-card-h: 108px;
+  --stack-gap: 48px;
+}
+
+.scroll-stack {
+  position: relative;
+  width: 100%;
+}
+
+.scroll-stack-track {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-gap);
+}
+
+.scroll-stack-card {
+  position: sticky;
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  min-height: var(--stack-card-h);
+  padding: 28px 32px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transform-origin: top center;
+  will-change: transform, opacity;
+  transition: transform 0.15s ease-out, opacity 0.15s ease-out, border-color 0.2s;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.scroll-stack-card:last-child {
+  margin-bottom: 0;
+}
+
+.stack-index {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.stack-content h3 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin-bottom: 6px;
+}
+
+.stack-content p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.scroll-stack-end {
+  height: 35vh;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --stack-base: 72px;
+    --stack-card-h: 96px;
+    --stack-gap: 32px;
+  }
+
+  .scroll-stack-card {
+    padding: 22px 24px;
+    gap: 16px;
+  }
+
+  .stack-content h3 {
+    font-size: 17px;
+  }
+
+  .scroll-stack-end {
+    height: 25vh;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-stack-card {
+    transition: none;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}

@@ -1,3 +1,4 @@
+import ScrollStack from './ScrollStack'
 import './Features.css'
 
 const searchTypes = [
@@ -18,22 +19,17 @@ const highlights = [
 const Features = () => {
   return (
     <section id="ozellikler" className="section features">
-      <div className="container">
-        <div className="section-head">
+      <div className="container features-layout">
+        <div className="features-head-sticky">
           <span className="section-label">Özellikler</span>
           <h2>Ne arayabilirsin?</h2>
           <p>Panelde kullanabileceğin tüm sorgu türleri.</p>
         </div>
 
-        <div className="search-grid">
-          {searchTypes.map((item) => (
-            <div key={item.name} className="search-item">
-              <h3>{item.name}</h3>
-              <p>{item.desc}</p>
-            </div>
-          ))}
-        </div>
+        <ScrollStack items={searchTypes} />
+      </div>
 
+      <div className="container">
         <div className="highlights">
           {highlights.map((item) => (
             <div key={item.title} className="highlight">
