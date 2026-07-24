@@ -20,7 +20,7 @@ DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
 SCHEMA_VERSION = 9
 PORT = 8080
-API_VERSION = "2026-07-24-pg-fix"
+API_VERSION = "2026-07-24-lock-fix"
 CREDIT = "api made by Ami.192 on signal"
 AUTO_REBUILD = os.environ.get("AUTO_REBUILD", "0") == "1"
 API_USAGE = {
@@ -884,7 +884,11 @@ def collect_stats(count_lines: bool = False) -> dict:
         "index_ready": INDEX_READY.is_set(),
         "index_building": INDEX_BUILDING.is_set(),
         "auto_rebuild": AUTO_REBUILD,
-        "indexed_records": count_records() if INDEX_READY.is_set() and INDEX_DB.exists() else 0,
+        "indexed_records": (
+            count_records()
+            if INDEX_READY.is_set() and INDEX_DB.exists() and not INDEX_BUILDING.is_set()
+            else 0
+        ),
         "sources": file_rows,
     }
 
@@ -907,9 +911,11 @@ def source_files() -> list[Path]:
     return files
 
 
-def connect_index() -> sqlite3.Connection:
-    conn = sqlite3.connect(INDEX_DB, check_same_thread=False)
+def connect_index(timeout: float = 60.0) -> sqlite3.Connection:
+    conn = sqlite3.connect(INDEX_DB, check_same_thread=False, timeout=timeout)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=60000")
     return conn
 
 
@@ -943,6 +949,20 @@ def ensure_index_schema(conn: sqlite3.Connection) -> None:
         "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
         (str(SCHEMA_VERSION),),
     )
+
+
+def ensure_index_schema_if_needed(conn: sqlite3.Connection) -> None:
+    tables = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='people'"
+    ).fetchone()
+    if not tables:
+        ensure_index_schema(conn)
+        return
+    stored = conn.execute(
+        "SELECT value FROM meta WHERE key='schema_version'"
+    ).fetchone()
+    if not stored or int(stored[0]) != SCHEMA_VERSION:
+        ensure_index_schema(conn)
 
 
 def record_to_row(record: dict) -> tuple:
@@ -1445,12 +1465,14 @@ def bootstrap_source_meta(conn: sqlite3.Connection) -> dict[str, dict]:
     return load_indexed_sources(conn)
 
 
-def index_pending_sources(conn: sqlite3.Connection) -> int:
+def index_pending_sources(conn: sqlite3.Connection, sql_db_only: bool = True) -> int:
     indexed = bootstrap_source_meta(conn)
     total_added = 0
     updated = dict(indexed)
 
     for path in source_files():
+        if sql_db_only and not source_is_importable(path):
+            continue
         if not file_needs_import(path, indexed):
             continue
         try:
@@ -1464,6 +1486,16 @@ def index_pending_sources(conn: sqlite3.Connection) -> int:
 
     save_indexed_sources(conn, updated)
     return total_added
+
+
+def index_sql_db_sources(conn: sqlite3.Connection) -> int:
+    indexed = load_indexed_sources(conn)
+    for path in source_files():
+        if source_is_importable(path):
+            indexed.pop(path.name, None)
+    save_indexed_sources(conn, indexed)
+    conn.commit()
+    return index_pending_sources(conn, sql_db_only=True)
 
 
 def ensure_index(force: bool = False) -> None:
@@ -1522,16 +1554,19 @@ def rebuild_index_async(force: bool = True) -> bool:
 
 def build_index_background() -> None:
     global INDEX_ERROR
+    INDEX_BUILDING.set()
     try:
-        if INDEX_DB.exists() and index_usable():
-            ensure_index(force=False)
-        else:
-            print("No index found, building once in background...", flush=True)
-            ensure_index(force=True)
+        with INDEX_LOCK:
+            if INDEX_DB.exists() and index_usable():
+                ensure_index(force=False)
+            else:
+                print("No index found, building once in background...", flush=True)
+                ensure_index(force=True)
     except Exception as error:
         INDEX_ERROR = str(error)
         print(f"Index build failed: {error}", flush=True)
     finally:
+        INDEX_BUILDING.clear()
         INDEX_READY.set()
 
 
@@ -1612,9 +1647,14 @@ def rebuild_index() -> dict:
 def count_records() -> int:
     if not INDEX_DB.exists():
         return 0
-    with connect_index() as conn:
-        ensure_index_schema(conn)
-        return conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
+    try:
+        conn = connect_index()
+        try:
+            return conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return 0
 
 
 def format_result(row: sqlite3.Row) -> dict:
@@ -1747,7 +1787,7 @@ def search(q: str | None = None) -> tuple[list[dict], dict]:
     """
 
     with connect_index() as conn:
-        ensure_index_schema(conn)
+        ensure_index_schema_if_needed(conn)
         rows = conn.execute(query_sql, params).fetchall()
 
     results = [format_result(row) for row in rows]
@@ -1785,29 +1825,24 @@ def api_reimport() -> Response:
         )
 
     if INDEX_BUILDING.is_set():
-        return raw_json(ok=True, rebuilding=True, message="Import already running")
+        return raw_json(ok=True, rebuilding=True, message="Import already running. Wait for it to finish.")
 
     def worker() -> None:
         global INDEX_ERROR
         INDEX_BUILDING.set()
         INDEX_ERROR = None
         try:
-            conn = sqlite3.connect(INDEX_DB)
-            try:
-                tune_sqlite_for_bulk(conn)
-                ensure_index_schema(conn)
-                indexed = load_indexed_sources(conn)
-                for path in source_files():
-                    if source_is_importable(path):
-                        indexed.pop(path.name, None)
-                save_indexed_sources(conn, indexed)
-                conn.commit()
-                added = index_pending_sources(conn)
-                conn.commit()
-                restore_sqlite_settings(conn)
-                print(f"Reimport added {added} records", flush=True)
-            finally:
-                conn.close()
+            with INDEX_LOCK:
+                conn = connect_index()
+                try:
+                    tune_sqlite_for_bulk(conn)
+                    ensure_index_schema_if_needed(conn)
+                    added = index_sql_db_sources(conn)
+                    conn.commit()
+                    restore_sqlite_settings(conn)
+                    print(f"Reimport added {added} records from SQL/DB files", flush=True)
+                finally:
+                    conn.close()
         except Exception as error:
             INDEX_ERROR = str(error)
             print(f"Reimport failed: {error}", flush=True)
@@ -1815,7 +1850,6 @@ def api_reimport() -> Response:
             INDEX_BUILDING.clear()
             INDEX_READY.set()
 
-    INDEX_BUILDING.set()
     threading.Thread(target=worker, daemon=True).start()
     return raw_json(
         ok=True,
@@ -1848,7 +1882,7 @@ def api(
                 ok=True,
                 ready=False,
                 status="indexing" if INDEX_BUILDING.is_set() else "starting",
-                records=count_records() if INDEX_DB.exists() else 0,
+                records=count_records() if INDEX_DB.exists() and not INDEX_BUILDING.is_set() else 0,
                 free_disk_mb=free_disk_bytes() // (1024 * 1024),
                 usage=API_USAGE,
             )
