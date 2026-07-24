@@ -10,13 +10,24 @@ from config import DATABASE_PATH
 def normalize_phone(value: str | None) -> str:
     if not value:
         return ""
-    return re.sub(r"\D+", "", value.strip())
+    digits = re.sub(r"\D+", "", value.strip())
+    if digits.startswith("90") and len(digits) >= 12:
+        return digits
+    if digits.startswith("0") and len(digits) >= 10:
+        return "90" + digits[1:]
+    return digits
 
 
 def normalize_text(value: str | None) -> str:
     if not value:
         return ""
     return re.sub(r"\s+", " ", value.strip().lower())
+
+
+def normalize_email(value: str | None) -> str:
+    if not value:
+        return ""
+    return value.strip().lower()
 
 
 def normalize_identity(value: str | None) -> str:
@@ -51,70 +62,29 @@ def ensure_database() -> None:
                 first_name_norm TEXT NOT NULL DEFAULT '',
                 last_name_norm TEXT NOT NULL DEFAULT '',
                 identity_norm TEXT NOT NULL DEFAULT '',
+                email_norm TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            """
+        )
 
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(people)").fetchall()}
+        if "email_norm" not in columns:
+            conn.execute("ALTER TABLE people ADD COLUMN email_norm TEXT NOT NULL DEFAULT ''")
+            conn.execute(
+                "UPDATE people SET email_norm = lower(trim(email)) WHERE email_norm = '' AND email != ''"
+            )
+
+        conn.executescript(
+            """
             CREATE INDEX IF NOT EXISTS idx_people_phone ON people(phone_norm);
+            CREATE INDEX IF NOT EXISTS idx_people_email ON people(email_norm);
             CREATE INDEX IF NOT EXISTS idx_people_first_name ON people(first_name_norm);
             CREATE INDEX IF NOT EXISTS idx_people_last_name ON people(last_name_norm);
             CREATE INDEX IF NOT EXISTS idx_people_identity ON people(identity_norm);
             CREATE INDEX IF NOT EXISTS idx_people_name ON people(first_name_norm, last_name_norm);
             """
         )
-
-        count = conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]
-        if count == 0:
-            seed_rows = [
-                (
-                    "Ege",
-                    "Tevkir",
-                    "+31612345678",
-                    "AB123456",
-                    "ege.tevkir@example.com",
-                    "Amsterdam",
-                    "NL",
-                    "sample",
-                    "Demo record only",
-                ),
-                (
-                    "John",
-                    "Doe",
-                    "0612345678",
-                    "XY987654",
-                    "john.doe@example.com",
-                    "Rotterdam",
-                    "NL",
-                    "sample",
-                    "Demo record only",
-                ),
-            ]
-            conn.executemany(
-                """
-                INSERT INTO people (
-                    first_name, last_name, phone, identity_number, email,
-                    city, country, source, notes,
-                    phone_norm, first_name_norm, last_name_norm, identity_norm
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                [
-                    (
-                        first,
-                        last,
-                        phone,
-                        identity,
-                        email,
-                        city,
-                        country,
-                        source,
-                        notes,
-                        normalize_phone(phone),
-                        normalize_text(first),
-                        normalize_text(last),
-                        normalize_identity(identity),
-                    )
-                    for first, last, phone, identity, email, city, country, source, notes in seed_rows
-                ],
-            )
 
 
 @contextmanager
@@ -144,23 +114,57 @@ def row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+def insert_person(conn: sqlite3.Connection, record: dict[str, str]) -> None:
+    first_name = record.get("first_name", "")
+    last_name = record.get("last_name", "")
+    phone = record.get("phone", "")
+    email = record.get("email", "")
+    identity_number = record.get("identity_number", "")
+
+    conn.execute(
+        """
+        INSERT INTO people (
+            first_name, last_name, phone, identity_number, email,
+            city, country, source, notes,
+            phone_norm, first_name_norm, last_name_norm, identity_norm, email_norm
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            first_name,
+            last_name,
+            phone,
+            identity_number,
+            email,
+            record.get("city", ""),
+            record.get("country", ""),
+            record.get("source", ""),
+            record.get("notes", ""),
+            normalize_phone(phone),
+            normalize_text(first_name),
+            normalize_text(last_name),
+            normalize_identity(identity_number),
+            normalize_email(email),
+        ),
+    )
+
+
 def search_people(
     *,
     phone: str | None = None,
+    email: str | None = None,
     first_name: str | None = None,
     last_name: str | None = None,
     identity_number: str | None = None,
     limit: int = 25,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    started = time.perf_counter()
-
     phone_norm = normalize_phone(phone)
+    email_norm = normalize_email(email)
     first_norm = normalize_text(first_name)
     last_norm = normalize_text(last_name)
     identity_norm = normalize_identity(identity_number)
 
-    if not any([phone_norm, first_norm, last_norm, identity_norm]):
-        raise ValueError("Provide at least one of: phone, first_name, last_name, identity_number")
+    if not any([phone_norm, email_norm, first_norm, last_norm, identity_norm]):
+        raise ValueError("Provide at least one of: phone, email, first_name, last_name, identity_number")
 
     clauses = []
     params: list[Any] = []
@@ -168,6 +172,10 @@ def search_people(
     if phone_norm:
         clauses.append("phone_norm LIKE ?")
         params.append(f"%{phone_norm}%")
+
+    if email_norm:
+        clauses.append("email_norm LIKE ?")
+        params.append(f"%{email_norm}%")
 
     if first_norm:
         clauses.append("first_name_norm LIKE ?")
@@ -193,12 +201,17 @@ def search_people(
     with connect() as conn:
         rows = conn.execute(sql, params).fetchall()
 
-    elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
     query = {
         "phone": phone or None,
+        "email": email or None,
         "first_name": first_name or None,
         "last_name": last_name or None,
         "identity_number": identity_number or None,
     }
 
     return [row_to_dict(row) for row in rows], query
+
+
+def count_people() -> int:
+    with connect() as conn:
+        return conn.execute("SELECT COUNT(*) FROM people").fetchone()[0]

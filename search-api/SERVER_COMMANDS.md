@@ -1,66 +1,69 @@
 # People Search API — Server Commands
 
-## Install (clone the correct branch)
+## Install
 
 ```bash
 rm -rf ~/search-api /tmp/personal-link-page
 mkdir -p ~/search-api
 cd /tmp
-git clone -b cursor/people-search-api-649a https://github.com/mootje5412/personal-link-page.git
+git clone https://github.com/mootje5412/personal-link-page.git
 cp -r personal-link-page/search-api/* ~/search-api/
 cd ~/search-api
-chmod +x deploy.sh remove-old-bot.sh
+chmod +x deploy.sh
 ./deploy.sh
 ```
 
-## Remove old Telegram bot
+## Import your XLSX or CSV
+
+Your file columns are supported automatically:
+
+`Name`, `Surname`, `Phone Number`, `E-Mail Contact`
+
+Upload your file to the server, then run:
 
 ```bash
 cd ~/search-api
-./remove-old-bot.sh
-rm -rf ~/findnow-bot
+./venv/bin/pip install -r requirements.txt
+./venv/bin/python import_data.py /root/your-file.xlsx --replace
+systemctl restart search-api
 ```
 
-## API links (no API key needed)
-
-Health:
+Or CSV/TSV:
 
 ```bash
-curl http://YOUR_SERVER_IP:8080/api/health
+./venv/bin/python import_data.py /root/your-file.csv --replace
 ```
 
-Search by phone:
+Check record count:
 
 ```bash
-curl "http://YOUR_SERVER_IP:8080/api/search?phone=0612345678"
+curl http://127.0.0.1:8080/api/health
 ```
 
-Search by first + last name:
+## Search links (no API key)
 
-```bash
-curl "http://YOUR_SERVER_IP:8080/api/search?first_name=Ege&last_name=Tevkir"
+By email:
+
+```
+http://YOUR_SERVER_IP:8080/api/search?email=alemm_07@hotmail.com
 ```
 
-Search by identity number:
+By phone:
 
-```bash
-curl "http://YOUR_SERVER_IP:8080/api/search?identity_number=AB123456"
+```
+http://YOUR_SERVER_IP:8080/api/search?phone=905331657436
+```
+
+By first + last name:
+
+```
+http://YOUR_SERVER_IP:8080/api/search?first_name=Gokhan&last_name=al
 ```
 
 Combined:
 
-```bash
-curl "http://YOUR_SERVER_IP:8080/api/search?phone=0612345678&first_name=John&last_name=Doe&identity_number=XY987654"
 ```
-
-## Import your database
-
-CSV columns:
-`first_name,last_name,phone,identity_number,email,city,country,source,notes`
-
-```bash
-cd ~/search-api
-./venv/bin/python import_csv.py your-data.csv
+http://YOUR_SERVER_IP:8080/api/search?first_name=Gokhan&last_name=al&email=alemm_07@hotmail.com
 ```
 
 ## Restart / logs
@@ -68,4 +71,11 @@ cd ~/search-api
 ```bash
 systemctl restart search-api
 journalctl -u search-api -f
+```
+
+## Remove old Telegram bot
+
+```bash
+pkill -9 -f "node index.js"
+rm -rf ~/findnow-bot
 ```

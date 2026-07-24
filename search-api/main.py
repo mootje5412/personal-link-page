@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from database import ensure_database, search_people
+from database import count_people, ensure_database, search_people
 
 app = FastAPI(
     title="People Search API",
@@ -24,6 +24,7 @@ app.add_middleware(
 
 class SearchBody(BaseModel):
     phone: str | None = None
+    email: str | None = None
     first_name: str | None = None
     last_name: str | None = None
     identity_number: str | None = None
@@ -50,19 +51,26 @@ def root() -> dict:
     return {
         "service": "People Search API",
         "status": "online",
+        "records": count_people(),
         "search": "/api/search",
-        "method": "GET or POST",
+        "fields": ["phone", "email", "first_name", "last_name", "identity_number"],
     }
 
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"success": True, "status": "ok", "timestamp": int(time.time())}
+    return {
+        "success": True,
+        "status": "ok",
+        "records": count_people(),
+        "timestamp": int(time.time()),
+    }
 
 
 @app.get("/api/search")
 def search_get(
     phone: str | None = Query(default=None),
+    email: str | None = Query(default=None),
     first_name: str | None = Query(default=None),
     last_name: str | None = Query(default=None),
     identity_number: str | None = Query(default=None),
@@ -72,6 +80,7 @@ def search_get(
     try:
         results, query = search_people(
             phone=phone,
+            email=email,
             first_name=first_name,
             last_name=last_name,
             identity_number=identity_number,
@@ -90,6 +99,7 @@ def search_post(body: SearchBody) -> JSONResponse:
     try:
         results, query = search_people(
             phone=body.phone,
+            email=body.email,
             first_name=body.first_name,
             last_name=body.last_name,
             identity_number=body.identity_number,
