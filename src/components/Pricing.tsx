@@ -6,20 +6,20 @@ const plans = [
     name: 'Başlangıç',
     price: '59',
     note: 'Denemek için',
-    items: ['75 arama / ay', 'TC ve isim', 'Temel destek'],
+    items: ['200 arama / gün', 'TC ve isim', 'Temel destek'],
   },
   {
     name: 'Standart',
     price: '119',
     note: 'En popüler',
-    items: ['300 arama / ay', 'Tüm arama türleri', 'Öncelikli destek'],
+    items: ['1.000 arama / gün', 'Tüm arama türleri', 'Öncelikli destek'],
     featured: true,
   },
   {
     name: 'Pro',
     price: '199',
     note: 'Yoğun kullanım',
-    items: ['1500 arama / ay', 'Tüm arama türleri', '7/24 destek'],
+    items: ['5.000 arama / gün', 'Tüm arama türleri', '7/24 destek'],
   },
 ]
 
@@ -30,7 +30,7 @@ const Pricing = () => {
         <div className="section-head">
           <span className="section-label">Fiyatlandırma</span>
           <h2>Paketler</h2>
-          <p>Aylık abonelik. İstediğin zaman iptal.</p>
+          <p>Günlük arama limiti. Aylık abonelik — istediğin zaman iptal.</p>
         </div>
 
         <div className="plans">

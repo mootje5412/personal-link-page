@@ -14,7 +14,7 @@ const Hero = () => {
               sorgula
             </h1>
             <p className="hero-lead">
-              TC, isim, adres, aile, IP ve e-posta — hepsi tek panelde.
+              TC, isim, adres, aile, IP ve e-posta — günlük binlerce arama, tek panelde.
             </p>
             <div className="hero-actions">
               <a href="#fiyatlar" className="btn">Paket seç</a>

@@ -11,8 +11,8 @@ const searchTypes = [
 ]
 
 const highlights = [
+  { title: '200+', desc: 'Günlük arama (Başlangıç)' },
   { title: 'Hızlı', desc: 'Saniyeler içinde sonuç' },
-  { title: 'Güncel', desc: 'Düzenli güncellenen veri' },
   { title: 'Güvenli', desc: 'Şifreli bağlantı' },
 ]
 
