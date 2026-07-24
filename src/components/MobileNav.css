@@ -10,7 +10,7 @@
     left: 0;
     right: 0;
     height: var(--nav-h);
-    background: var(--bg);
+    background: #000;
     border-top: 1px solid var(--line);
     padding-bottom: env(safe-area-inset-bottom, 0);
   }
@@ -24,7 +24,12 @@
     color: var(--muted);
   }
 
-  .mobile-nav a:active {
-    color: var(--text);
+  .mobile-nav-accent {
+    color: #000;
+    background: #fff;
+    font-weight: 500;
+    margin: 8px;
+    border-radius: 6px;
+    flex: 1.2;
   }
 }

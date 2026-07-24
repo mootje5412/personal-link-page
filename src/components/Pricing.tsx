@@ -4,38 +4,55 @@ const plans = [
   {
     name: 'Başlangıç',
     price: '39',
-    details: ['50 arama', 'TC ve isim', 'Temel destek'],
+    note: 'Denemek için',
+    items: ['50 arama / ay', 'TC ve isim', 'Temel destek'],
   },
   {
     name: 'Standart',
     price: '79',
-    details: ['200 arama', 'Tüm arama türleri', 'Öncelikli destek'],
+    note: 'Çoğu kullanıcı bunu alır',
+    items: ['200 arama / ay', 'Tüm arama türleri', 'Öncelikli destek'],
+    featured: true,
   },
   {
     name: 'Pro',
     price: '149',
-    details: ['1000 arama', 'Tüm arama türleri', '7/24 destek'],
+    note: 'Yoğun kullanım',
+    items: ['1000 arama / ay', 'Tüm arama türleri', '7/24 destek'],
   },
 ]
 
 const Pricing = () => {
   return (
-    <section id="fiyatlar" className="block pricing">
+    <section id="fiyatlar" className="section pricing">
       <div className="container">
-        <h2>Fiyatlar</h2>
+        <div className="section-head">
+          <h2>Fiyatlar</h2>
+          <p>Aylık paketler. İstediğin zaman iptal edebilirsin.</p>
+        </div>
+
         <div className="plans">
           {plans.map((plan) => (
-            <div key={plan.name} className="plan">
-              <div className="plan-top">
-                <span className="plan-name">{plan.name}</span>
-                <span className="plan-price">{plan.price} ₺<small>/ay</small></span>
+            <article
+              key={plan.name}
+              className={`plan${plan.featured ? ' plan-featured' : ''}`}
+            >
+              <div className="plan-head">
+                <h3>{plan.name}</h3>
+                <p className="plan-note">{plan.note}</p>
               </div>
+              <p className="plan-price">
+                {plan.price} <span>₺/ay</span>
+              </p>
               <ul>
-                {plan.details.map((d) => (
-                  <li key={d}>{d}</li>
+                {plan.items.map((item) => (
+                  <li key={item}>{item}</li>
                 ))}
               </ul>
-            </div>
+              <button type="button" className={plan.featured ? 'btn plan-btn' : 'btn btn-outline plan-btn'}>
+                Seç
+              </button>
+            </article>
           ))}
         </div>
       </div>
