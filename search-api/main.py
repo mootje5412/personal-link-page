@@ -11,6 +11,7 @@ from fastapi.responses import Response
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
+SCHEMA_VERSION = 2
 PORT = 8080
 CREDIT = "api made by Ami.192 on signal"
 
@@ -153,7 +154,16 @@ def read_xlsx_rows(path: Path) -> list[dict]:
     workbook = load_workbook(path, read_only=True, data_only=True)
     sheet = workbook.active
     rows = sheet.iter_rows(values_only=True)
-    headers = [clean_header(cell) for cell in next(rows, [])]
+
+    headers: list[str] = []
+    for row in rows:
+        headers = [clean_header(cell) for cell in row]
+        if any(headers):
+            break
+
+    if not any(headers):
+        workbook.close()
+        return []
 
     mapped_rows = []
     for row in rows:
@@ -239,7 +249,15 @@ def ensure_index_schema(conn: sqlite3.Connection) -> None:
             email_n TEXT NOT NULL DEFAULT '',
             identity_number_n TEXT NOT NULL DEFAULT ''
         );
+        CREATE TABLE IF NOT EXISTS meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
         """
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
+        (str(SCHEMA_VERSION),),
     )
 
 
@@ -284,8 +302,37 @@ def load_file_records(path: Path) -> list[dict]:
     return [record for record in records if row_is_valid(record)]
 
 
+def index_schema_ok() -> bool:
+    if not INDEX_DB.exists():
+        return False
+
+    conn = sqlite3.connect(INDEX_DB)
+    try:
+        version = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='meta'"
+        ).fetchone()
+        if not version:
+            return False
+        stored = conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
+        if not stored or int(stored[0]) != SCHEMA_VERSION:
+            return False
+
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(people)")}
+        required = {
+            "first_name", "last_name", "phone", "email", "identity_number",
+            "city", "country", "notes", "extra_json", "phone_n",
+        }
+        return required.issubset(columns)
+    except (sqlite3.Error, ValueError, TypeError):
+        return False
+    finally:
+        conn.close()
+
+
 def index_is_stale() -> bool:
     if not INDEX_DB.exists():
+        return True
+    if not index_schema_ok():
         return True
     index_mtime = INDEX_DB.stat().st_mtime
     for path in source_files():
@@ -385,13 +432,11 @@ def search(
     params: list = []
 
     if phone:
-        needle = norm_phone(phone)
-        if needle:
-            clauses.append("phone_n LIKE ?")
-            params.append(f"%{needle}%")
-        else:
-            clauses.append("phone_n LIKE ?")
-            params.append(f"%{phone_digits(phone)}%")
+        needle = norm_phone(phone) or phone_digits(phone)
+        if not needle:
+            raise ValueError("Invalid phone number")
+        clauses.append("phone_n LIKE ?")
+        params.append(f"%{needle}%")
     if email:
         clauses.append("email_n LIKE ?")
         params.append(f"%{norm_email(email)}%")
@@ -464,6 +509,14 @@ def api_search(
         results, query = search(phone, email, first_name, last_name, identity_number, limit)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+    except sqlite3.Error as error:
+        ensure_index()
+        try:
+            results, query = search(phone, email, first_name, last_name, identity_number, limit)
+        except Exception as retry_error:
+            raise HTTPException(status_code=500, detail=str(retry_error)) from retry_error
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
 
     return raw_json(
         success=True,
