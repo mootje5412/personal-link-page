@@ -7,13 +7,13 @@ fi
 set -e
 set -u
 
-# ApexSearch — one-command server install/update
+# ApexSearch - one-command server install/update
 #
 # Fresh install or update:
 #   rm -rf /tmp/apex && git clone -b cursor/telegram-bot-setup-326b https://github.com/mootje5412/personal-link-page.git /tmp/apex && bash /tmp/apex/bot/install.sh
 #
 # Or from an existing clone:
-#   cd /tmp/apex/bot && bash install.sh
+#   cd /tmp/apex && git pull && bash bot/install.sh
 
 REPO="${APEX_REPO:-https://github.com/mootje5412/personal-link-page.git}"
 BRANCH="${APEX_BRANCH:-cursor/telegram-bot-setup-326b}"
@@ -55,12 +55,12 @@ cd "$INSTALL_DIR"
 mkdir -p data
 
 echo "==> Writing .env..."
-cat > .env << 'EOF'
-TELEGRAM_BOT_TOKEN=8296025702:AAFxh2r7gxJSOkAbYkQtuKxCDLA7zCFPZGY
-OWNER_ID=8073205490
-INTEL_API_KEY=2aaef599-fcf9-461c-b996-69e5e5d71ee2
-INTEL_BASE_URL=https://www.osintcat.net/api
-EOF
+printf '%s\n' \
+  'TELEGRAM_BOT_TOKEN=8296025702:AAFxh2r7gxJSOkAbYkQtuKxCDLA7zCFPZGY' \
+  'OWNER_ID=8073205490' \
+  'INTEL_API_KEY=2aaef599-fcf9-461c-b996-69e5e5d71ee2' \
+  'INTEL_BASE_URL=https://www.osintcat.net/api' \
+  > .env
 
 if ! command -v node >/dev/null 2>&1; then
   echo "==> Installing Node.js 20..."

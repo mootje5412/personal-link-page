@@ -25,7 +25,8 @@ sshpass -p "$PASS" scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/nu
 echo "==> Installing on server..."
 sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   "${USER}@${SERVER}" "REMOTE_DIR='${REMOTE_DIR}' bash -s" << 'REMOTE'
-set -euo pipefail
+set -e
+set -u
 
 echo "==> Stopping old bots..."
 pm2 delete apexsearch 2>/dev/null || true
