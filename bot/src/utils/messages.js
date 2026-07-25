@@ -206,7 +206,7 @@ function apisMessage() {
   return [
     header('OsintCat APIs'),
     '',
-    'Email searches call these two endpoints:',
+    'Email searches call these endpoints:',
     '',
     '<b>1. Breach Lookup</b>',
     '<code>GET /api/breach?query=EMAIL</code>',
@@ -214,6 +214,11 @@ function apisMessage() {
     '',
     '<b>2. Stealer / Database Search</b>',
     '<code>GET /api/database-search?query=EMAIL&amp;type=email</code>',
+    'Header: <code>X-API-KEY</code>',
+    '',
+    '<b>3. Footprint Scan</b>',
+    '<code>GET /api/footprint/create-task?query=EMAIL&amp;type=email</code>',
+    'Then polls <code>GET /api/footprint/get-task?id=TASK_ID</code>',
     'Header: <code>X-API-KEY</code>',
     '',
     'Base URL: <code>https://www.osintcat.net/api</code>',
@@ -281,9 +286,12 @@ function searchProgressMessage(query, count, options = {}) {
     lines.push('<b>APIs</b>');
     lines.push('<code>GET /api/breach</code>');
     lines.push('<code>GET /api/database-search?type=email</code>');
+    lines.push('<code>GET /api/footprint/create-task?type=email</code>');
   }
 
-  if (options.status === 'stealer') {
+  if (options.status === 'footprint') {
+    lines.push('Status: running footprint scan...');
+  } else if (options.status === 'stealer') {
     lines.push('Status: querying stealer database...');
   } else if (count > 0) {
     lines.push(`Status: <b>${count}</b> result${count === 1 ? '' : 's'} found`);

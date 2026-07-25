@@ -114,6 +114,7 @@ class IntelligenceService {
     if (types.includes('email')) {
       add('breach', () => apiClient.breach(query));
       add('database-search', () => apiClient.databaseSearch(query, 'email'));
+      add('footprint', () => this.fetchFootprint(query));
       return tasks;
     }
 
@@ -189,12 +190,14 @@ class IntelligenceService {
       .filter(([, status]) => ['failed', 'timeout', 'auth'].includes(status))
       .map(([name, status]) => ({ name, status, detail: sourceDetails[name] || '' }));
 
-    const apiReport = ['breach', 'database-search'].map((name) => {
+    const apiReport = ['breach', 'database-search', 'footprint'].map((name) => {
       const status = sourceStatus[name] || 'not run';
       const detail = sourceDetails[name] || '';
       const label = name === 'breach'
         ? 'GET /api/breach'
-        : 'GET /api/database-search';
+        : name === 'database-search'
+          ? 'GET /api/database-search'
+          : 'GET /api/footprint/create-task';
 
       return { name, label, status, detail };
     });
@@ -210,25 +213,43 @@ class IntelligenceService {
   }
 
   async fetchFootprint(query) {
-    const created = await apiClient.createFootprintTask(query, 'username');
-    if (created.error) return created;
+    const footprintType = apiClient.detectFootprintType(query);
+    const created = await apiClient.createFootprintTask(query, footprintType);
 
-    const taskId = created.task_id;
-    if (!taskId) return created;
+    if (created?.error === true) {
+      return created;
+    }
+
+    if (typeof created?.error === 'string') {
+      return { error: true, message: created.error };
+    }
+
+    const taskId = created.task_id || created.id || created.taskId;
+    if (!taskId) {
+      return created.results ? created : { error: true, message: 'Footprint task id missing.' };
+    }
 
     const deadline = Date.now() + config.footprintMaxWaitMs;
 
     while (Date.now() < deadline) {
       await this.delay(config.footprintPollMs);
       const task = await apiClient.getFootprintTask(taskId);
-      if (task.error) return task;
 
-      const status = String(task.status || '').toLowerCase();
-      if (['completed', 'done', 'success', 'finished'].includes(status)) {
+      if (task?.error === true) {
         return task;
       }
+
+      if (typeof task?.error === 'string') {
+        return { error: true, message: task.error };
+      }
+
+      const status = String(task.status || task.state || '').toLowerCase();
+      if (['completed', 'done', 'success', 'finished', 'complete'].includes(status)) {
+        return task;
+      }
+
       if (['failed', 'error'].includes(status)) {
-        return { error: true, message: 'Footprint scan failed.' };
+        return { error: true, message: task.message || 'Footprint scan failed.' };
       }
     }
 
@@ -267,14 +288,14 @@ class IntelligenceService {
     }
 
     if (name === 'footprint') {
-      return config.footprintMaxWaitMs + 5000;
-    }
-
-    if (name === 'breach') {
-      return config.breachTimeoutMs || config.apiTimeoutMs;
+      return config.footprintMaxWaitMs + 10000;
     }
 
     return config.fastSourceTimeoutMs;
+  }
+
+  isFootprintTask(name) {
+    return name === 'footprint';
   }
 
   isStealerTask(name) {
@@ -307,6 +328,10 @@ class IntelligenceService {
 
     if (this.isStealerTask(name)) {
       notify('stealer');
+    }
+
+    if (this.isFootprintTask(name)) {
+      notify('footprint');
     }
 
     const data = await this.withTimeout(run(), timeoutMs, name);
@@ -415,15 +440,83 @@ class IntelligenceService {
     return lines.length ? lines.join('\n') : null;
   }
 
+  formatFootprintFields(item) {
+    if (!item || typeof item !== 'object' || isApiShellRecord(item)) {
+      return null;
+    }
+
+    const registered = item.taken === true
+      || item.registered === true
+      || item.exists === true
+      || item.found === true;
+
+    if (!registered && item.taken === false) {
+      return null;
+    }
+
+    const fields = {};
+    const set = (label, value) => {
+      if (value !== null && value !== undefined && String(value).trim() !== '') {
+        fields[label] = String(value).trim();
+      }
+    };
+
+    set('Platform', item.domain || item.platform || item.name || item.site);
+    set('Registered', registered ? 'yes' : 'no');
+    set('Type', item.type || item.method);
+    set('URL', item.url || item.profile_url);
+
+    const extra = item.ExtraData || item.extra_data || item.metadata || item.meta;
+    if (extra && typeof extra === 'object') {
+      Object.entries(extra).forEach(([key, value]) => {
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+          set(key, value);
+        }
+      });
+    }
+
+    return Object.keys(fields).length ? fields : null;
+  }
+
+  processFootprintResponse(data, results, seen) {
+    if (!data || data.error === true) return;
+
+    const candidates = [
+      data.results,
+      data.platforms,
+      data.data,
+      data.data && data.data.results
+    ].filter((value) => Array.isArray(value));
+
+    let added = 0;
+
+    candidates.forEach((items) => {
+      items.forEach((item) => {
+        const fields = this.formatFootprintFields(item);
+        if (fields) {
+          this.pushResultFields(results, seen, 'footprint', fields);
+          added += 1;
+        }
+      });
+    });
+
+    if (added === 0) {
+      const text = this.formatFootprint(data);
+      if (text) {
+        this.pushResult(results, seen, 'footprint', text);
+      }
+    }
+  }
+
   formatFootprint(response) {
     const platforms = response.platforms || response.results || response.data;
     if (!platforms) return null;
 
     if (Array.isArray(platforms)) {
-      const hits = platforms.filter((p) => p.registered || p.exists || p.found);
-      if (!hits.length) return 'No platform registrations found.';
+      const hits = platforms.filter((p) => p.taken || p.registered || p.exists || p.found);
+      if (!hits.length) return null;
       return hits.slice(0, 15).map((p) => {
-        const name = p.platform || p.name || p.site || 'Platform';
+        const name = p.domain || p.platform || p.name || p.site || 'Platform';
         const extra = p.url || p.profile_url || p.status || 'registered';
         return `${name}: ${extra}`;
       }).join('\n');
@@ -580,8 +673,7 @@ class IntelligenceService {
     }
 
     if (name === 'footprint') {
-      const text = this.formatFootprint(data);
-      if (text) this.pushResult(results, seen, 'footprint', text);
+      this.processFootprintResponse(data, results, seen);
       return;
     }
 

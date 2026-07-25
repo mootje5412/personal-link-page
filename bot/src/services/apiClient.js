@@ -153,13 +153,25 @@ class ApiClient {
   tiktok(query) { return this.get('/tiktok-resolver', query); }
   instagram(query) { return this.get('/instagram-resolver', query); }
 
-  createFootprintTask(query, type = 'username') {
-    return this.get('/footprint/create-task', query, { type });
+  detectFootprintType(query) {
+    return query.includes('@') ? 'email' : 'username';
+  }
+
+  /**
+   * curl "https://www.osintcat.net/api/footprint/create-task?query=QUERY&type=email" \
+   *      -H "X-API-KEY: YOUR_API_KEY"
+   */
+  createFootprintTask(query, type = null) {
+    const footprintType = type || this.detectFootprintType(query);
+    const url = this.buildUrl('/footprint/create-task', query, { type: footprintType });
+    console.log(`[API] Footprint create-task -> ${url}`);
+    return this.request(url, { method: 'GET' }, config.apiTimeoutMs);
   }
 
   getFootprintTask(taskId) {
     const url = `${config.intelBaseUrl}/footprint/get-task?id=${encodeURIComponent(taskId)}`;
-    return this.request(url);
+    console.log(`[API] Footprint get-task -> ${url}`);
+    return this.request(url, { method: 'GET' }, config.apiTimeoutMs);
   }
 
   searchMachines(query) {

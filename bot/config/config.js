@@ -4,7 +4,7 @@ module.exports = {
   botToken: process.env.TELEGRAM_BOT_TOKEN,
   ownerId: Number(process.env.OWNER_ID || 8073205490),
   botName: 'ApexSearch',
-  version: '1.4.0',
+  version: '1.4.1',
   supportContact: '@strafbaar',
   supportUrl: 'https://t.me/strafbaar',
   itemsPerPage: 10,
@@ -19,7 +19,7 @@ module.exports = {
   fastSourceTimeoutMs: Number(process.env.FAST_SOURCE_TIMEOUT_MS || 25000),
   machineSearchTimeoutMs: 45000,
   footprintPollMs: 2000,
-  footprintMaxWaitMs: 30000,
+  footprintMaxWaitMs: 45000,
   polling: {
     interval: 300,
     params: {
