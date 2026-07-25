@@ -203,6 +203,9 @@ def detect_search(text: str) -> DetectedSearch | None:
             return _name_search(words[0], words[1])
         return _name_search(words[0], " ".join(words[1:]))
 
+    if len(words) == 1 and re.match(r"^[A-Za-z0-9@._-]{3,}$", words[0]):
+        return _odido_search(words[0])
+
     return None
 
 
@@ -214,6 +217,7 @@ def format_detection_hint() -> str:
         "  John Doe ................. name\n"
         "  John Doe CA .............. name + state\n"
         "  John,Doe,90210 ........... Intelius\n"
+        "  example .................. Odido keyword\n"
         "  user@email.com ............. Odido\n"
         "  0612345678 ............... Odido (NL phone)\n"
         "  (256) 521-1446 ........... phone\n"

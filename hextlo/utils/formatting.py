@@ -61,6 +61,7 @@ def format_welcome(first_name: str) -> str:
         "  John Doe ................. name search\n"
         "  John Doe CA .............. name + state\n"
         "  John,Doe,90210 ........... Intelius\n"
+        "  example .................. Odido keyword\n"
         "  user@email.com ............. Odido lookup\n"
         "  0612345678 ............... Odido (NL phone)\n"
         "  (256) 521-1446 ........... phone lookup\n"
