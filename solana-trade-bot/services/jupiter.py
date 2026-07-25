@@ -100,7 +100,7 @@ async def _send_with_fallback(keypair, swap_data: dict) -> str:
         client = AsyncClient(rpc)
         try:
             result = await client.send_raw_transaction(
-                raw, opts=TxOpts(skip_preflight=False, max_retries=5),
+                raw, opts=TxOpts(skip_preflight=True, max_retries=3),
             )
             return str(result.value)
         except Exception as exc:
@@ -121,8 +121,13 @@ async def swap_sol_for_token(keypair, token_mint: str, amount_lamports: int, sli
     sig = await _send_with_fallback(keypair, swap_data)
 
     from services.wallet import confirm_transaction
-    if not await confirm_transaction(sig):
-        raise ValueError(f"TX not confirmed: {sig[:16]}...")
+    confirmed = await confirm_transaction(sig)
+    if not confirmed:
+        # Tx was submitted — confirmation may lag on public RPCs; verify once more
+        await asyncio.sleep(3)
+        confirmed = await confirm_transaction(sig, timeout_sec=30)
+    if not confirmed:
+        raise ValueError(f"TX submitted but not confirmed yet: {sig[:16]}... — check Solscan")
 
     return sig, {"quote": quote, "out_amount": int(quote.get("outAmount", 0)), "price_impact": impact}
 

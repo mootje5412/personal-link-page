@@ -78,7 +78,7 @@ async def get_token_balance_raw(owner_pubkey: str, token_mint: str) -> int:
     return await _with_rpc(_fetch)
 
 
-async def confirm_transaction(signature: str, timeout_sec: int = 45) -> bool:
+async def confirm_transaction(signature: str, timeout_sec: int = 60) -> bool:
     import asyncio
 
     async def _check(client):
