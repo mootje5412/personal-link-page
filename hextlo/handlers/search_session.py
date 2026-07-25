@@ -8,6 +8,7 @@ def save_search_session(context, response: SearchResponse) -> None:
         "message": response.message,
         "api_connected": response.api_connected,
         "total": response.count,
+        "label": response.label,
         "results": [{"title": r.title, "fields": dict(r.fields)} for r in response.results],
     }
 
@@ -28,4 +29,5 @@ def load_search_session(context) -> SearchResponse | None:
         total=int(data.get("total") or len(results)),
         api_connected=bool(data.get("api_connected", True)),
         message=str(data.get("message") or ""),
+        label=str(data.get("label") or ""),
     )

@@ -17,7 +17,7 @@ def page_count(total: int, page_size: int | None = None) -> int:
 
 
 def format_search_page(response: SearchResponse, page: int = 0) -> str:
-    label = SEARCH_LABELS.get(response.search_type, "Search")
+    label = response.label or SEARCH_LABELS.get(response.search_type, "Search")
     header = f"{label}\nQuery: {response.query}\n"
 
     if not response.api_connected:
@@ -58,10 +58,9 @@ def format_welcome(first_name: str) -> str:
         "Examples:\n"
         "• 418-90-8868 — SSN lookup\n"
         "• John Smith — name search\n"
-        "• John Smith CA — Intelius\n"
+        "• John Smith CA — name + state\n"
         "• John Smith Los Angeles CA — criminal\n"
         "• 5551234567 — phone lookup\n"
         "• 1HGBH41JXMN109186 — VIN\n\n"
-        "Best accuracy with commas:\n"
         "John, Smith, Los Angeles, CA"
     )

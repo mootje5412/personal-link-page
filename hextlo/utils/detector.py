@@ -5,8 +5,8 @@ from models.search import DetectedSearch, SearchType
 VIN_PATTERN = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$", re.IGNORECASE)
 SSN_PATTERN = re.compile(r"^\d{3}-?\d{2}-?\d{4}$")
 PHONE_PATTERN = re.compile(r"^\+?1?[\d\s().-]{10,20}$")
-STATE_PATTERN = re.compile(r"^[A-Za-z]{2}$")
 ZIP_PATTERN = re.compile(r"^\d{5}(?:-\d{4})?$")
+NAME_PART_PATTERN = re.compile(r"^[A-Za-z][A-Za-z'.-]*$")
 
 US_STATES = {
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA",
@@ -14,6 +14,8 @@ US_STATES = {
     "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT",
     "VA", "WA", "WV", "WI", "WY", "DC",
 }
+
+NATIONWIDE_STATE = "XX"
 
 
 def _comma_query(parts: list[str]) -> str:
@@ -61,6 +63,30 @@ def _is_state(value: str) -> bool:
     return value.upper() in US_STATES
 
 
+def _looks_like_name_part(value: str) -> bool:
+    return bool(NAME_PART_PATTERN.match(value.strip()))
+
+
+def _name_search(first: str, last: str, state: str = NATIONWIDE_STATE) -> DetectedSearch:
+    display = f"{first} {last}" if state == NATIONWIDE_STATE else f"{first} {last} {state}"
+    label = "Name Search" if state == NATIONWIDE_STATE else "Criminal Lookup"
+    return DetectedSearch(
+        SearchType.CRIMINAL,
+        _comma_query([first, last, state.upper()]),
+        display,
+        label=label,
+    )
+
+
+def _criminal_search(first: str, last: str, city: str, state: str) -> DetectedSearch:
+    return DetectedSearch(
+        SearchType.CRIMINAL,
+        _comma_query([first, last, city, state.upper()]),
+        f"{first} {last} {city} {state.upper()}",
+        label="Criminal Lookup",
+    )
+
+
 def detect_search(text: str) -> DetectedSearch | None:
     raw = text.strip()
     if not raw or raw.startswith("/"):
@@ -69,77 +95,57 @@ def detect_search(text: str) -> DetectedSearch | None:
     if "," in raw:
         parts = [part.strip() for part in raw.split(",") if part.strip()]
         if len(parts) >= 4:
-            return DetectedSearch(
-                SearchType.CRIMINAL,
-                _comma_query(parts[:4]),
-                raw,
-            )
+            return _criminal_search(parts[0], parts[1], parts[2], parts[3])
         if len(parts) == 3:
-            if _looks_like_ssn(parts[0]) or _looks_like_phone(parts[0]):
-                return DetectedSearch(SearchType.SSN, normalize_ssn(parts[0]), raw)
-            return DetectedSearch(
-                SearchType.INTELIUS,
-                _comma_query([parts[0], parts[1], parts[2].upper() if _is_state(parts[2]) else parts[2]]),
-                raw,
-            )
+            if _looks_like_ssn(parts[0]):
+                return DetectedSearch(SearchType.SSN, normalize_ssn(parts[0]), raw, label="SSN Search")
+            if _is_state(parts[2]):
+                return _name_search(parts[0], parts[1], parts[2])
+            return _name_search(parts[0], " ".join(parts[1:]))
         if len(parts) == 2:
             left, right = parts
             if _looks_like_ssn(left) or _looks_like_ssn(right):
-                return DetectedSearch(SearchType.SSN, normalize_ssn(left if _looks_like_ssn(left) else right), raw)
+                ssn = left if _looks_like_ssn(left) else right
+                return DetectedSearch(SearchType.SSN, normalize_ssn(ssn), raw, label="SSN Search")
             if _looks_like_phone(left) or _looks_like_phone(right):
-                return DetectedSearch(SearchType.MOBILE, _comma_query([normalize_phone(left), right]), raw)
-            return DetectedSearch(SearchType.SSN, _comma_query([left, right]), raw)
+                return DetectedSearch(
+                    SearchType.MOBILE,
+                    _comma_query([normalize_phone(left if _looks_like_phone(left) else right), ""]),
+                    raw,
+                    label="Mobile Lookup",
+                )
+            return _name_search(left, right)
 
     compact = raw.replace(" ", "").upper()
     if _looks_like_vin(compact):
-        return DetectedSearch(SearchType.VIN, compact, raw)
+        return DetectedSearch(SearchType.VIN, compact, raw, label="VIN Search")
 
     if _looks_like_ssn(raw):
-        return DetectedSearch(SearchType.SSN, normalize_ssn(raw), raw)
+        return DetectedSearch(SearchType.SSN, normalize_ssn(raw), raw, label="SSN Search")
 
     if _looks_like_phone(raw):
         phone = normalize_phone(raw)
-        return DetectedSearch(SearchType.MOBILE, _comma_query([phone, phone]), raw)
-
-    if ZIP_PATTERN.match(raw):
-        return DetectedSearch(SearchType.SSN, raw, raw)
+        return DetectedSearch(
+            SearchType.MOBILE,
+            _comma_query([phone, phone]),
+            raw,
+            label="Mobile Lookup",
+        )
 
     words = raw.split()
     if len(words) >= 4 and _is_state(words[-1]):
         state = words[-1].upper()
         if len(words) == 4:
-            first, last, city = words[0], words[1], words[2]
-        else:
-            first, last, city = words[0], words[1], " ".join(words[2:-1])
-        return DetectedSearch(
-            SearchType.CRIMINAL,
-            _comma_query([first, last, city, state]),
-            raw,
-        )
+            return _criminal_search(words[0], words[1], words[2], state)
+        return _criminal_search(words[0], words[1], " ".join(words[2:-1]), state)
 
     if len(words) == 3 and _is_state(words[-1]):
-        return DetectedSearch(
-            SearchType.INTELIUS,
-            _comma_query([words[0], words[1], words[2].upper()]),
-            raw,
-        )
+        return _name_search(words[0], words[1], words[-1])
 
-    if len(words) == 3:
-        return DetectedSearch(
-            SearchType.SSN,
-            _comma_query([words[0], " ".join(words[1:])]),
-            raw,
-        )
-
-    if len(words) == 2:
-        return DetectedSearch(
-            SearchType.SSN,
-            _comma_query([words[0], words[1]]),
-            raw,
-        )
-
-    if len(words) == 1 and len(words[0]) >= 3:
-        return DetectedSearch(SearchType.SSN, words[0], raw)
+    if len(words) >= 2 and all(_looks_like_name_part(word) for word in words):
+        if len(words) == 2:
+            return _name_search(words[0], words[1])
+        return _name_search(words[0], " ".join(words[1:]))
 
     return None
 
@@ -148,11 +154,11 @@ def format_detection_hint() -> str:
     return (
         "Could not detect that search. Try:\n\n"
         "• 418-90-8868 — SSN lookup\n"
-        "• John Smith — name search\n"
-        "• John Smith CA — Intelius\n"
-        "• John Smith Los Angeles CA — criminal\n"
-        "• 5551234567 — phone / mobile\n"
+        "• John Doe — name search\n"
+        "• John Doe CA — name + state\n"
+        "• John Doe Los Angeles CA — criminal\n"
+        "• 5551234567 — phone lookup\n"
         "• 1HGBH41JXMN109186 — VIN\n\n"
-        "Comma format is most accurate:\n"
-        "John, Smith, Los Angeles, CA"
+        "Comma format:\n"
+        "John, Doe, CA"
     )

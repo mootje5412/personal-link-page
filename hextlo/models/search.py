@@ -25,6 +25,7 @@ class DetectedSearch:
     search_type: SearchType
     api_query: str
     display_query: str
+    label: str = ""
 
 
 @dataclass
@@ -57,6 +58,7 @@ class SearchResponse:
     total: int = 0
     api_connected: bool = True
     message: str = ""
+    label: str = ""
     raw: Any = None
 
     @property

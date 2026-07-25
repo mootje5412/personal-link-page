@@ -3,7 +3,6 @@ from telegram.ext import ContextTypes
 
 from bot.keyboards.pagination import pagination_keyboard
 from handlers.search_session import load_search_session, save_search_session
-from models.search import SEARCH_LABELS
 from services.registry import run_detected_search
 from utils.detector import detect_search, format_detection_hint
 from utils.formatting import format_search_page
@@ -23,7 +22,7 @@ async def handle_text_search(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await message.reply_text(format_detection_hint())
         return
 
-    label = SEARCH_LABELS.get(detected.search_type, "Search")
+    label = detected.label or "records"
     await message.reply_chat_action("typing")
     status = await message.reply_text(f"Searching {label.lower()}...")
     user_id = update.effective_user.id if update.effective_user else 0

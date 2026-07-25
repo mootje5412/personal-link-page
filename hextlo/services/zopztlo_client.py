@@ -28,6 +28,13 @@ FIELD_ALIASES = {
     "case": "Case",
     "court": "Court",
     "offense": "Offense",
+    "offensecode": "Offense Code",
+    "chargesfileddate": "Charges Filed",
+    "agency": "Agency",
+    "age": "Age",
+    "height": "Height",
+    "weight": "Weight",
+    "sex": "Sex",
     "status": "Status",
 }
 
@@ -165,11 +172,16 @@ def _parse_results(payload: Any, search_type: SearchType | None = None) -> tuple
 
 
 class ZopzTloClient:
+    def _response(self, detected: DetectedSearch, **kwargs) -> SearchResponse:
+        kwargs.setdefault("search_type", detected.search_type)
+        kwargs.setdefault("query", detected.display_query)
+        kwargs.setdefault("label", detected.label)
+        return SearchResponse(**kwargs)
+
     async def search(self, detected: DetectedSearch) -> SearchResponse:
         if not settings.api_key:
-            return SearchResponse(
-                search_type=detected.search_type,
-                query=detected.display_query,
+            return self._response(
+                detected,
                 api_connected=False,
                 message="API key is not configured.",
             )
@@ -185,34 +197,17 @@ class ZopzTloClient:
                 response.raise_for_status()
                 payload = response.json()
         except httpx.TimeoutException:
-            return SearchResponse(
-                search_type=detected.search_type,
-                query=detected.display_query,
-                message="Search timed out. Try again.",
-            )
+            return self._response(detected, message="Search timed out. Try again.")
         except httpx.HTTPStatusError as error:
-            return SearchResponse(
-                search_type=detected.search_type,
-                query=detected.display_query,
-                message=f"API error {error.response.status_code}.",
-            )
+            return self._response(detected, message=f"API error {error.response.status_code}.")
         except ValueError:
-            return SearchResponse(
-                search_type=detected.search_type,
-                query=detected.display_query,
-                message="API returned invalid JSON.",
-            )
+            return self._response(detected, message="API returned invalid JSON.")
         except httpx.HTTPError as error:
-            return SearchResponse(
-                search_type=detected.search_type,
-                query=detected.display_query,
-                message=f"Network error: {error}",
-            )
+            return self._response(detected, message=f"Network error: {error}")
 
         results, total, message = _parse_results(payload, detected.search_type)
-        return SearchResponse(
-            search_type=detected.search_type,
-            query=detected.display_query,
+        return self._response(
+            detected,
             results=results,
             total=total,
             message=message,
