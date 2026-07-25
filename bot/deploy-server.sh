@@ -25,10 +25,26 @@ echo "==> Installing on server..."
 sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   "${USER}@${SERVER}" "REMOTE_DIR='${REMOTE_DIR}' bash -s" << 'REMOTE'
 set -euo pipefail
+
+echo "==> Stopping old bots..."
+pm2 delete apexsearch 2>/dev/null || true
+pm2 delete findnow 2>/dev/null || true
+pkill -f "/root/findnow-bot" 2>/dev/null || true
+pkill -f "node index.js" 2>/dev/null || true
+rm -rf /root/findnow-bot
+sleep 1
+
 cd "$REMOTE_DIR"
 tar -xzf apexsearch-bot.tar.gz
 rm -f apexsearch-bot.tar.gz
 mkdir -p data
+
+cat > .env << 'EOF'
+TELEGRAM_BOT_TOKEN=8296025702:AAFxh2r7gxJSOkAbYkQtuKxCDLA7zCFPZGY
+OWNER_ID=8073205490
+INTEL_API_KEY=2aaef599-fcf9-461c-b996-69e5e5d71ee2
+INTEL_BASE_URL=https://www.osintcat.net/api
+EOF
 
 if ! command -v node >/dev/null 2>&1; then
   echo "Installing Node.js 20..."
@@ -45,22 +61,11 @@ if ! command -v pm2 >/dev/null 2>&1; then
   npm install -g pm2
 fi
 
-if [ ! -f .env ]; then
-  echo "WARNING: .env not found on server — create it before first deploy."
-else
-  grep -q '^INTEL_BASE_URL=' .env || echo 'INTEL_BASE_URL=https://www.osintcat.net/api' >> .env
-fi
-
 npm install --production
-
-pm2 delete apexsearch 2>/dev/null || true
-pm2 delete findnow 2>/dev/null || true
-pkill -f "/root/findnow-bot" 2>/dev/null || true
-pkill -f "node index.js" 2>/dev/null || true
-sleep 1
 
 pm2 start index.js --name apexsearch --cwd "$REMOTE_DIR"
 pm2 save
+pm2 startup systemd -u root --hp /root 2>/dev/null || true
 
 sleep 2
 pm2 status apexsearch
