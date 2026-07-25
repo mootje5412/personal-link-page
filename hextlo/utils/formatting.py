@@ -24,7 +24,11 @@ def format_search_response(response: SearchResponse) -> str:
 
     lines = [header, f"Found {response.count} result(s):\n"]
     for index, result in enumerate(response.results[: settings.max_results], start=1):
-        lines.append(f"{index}. {result.to_text()}\n")
+        block = result.to_text()
+        if response.search_type.value == "vinsearch":
+            lines.append(block + "\n")
+        else:
+            lines.append(f"{index}. {block}\n")
 
     remaining = response.count - settings.max_results
     if remaining > 0:
@@ -36,13 +40,14 @@ def format_search_response(response: SearchResponse) -> str:
 def format_welcome(first_name: str) -> str:
     return (
         f"Welcome to HexTLO, {first_name}.\n\n"
-        "Just type what you want to search — I'll detect the lookup type automatically.\n\n"
+        "Type anything to search. I auto-detect the lookup type.\n\n"
         "Examples:\n"
-        "• John Smith — SSN / name search\n"
+        "• 418-90-8868 — SSN lookup\n"
+        "• John Smith — name search\n"
         "• John Smith CA — Intelius\n"
-        "• John Smith Los Angeles CA — criminal lookup\n"
-        "• 5551234567 — mobile lookup\n"
-        "• 1HGBH41JXMN109186 — VIN search\n\n"
-        "Use commas for exact matching:\n"
+        "• John Smith Los Angeles CA — criminal\n"
+        "• 5551234567 — phone lookup\n"
+        "• 1HGBH41JXMN109186 — VIN\n\n"
+        "Best accuracy with commas:\n"
         "John, Smith, Los Angeles, CA"
     )
