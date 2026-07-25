@@ -1,5 +1,6 @@
-#!/bin/bash
-set -euo pipefail
+#!/usr/bin/env bash
+set -e
+set -u
 
 SERVER="${DEPLOY_SERVER:-109.71.252.128}"
 USER="${DEPLOY_USER:-root}"

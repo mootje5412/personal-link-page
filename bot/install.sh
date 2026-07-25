@@ -1,19 +1,25 @@
-#!/bin/bash
-set -euo pipefail
+#!/usr/bin/env bash
+# Re-exec with bash if launched via sh/dash
+if [ -z "${BASH_VERSION:-}" ]; then
+  exec /bin/bash "$0" "$@"
+fi
+
+set -e
+set -u
 
 # ApexSearch — one-command server install/update
 #
-# Option A — clone repo then install:
-#   git clone -b cursor/telegram-bot-setup-326b https://github.com/mootje5412/personal-link-page.git
-#   cd personal-link-page/bot && bash install.sh
+# Fresh install or update:
+#   rm -rf /tmp/apex && git clone -b cursor/telegram-bot-setup-326b https://github.com/mootje5412/personal-link-page.git /tmp/apex && bash /tmp/apex/bot/install.sh
 #
-# Option B — one-liner (public repo):
-#   curl -fsSL https://raw.githubusercontent.com/mootje5412/personal-link-page/cursor/telegram-bot-setup-326b/bot/install.sh | bash
+# Or from an existing clone:
+#   cd /tmp/apex/bot && bash install.sh
 
 REPO="${APEX_REPO:-https://github.com/mootje5412/personal-link-page.git}"
 BRANCH="${APEX_BRANCH:-cursor/telegram-bot-setup-326b}"
 INSTALL_DIR="${APEX_DIR:-/root/apexsearch-bot}"
 OLD_DIR="/root/findnow-bot"
+CLONE_DIR="/tmp/apexsearch-deploy"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "==> Stopping old bots..."
@@ -38,11 +44,11 @@ else
     apt-get update -qq
     apt-get install -y -qq git
   fi
-  rm -rf /tmp/apexsearch-deploy
-  git clone --depth 1 -b "$BRANCH" "$REPO" /tmp/apexsearch-deploy
+  rm -rf "$CLONE_DIR"
+  git clone --depth 1 -b "$BRANCH" "$REPO" "$CLONE_DIR"
   rm -rf "$INSTALL_DIR"
-  mv /tmp/apexsearch-deploy/bot "$INSTALL_DIR"
-  rm -rf /tmp/apexsearch-deploy
+  mv "$CLONE_DIR/bot" "$INSTALL_DIR"
+  rm -rf "$CLONE_DIR"
 fi
 
 cd "$INSTALL_DIR"
