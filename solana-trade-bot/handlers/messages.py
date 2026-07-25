@@ -14,7 +14,7 @@ Or ask the AI anything — just type your question.
 WELCOME_BACK = """
 Welcome back. Your bot is ready.
 
-Check the dashboard for performance, run a scan to see the best buys, or ask the AI a question.
+Run Best Buys for ranked picks with full breakdowns, check the dashboard for your portfolio, or ask the AI anything.
 """
 
 HELP = """

@@ -11,6 +11,21 @@ BOT_SECRET_KEY = os.getenv("BOT_SECRET_KEY", "").strip()
 SOLANA_RPC_URL = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com").strip()
 WEBAPP_URL = os.getenv("WEBAPP_URL", "").strip()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
+JUPITER_API_KEY = os.getenv("JUPITER_API_KEY", "").strip()
+
+# Jupiter v1 API (v6 quote-api.jup.ag is deprecated / DNS dead)
+JUPITER_QUOTE_URLS = [
+    u.strip() for u in os.getenv(
+        "JUPITER_QUOTE_URLS",
+        "https://lite-api.jup.ag/swap/v1/quote,https://api.jup.ag/swap/v1/quote",
+    ).split(",") if u.strip()
+]
+JUPITER_SWAP_URLS = [
+    u.strip() for u in os.getenv(
+        "JUPITER_SWAP_URLS",
+        "https://lite-api.jup.ag/swap/v1/swap,https://api.jup.ag/swap/v1/swap",
+    ).split(",") if u.strip()
+]
 
 SOLANA_RPC_FALLBACKS = [
     u.strip() for u in os.getenv(

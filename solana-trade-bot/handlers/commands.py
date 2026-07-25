@@ -60,7 +60,7 @@ from services.ai_scorer import rank_coins
 from services.crypto_store import encrypt_private_key
 from services.portfolio import get_unrealized_pnl
 from services.scanner import scan_meme_coins, get_token_price_cached
-from services.trader import auto_trader, cache_scan_results, get_cached_coin
+from services.trader import auto_trader, cache_scan_results, get_autotrade_status, get_cached_coin
 from services.wallet import get_balance_sol, keypair_from_private_key, validate_pubkey
 
 logger = logging.getLogger(__name__)
@@ -214,7 +214,10 @@ async def _format_dashboard(user_id: int) -> str:
     if user.get("wallet_pubkey"):
         bal = await get_balance_sol(user["wallet_pubkey"])
 
-    return format_dashboard(user, stats, best, bal, unrealized, positions, position_details)
+    return format_dashboard(
+        user, stats, best, bal, unrealized, positions, position_details,
+        get_autotrade_status(user_id),
+    )
 
 
 async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

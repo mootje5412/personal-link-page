@@ -31,10 +31,19 @@ from services.wallet import get_balance_sol, get_token_balance_raw, keypair_from
 logger = logging.getLogger(__name__)
 
 _low_balance_warned: dict[int, float] = {}
+_fail_warned: dict[int, float] = {}
+_no_candidate_warned: dict[int, float] = {}
 WARN_COOLDOWN_SEC = 3600
 
 # Cache last scan for manual buy buttons
 _last_scan: dict[str, MemeCoin] = {}
+
+# Per-user autotrade status for dashboard
+_autotrade_status: dict[int, dict] = {}
+
+
+def get_autotrade_status(user_id: int) -> dict:
+    return _autotrade_status.get(user_id, {})
 
 
 class AutoTrader:
@@ -71,6 +80,11 @@ class AutoTrader:
             except Exception as exc:
                 logger.error("Notify failed %s: %s", user_id, exc)
 
+    def _set_status(self, user_id: int, **fields) -> None:
+        status = _autotrade_status.setdefault(user_id, {})
+        status.update(fields)
+        status["updated_at"] = time.time()
+
     async def _scan_loop(self) -> None:
         while self._running:
             try:
@@ -79,6 +93,7 @@ class AutoTrader:
                         await self._process_buys(user)
                     except Exception as exc:
                         logger.error("Buy user %s: %s", user["user_id"], exc)
+                        self._set_status(user["user_id"], last_error=str(exc), state="error")
             except Exception as exc:
                 logger.error("Scan loop: %s", exc)
             await asyncio.sleep(SCAN_INTERVAL_SEC)
@@ -100,11 +115,15 @@ class AutoTrader:
     async def _process_buys(self, user: dict) -> None:
         user_id = user["user_id"]
         if not user.get("encrypted_key"):
+            self._set_status(user_id, state="no_wallet_key")
             return
 
         open_positions = await get_open_positions(user_id)
         max_pos = int(user.get("max_positions") or 3)
         if len(open_positions) >= max_pos:
+            self._set_status(
+                user_id, state="max_positions", open_positions=len(open_positions), max_positions=max_pos,
+            )
             return
 
         balance = await get_balance_sol(user["wallet_pubkey"])
@@ -112,6 +131,9 @@ class AutoTrader:
         needed = trade_sol + MIN_RESERVE_SOL
 
         if balance < needed:
+            self._set_status(
+                user_id, state="low_balance", balance=balance, needed=needed,
+            )
             last = _low_balance_warned.get(user_id, 0)
             if time.time() - last > WARN_COOLDOWN_SEC:
                 _low_balance_warned[user_id] = time.time()
@@ -132,26 +154,73 @@ class AutoTrader:
         held = {p["token_mint"] for p in open_positions}
 
         candidates = []
+        blocked_samples = []
         for coin in ranked:
             if coin.mint in held or coin.mint in cooldown:
                 continue
             ok, reason = validate_entry(coin, min_score)
             if ok:
                 candidates.append(coin)
+            elif len(blocked_samples) < 3:
+                blocked_samples.append(f"${coin.symbol}: {reason}")
+
+        self._set_status(
+            user_id,
+            state="scanning",
+            scanned=len(ranked),
+            candidates=len(candidates),
+            balance=balance,
+            top_pick=f"${candidates[0].symbol}" if candidates else None,
+            blocked=blocked_samples,
+        )
+
+        if not candidates:
+            self._set_status(user_id, state="waiting", scanned=len(ranked), candidates=0)
+            last = _no_candidate_warned.get(user_id, 0)
+            if time.time() - last > WARN_COOLDOWN_SEC:
+                _no_candidate_warned[user_id] = time.time()
+                top = ranked[0] if ranked else None
+                detail = ""
+                if top:
+                    _, reason = validate_entry(top, min_score)
+                    detail = f"\nTop coin ${top.symbol} ({top.ai_score}/100) blocked: {reason}"
+                await self._notify_user(
+                    user_id,
+                    f"<b>Auto Trade — Waiting</b>\n\n"
+                    f"Scanned {len(ranked)} coins. None pass entry filters right now.{detail}\n\n"
+                    f"Try Balanced/Degen mode or run Best Buys to buy manually.",
+                    user,
+                )
+            return
 
         bought = 0
+        last_fail = ""
         for coin in candidates[:6]:
             current = await get_open_positions(user_id)
             if len(current) >= max_pos:
                 break
-            success = await self._buy(user, coin, trade_sol)
+            success, err = await self._buy(user, coin, trade_sol)
             if success:
                 bought += 1
-            if bought >= 1:
+                self._set_status(user_id, state="bought", last_buy=coin.symbol, last_buy_at=time.time())
                 break
+            last_fail = err
             await asyncio.sleep(2)
 
-    async def _buy(self, user: dict, coin: MemeCoin, trade_sol: float) -> bool:
+        if bought == 0 and last_fail:
+            self._set_status(user_id, state="swap_failed", last_error=last_fail, candidates=len(candidates))
+            last = _fail_warned.get(user_id, 0)
+            if time.time() - last > WARN_COOLDOWN_SEC:
+                _fail_warned[user_id] = time.time()
+                await self._notify_user(
+                    user_id,
+                    f"<b>Auto Trade — Buy Failed</b>\n\n"
+                    f"Found {len(candidates)} coin(s) but swap failed:\n{last_fail}\n\n"
+                    f"Retrying automatically. Check /dashboard for status.",
+                    user,
+                )
+
+    async def _buy(self, user: dict, coin: MemeCoin, trade_sol: float) -> tuple[bool, str]:
         user_id = user["user_id"]
         key = decrypt_private_key(user_id, user["encrypted_key"])
         kp = keypair_from_private_key(key)
@@ -185,10 +254,11 @@ class AutoTrader:
                 f"<a href='https://solscan.io/tx/{sig}'>Transaction</a> | <a href='{coin.url}'>Chart</a>"
             )
             await self._notify_user(user_id, msg, user)
-            return True
+            return True, ""
         except Exception as exc:
-            logger.warning("Buy fail %s: %s", coin.symbol, exc)
-            return False
+            err = str(exc)
+            logger.warning("Buy fail %s: %s", coin.symbol, err)
+            return False, f"${coin.symbol}: {err}"
 
     async def buy_coin(self, user: dict, mint: str) -> tuple[bool, str]:
         coin = _last_scan.get(mint) or await get_token_price_cached(mint)
@@ -199,20 +269,26 @@ class AutoTrader:
         if not ok:
             return False, f"Entry rejected: {reason}"
         trade_sol = float(user.get("trade_sol") or 0.05)
-        success = await self._buy(user, coin, trade_sol)
-        return success, f"Bought ${coin.symbol}" if success else "Swap failed — try again"
+        success, err = await self._buy(user, coin, trade_sol)
+        if success:
+            return True, f"Bought ${coin.symbol}"
+        return False, err or "Swap failed — try again"
 
     async def buy_top_coin(self, user: dict) -> tuple[bool, str]:
         coins = await scan_meme_coins()
         ranked = rank_coins(coins)
         min_score = float(user.get("min_ai_score") or 75)
+        last_err = ""
         for coin in ranked:
             ok, reason = validate_entry(coin, min_score)
             if ok:
                 trade_sol = float(user.get("trade_sol") or 0.05)
-                success = await self._buy(user, coin, trade_sol)
+                success, err = await self._buy(user, coin, trade_sol)
                 if success:
                     return True, f"Bought ${coin.symbol} ({coin.ai_score}/100)"
+                last_err = err
+        if last_err:
+            return False, last_err
         return False, "No coins pass entry filters right now"
 
     async def sell_all(self, user: dict) -> tuple[int, int]:

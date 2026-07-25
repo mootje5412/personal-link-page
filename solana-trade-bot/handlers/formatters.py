@@ -257,6 +257,43 @@ def format_position_detail(pos: dict, detail: dict, user: dict) -> str:
     return "\n".join(lines)
 
 
+def format_autotrade_status(status: dict, autotrade_on: bool) -> str:
+    if not autotrade_on:
+        return "Auto trade: Off"
+
+    state = status.get("state", "idle")
+    lines = ["<b>Auto Trade Status</b>"]
+
+    labels = {
+        "bought": "Last action: bought",
+        "scanning": "Scanning market",
+        "waiting": "Waiting for a good entry",
+        "swap_failed": "Swap failed — retrying",
+        "low_balance": "Low balance — paused",
+        "max_positions": "Max positions reached",
+        "no_wallet_key": "Wallet key missing",
+        "error": "Error",
+    }
+    lines.append(f"State: {labels.get(state, state)}")
+
+    if status.get("scanned"):
+        lines.append(f"Last scan: {status['scanned']} coins")
+    if status.get("candidates") is not None:
+        lines.append(f"Ready to buy: {status['candidates']} coin(s)")
+    if status.get("top_pick"):
+        lines.append(f"Top pick: {status['top_pick']}")
+    if status.get("last_buy"):
+        lines.append(f"Last buy: ${status['last_buy']}")
+    if status.get("last_error"):
+        lines.append(f"Issue: {status['last_error']}")
+    if status.get("blocked"):
+        lines.append("Blocked examples:")
+        for b in status["blocked"]:
+            lines.append(f"  - {b}")
+
+    return "\n".join(lines)
+
+
 def format_dashboard(
     user: dict,
     stats: dict,
@@ -265,6 +302,7 @@ def format_dashboard(
     unrealized: dict | None,
     positions: list[dict],
     position_details: list[dict],
+    autotrade_status: dict | None = None,
 ) -> str:
     autotrade = "Running" if user.get("autotrade") else "Paused"
     mode_label = PRESETS.get(user.get("risk_mode") or "balanced", PRESETS["balanced"])["label"]
@@ -327,6 +365,10 @@ def format_dashboard(
         f"Trail: -{float(user.get('trailing_stop_pct', 10))}%",
         f"Min AI score: {float(user.get('min_ai_score', 75))}/100",
     ])
+
+    if autotrade_status is not None:
+        lines.extend(["", format_autotrade_status(autotrade_status, bool(user.get("autotrade")))])
+
     return "\n".join(lines)
 
 

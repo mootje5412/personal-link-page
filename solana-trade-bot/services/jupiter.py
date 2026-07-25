@@ -6,12 +6,53 @@ from solana.rpc.async_api import AsyncClient
 from solana.rpc.types import TxOpts
 from solders.transaction import VersionedTransaction
 
-from config import MAX_PRICE_IMPACT_PCT, SOL_MINT, SOLANA_RPC_FALLBACKS, SOLANA_RPC_URL
+from config import (
+    JUPITER_API_KEY,
+    JUPITER_QUOTE_URLS,
+    JUPITER_SWAP_URLS,
+    MAX_PRICE_IMPACT_PCT,
+    SOL_MINT,
+    SOLANA_RPC_FALLBACKS,
+    SOLANA_RPC_URL,
+)
 
 logger = logging.getLogger(__name__)
 
-JUPITER_QUOTE = "https://quote-api.jup.ag/v6/quote"
-JUPITER_SWAP = "https://quote-api.jup.ag/v6/swap"
+
+def _jupiter_headers() -> dict[str, str]:
+    headers = {"Accept": "application/json"}
+    if JUPITER_API_KEY:
+        headers["x-api-key"] = JUPITER_API_KEY
+    return headers
+
+
+async def _request_with_fallback(
+    method: str,
+    urls: list[str],
+    *,
+    params: dict | None = None,
+    json: dict | None = None,
+) -> httpx.Response:
+    last_err = None
+    headers = _jupiter_headers()
+    for url in urls:
+        for attempt in range(+2):
+            try:
+                async with httpx.AsyncClient(timeout=30, headers=headers) as client:
+                    if method == "GET":
+                        resp = await client.get(url, params=params)
+                    else:
+                        resp = await client.post(url, json=json)
+                    if resp.status_code == 400:
+                        detail = resp.text[:200]
+                        raise ValueError(f"No route available ({detail})")
+                    resp.raise_for_status()
+                    return resp
+            except Exception as exc:
+                last_err = exc
+                logger.warning("Jupiter %s failed (%s): %s", url, attempt + 1, exc)
+                await asyncio.sleep(0.5 + attempt)
+    raise ValueError(f"Quote failed: {last_err}")
 
 
 async def get_quote(input_mint: str, output_mint: str, amount: int, slippage_bps: int = 300) -> dict:
@@ -22,19 +63,8 @@ async def get_quote(input_mint: str, output_mint: str, amount: int, slippage_bps
         "slippageBps": str(slippage_bps),
         "onlyDirectRoutes": "false",
     }
-    last_err = None
-    for attempt in range(3):
-        try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.get(JUPITER_QUOTE, params=params)
-                if resp.status_code == 400:
-                    raise ValueError(f"No route available")
-                resp.raise_for_status()
-                return resp.json()
-        except Exception as exc:
-            last_err = exc
-            await asyncio.sleep(1 + attempt)
-    raise ValueError(f"Quote failed: {last_err}")
+    resp = await _request_with_fallback("GET", JUPITER_QUOTE_URLS, params=params)
+    return resp.json()
 
 
 def _price_impact_pct(quote: dict) -> float:
@@ -52,10 +82,8 @@ async def build_swap_transaction(quote: dict, user_pubkey: str) -> dict:
         "dynamicComputeUnitLimit": True,
         "prioritizationFeeLamports": "auto",
     }
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(JUPITER_SWAP, json=payload)
-        resp.raise_for_status()
-        return resp.json()
+    resp = await _request_with_fallback("POST", JUPITER_SWAP_URLS, json=payload)
+    return resp.json()
 
 
 async def _send_with_fallback(keypair, swap_data: dict) -> str:
