@@ -56,7 +56,18 @@ class ApexSearchBot {
 
     this.bot.on('message', (msg) => {
       if (!msg.text || msg.text.startsWith('/')) return;
-      messageHandler.handleMessage(this.bot, msg);
+      messageHandler.handleMessage(this.bot, msg).catch((error) => {
+        console.error('Unhandled message error:', error);
+        this.bot.sendMessage(
+          msg.chat.id,
+          require('./utils/messages').errorMessage('Error', 'Something went wrong processing your request.'),
+          { parse_mode: 'HTML', reply_markup: require('./utils/keyboards').supportKeyboard() }
+        ).catch(() => {});
+      });
+    });
+
+    process.on('unhandledRejection', (error) => {
+      console.error('Unhandled rejection:', error);
     });
 
     this.bot.on('polling_error', (error) => {

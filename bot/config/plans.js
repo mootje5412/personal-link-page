@@ -9,15 +9,16 @@ module.exports = {
     machineViewer: false,
     features: [
       'Unlimited OSINT searches',
-      'Breach & stealer databases',
+      'Breach and stealer databases',
       'Email, phone, IP, username lookup',
+      'Discord, Roblox, social resolvers',
       'Paginated results'
     ]
   },
   premium: {
     id: 'premium',
     name: 'Premium',
-    price: '25,00',
+    price: '20,00',
     currency: 'EUR',
     period: 'month',
     searches: 'unlimited',

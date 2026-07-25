@@ -10,13 +10,19 @@ const {
   planDetailMessage,
   premiumRequiredMessage,
   machineProgressMessage,
-  escapeHtml
+  errorMessage,
+  noResultsMessage,
+  machineNoResultsMessage,
+  escapeHtml,
+  purchaseLine
 } = require('../utils/messages');
 const {
   mainMenuKeyboard,
   backToStartKeyboard,
-  pricingKeyboard
+  pricingKeyboard,
+  supportKeyboard
 } = require('../utils/keyboards');
+const PLANS = require('../../config/plans');
 
 class CommandHandler {
   isOwner(userId) {
@@ -53,7 +59,9 @@ class CommandHandler {
           '',
           'No active subscription.',
           '',
-          'Use /prices to view plans.'
+          'Use /prices to view plans.',
+          '',
+          purchaseLine()
         ].join('\n'),
         { parse_mode: 'HTML', reply_markup: backToStartKeyboard() }
       );
@@ -93,7 +101,9 @@ class CommandHandler {
         `Username: ${escapeHtml(username)}`,
         `Name: ${escapeHtml([msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || 'N/A')}`,
         '',
-        'Send this ID to the owner to purchase access.'
+        'Send this ID to purchase access.',
+        '',
+        purchaseLine()
       ].join('\n'),
       { parse_mode: 'HTML', reply_markup: backToStartKeyboard() }
     );
@@ -128,8 +138,8 @@ class CommandHandler {
           '<code>/grant &lt;user_id&gt; &lt;plan&gt; &lt;days&gt;</code>',
           '',
           '<b>Plans</b>',
-          '<code>basic</code> — unlimited searches (€12,50/month)',
-          '<code>premium</code> — unlimited searches + Machine Viewer (€25,00/month)',
+          `<code>basic</code> — unlimited searches (€${PLANS.basic.price}/month)`,
+          `<code>premium</code> — unlimited + Machine Viewer (€${PLANS.premium.price}/month)`,
           '',
           '<b>Examples</b>',
           '<code>/grant @john basic 30</code>',
@@ -248,22 +258,25 @@ class CommandHandler {
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
 
       if (machines.length === 0) {
-        bot.sendMessage(
-          chatId,
-          `<b>Machine Viewer</b>\n\nNo machines found for: <code>${escapeHtml(query)}</code>`,
-          { parse_mode: 'HTML' }
-        );
+        bot.sendMessage(chatId, machineNoResultsMessage(query), {
+          parse_mode: 'HTML',
+          reply_markup: supportKeyboard()
+        });
         return;
       }
 
       await machinePaginationHandler.sendPage(bot, chatId, query, machines, 0);
     } catch (error) {
       console.error('Machine search error:', error);
-      bot.editMessageText(
-        `<b>Machine Viewer</b>\n\nSearch failed for: <code>${escapeHtml(query)}</code>`,
-        { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' }
-      ).catch(() => {
-        bot.sendMessage(chatId, 'Machine search failed.');
+      const text = errorMessage('Machine Search Failed', 'Could not complete machine lookup.');
+
+      bot.editMessageText(text, {
+        chat_id: chatId,
+        message_id: statusMsg.message_id,
+        parse_mode: 'HTML',
+        reply_markup: supportKeyboard()
+      }).catch(() => {
+        bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: supportKeyboard() });
       });
     }
   }

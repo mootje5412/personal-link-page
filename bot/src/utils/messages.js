@@ -9,7 +9,15 @@ function escapeHtml(text) {
 }
 
 function header(title) {
-  return `<b>${escapeHtml(config.botName.toUpperCase())}</b>\n<code>${'─'.repeat(20)}</code>\n<b>${escapeHtml(title)}</b>`;
+  return `<b>${escapeHtml(config.botName.toUpperCase())}</b>\n<code>${'─'.repeat(22)}</code>\n<b>${escapeHtml(title)}</b>`;
+}
+
+function supportLine() {
+  return `Support: ${config.supportContact}`;
+}
+
+function purchaseLine() {
+  return `Purchase: DM ${config.supportContact} with your User ID.`;
 }
 
 function welcomeMessage(firstName) {
@@ -18,16 +26,19 @@ function welcomeMessage(firstName) {
     '',
     `Welcome, <b>${escapeHtml(firstName)}</b>.`,
     '',
-    'ApexSearch is an OSINT intelligence platform.',
-    'Send any query to search breach, stealer, and public data sources.',
+    'ApexSearch is a private OSINT intelligence platform.',
+    'Send any query to search breach, stealer, social, and network sources instantly.',
+    '',
+    '<b>Quick start</b>',
+    'Type a username, email, phone, IP, or Discord ID.',
     '',
     '<b>Commands</b>',
-    '<code>/start</code> — Main menu',
-    '<code>/prices</code> — View plans',
-    '<code>/account</code> — Your subscription',
-    '<code>/machine &lt;name&gt;</code> — Machine lookup (Premium)',
+    '<code>/start</code>  Main menu',
+    '<code>/prices</code>  Plans and payment',
+    '<code>/account</code>  Your subscription',
+    '<code>/machine &lt;name&gt;</code>  Machine lookup (Premium)',
     '',
-    'Type a query below to begin.'
+    purchaseLine()
   ].join('\n');
 }
 
@@ -35,18 +46,20 @@ function howItWorksMessage() {
   return [
     header('How It Works'),
     '',
-    '1. Send any search term as a plain message',
-    '2. ApexSearch queries multiple OSINT sources in parallel',
-    '3. Results are returned in pages of 10',
-    '4. Navigate with Prev / Next buttons',
+    '1. Send any search term as a message',
+    '2. ApexSearch scans all relevant databases in parallel',
+    '3. Results appear in clean pages of 10',
+    '4. Use Prev / Next to browse',
     '',
-    '<b>Supported queries</b>',
-    'Usernames, emails, phone numbers, IP addresses, Discord IDs, and general terms.',
+    '<b>Supported</b>',
+    'Emails, usernames, phones, IPs, Discord IDs, domains, VINs, and more.',
     '',
-    '<b>Example</b>',
+    '<b>Examples</b>',
     '<code>john@gmail.com</code>',
     '<code>192.168.1.1</code>',
-    '<code>username123</code>'
+    '<code>cooluser123</code>',
+    '',
+    supportLine()
   ].join('\n');
 }
 
@@ -54,18 +67,17 @@ function aiSearchMessage() {
   return [
     header('AI Search'),
     '',
-    'ApexSearch uses intelligent query detection to route your search to the right sources automatically.',
+    'Smart query detection routes your search automatically.',
     '',
-    '<b>Detection</b>',
-    'Email — breach and credential databases',
-    'Phone — carrier and leak lookup',
-    'IP — geolocation and WHOIS',
-    'Username — cross-platform matching',
-    'Discord ID — profile enrichment',
+    'Email — breach and credential data',
+    'Phone — carrier and leak intelligence',
+    'IP — geolocation, DNS, and WHOIS',
+    'Username — cross-platform and footprint scan',
+    'Discord — profile and linked accounts',
     '',
-    'Results are ranked and deduplicated before delivery.',
+    'All sources run in parallel for fast results.',
     '',
-    'Live sources: breach, stealer, social, network, gaming, and footprint databases.'
+    supportLine()
   ].join('\n');
 }
 
@@ -76,19 +88,19 @@ function pricingMessage() {
   return [
     header('Pricing'),
     '',
-    `<b>${basic.name}</b> — €${basic.price}/${basic.period}`,
-    'Unlimited searches',
-    'Full OSINT database access',
+    `<b>${basic.name}</b>  €${basic.price}/${basic.period}`,
+    '  Unlimited searches',
+    '  Full database access',
     '',
-    `<b>${premium.name}</b> — €${premium.price}/${premium.period}`,
-    'Unlimited searches',
-    'Machine Viewer included',
-    '<code>/machine</code> command access',
+    `<b>${premium.name}</b>  €${premium.price}/${basic.period}`,
+    '  Unlimited searches',
+    '  Machine Viewer included',
+    '  <code>/machine</code> command',
     '',
-    '<b>Payment methods</b>',
-    ...config.paymentMethods.map((m) => `· ${m}`),
+    '<b>Payment</b>',
+    ...config.paymentMethods.map((m) => `  ${m}`),
     '',
-    'Contact the owner with your User ID to purchase.'
+    purchaseLine()
   ].join('\n');
 }
 
@@ -99,38 +111,77 @@ function planDetailMessage(planId) {
   return [
     header(`${plan.name} Plan`),
     '',
-    `Price: <b>€${plan.price}/${plan.period}</b>`,
-    `Searches: <b>${plan.searches}</b>`,
-    plan.machineViewer ? 'Machine Viewer: <b>included</b>' : 'Machine Viewer: <b>not included</b>',
+    `Price       <b>€${plan.price}/${plan.period}</b>`,
+    `Searches    <b>${plan.searches}</b>`,
+    `Machine     <b>${plan.machineViewer ? 'included' : 'not included'}</b>`,
     '',
     '<b>Includes</b>',
-    ...plan.features.map((f) => `· ${f}`),
+    ...plan.features.map((f) => `  ${f}`),
     '',
-    '<b>Payment methods</b>',
-    ...config.paymentMethods.map((m) => `· ${m}`),
+    '<b>Payment</b>',
+    ...config.paymentMethods.map((m) => `  ${m}`),
     '',
-    'Send your User ID to the owner to activate.'
+    purchaseLine()
   ].join('\n');
 }
 
 function noAccessMessage(reason) {
   return [
-    header('Access Denied'),
+    header('Access Required'),
     '',
     escapeHtml(reason),
     '',
-    'Use /prices to view plans or contact the owner.'
+    'Use /prices to view plans.',
+    purchaseLine()
   ].join('\n');
 }
 
 function premiumRequiredMessage() {
+  const premium = PLANS.premium;
   return [
     header('Premium Required'),
     '',
-    'Machine Viewer requires a Premium subscription.',
+    'Machine Viewer is a Premium feature.',
     '',
-    'Upgrade to Premium for €25,00/month.',
-    'Use /prices to view details.'
+    `Upgrade for <b>€${premium.price}/${premium.period}</b>.`,
+    'Use /prices or contact support to purchase.',
+    '',
+    purchaseLine()
+  ].join('\n');
+}
+
+function errorMessage(title, detail) {
+  return [
+    header(title),
+    '',
+    detail ? escapeHtml(detail) : 'An unexpected error occurred.',
+    '',
+    `If this keeps happening, DM ${config.supportContact}.`
+  ].join('\n');
+}
+
+function noResultsMessage(query) {
+  return [
+    header('No Results'),
+    '',
+    `Query: <code>${escapeHtml(query)}</code>`,
+    '',
+    'Nothing found across active sources.',
+    'Try a different term or format.',
+    '',
+    supportLine()
+  ].join('\n');
+}
+
+function machineNoResultsMessage(query) {
+  return [
+    header('Machine Viewer'),
+    '',
+    `Query: <code>${escapeHtml(query)}</code>`,
+    '',
+    'No machines matched this query.',
+    '',
+    supportLine()
   ].join('\n');
 }
 
@@ -142,9 +193,9 @@ function searchProgressMessage(query, count) {
   ];
 
   if (count > 0) {
-    lines.push(`Status: ${count} result${count === 1 ? '' : 's'} found...`);
+    lines.push(`Status: <b>${count}</b> result${count === 1 ? '' : 's'} found...`);
   } else {
-    lines.push('Status: scanning sources...');
+    lines.push('Status: scanning databases...');
   }
 
   return lines.join('\n');
@@ -155,7 +206,7 @@ function machineProgressMessage(query) {
     header('Machine Viewer'),
     '',
     `Query: <code>${escapeHtml(query)}</code>`,
-    'Status: searching machines...'
+    'Status: searching infected machines...'
   ].join('\n');
 }
 
@@ -164,8 +215,8 @@ function resultsHeader(query, page, totalPages, total) {
     header('Results'),
     '',
     `Query: <code>${escapeHtml(query)}</code>`,
-    `Page ${page + 1} of ${totalPages} — ${total} total`,
-    `<code>${'─'.repeat(20)}</code>`
+    `Page ${page + 1} of ${totalPages}  |  ${total} total`,
+    `<code>${'─'.repeat(22)}</code>`
   ].join('\n');
 }
 
@@ -174,14 +225,14 @@ function machineResultsHeader(query, page, totalPages, total) {
     header('Machine Viewer'),
     '',
     `Query: <code>${escapeHtml(query)}</code>`,
-    `Page ${page + 1} of ${totalPages} — ${total} machines`,
-    `<code>${'─'.repeat(20)}</code>`
+    `Page ${page + 1} of ${totalPages}  |  ${total} machines`,
+    `<code>${'─'.repeat(22)}</code>`
   ].join('\n');
 }
 
 function formatResultBlock(index, result) {
   const label = result.source || 'RESULT';
-  const lines = [`<b>[${index}]</b> ${escapeHtml(label)}`];
+  const lines = [`<b>[${index}]</b>  ${escapeHtml(label)}`];
 
   Object.entries(result.fields).forEach(([key, value]) => {
     lines.push(`${escapeHtml(key)}: <code>${escapeHtml(String(value))}</code>`);
@@ -192,7 +243,7 @@ function formatResultBlock(index, result) {
 
 function formatMachineBlock(index, machine) {
   const lines = [
-    `<b>[${index}]</b> ${escapeHtml(machine.name)}`,
+    `<b>[${index}]</b>  ${escapeHtml(machine.name)}`,
     `Files: <code>${machine.file_count}</code>`,
     `Size: <code>${machine.size}</code>`,
     `OS: <code>${escapeHtml(machine.os)}</code>`,
@@ -214,6 +265,9 @@ module.exports = {
   planDetailMessage,
   noAccessMessage,
   premiumRequiredMessage,
+  errorMessage,
+  noResultsMessage,
+  machineNoResultsMessage,
   searchProgressMessage,
   machineProgressMessage,
   resultsHeader,
@@ -221,5 +275,7 @@ module.exports = {
   formatResultBlock,
   formatMachineBlock,
   escapeHtml,
-  header
+  header,
+  supportLine,
+  purchaseLine
 };

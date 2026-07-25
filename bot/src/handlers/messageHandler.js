@@ -2,11 +2,14 @@ const config = require('../../config/config');
 const userService = require('../services/userService');
 const searchService = require('../services/searchService');
 const paginationHandler = require('./paginationHandler');
+const PLANS = require('../../config/plans');
 const {
   noAccessMessage,
   searchProgressMessage,
-  escapeHtml
+  errorMessage,
+  noResultsMessage
 } = require('../utils/messages');
+const { supportKeyboard } = require('../utils/keyboards');
 
 class MessageHandler {
   isOwner(userId) {
@@ -63,26 +66,25 @@ class MessageHandler {
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
 
       if (results.length === 0) {
-        bot.sendMessage(
-          chatId,
-          `<b>No Results</b>\n\nQuery: <code>${escapeHtml(query)}</code>\n\nTry a different term.`,
-          { parse_mode: 'HTML' }
-        );
+        bot.sendMessage(chatId, noResultsMessage(query), {
+          parse_mode: 'HTML',
+          reply_markup: supportKeyboard()
+        });
         return;
       }
 
       await paginationHandler.sendPage(bot, chatId, query, results, 0);
     } catch (error) {
       console.error('Search error:', error);
-      bot.editMessageText(
-        `<b>Search Failed</b>\n\nQuery: <code>${escapeHtml(query)}</code>`,
-        {
-          chat_id: chatId,
-          message_id: statusMsg.message_id,
-          parse_mode: 'HTML'
-        }
-      ).catch(() => {
-        bot.sendMessage(chatId, 'Search failed. Try again.');
+      const text = errorMessage('Search Failed', `Could not complete search for your query.`);
+
+      bot.editMessageText(text, {
+        chat_id: chatId,
+        message_id: statusMsg.message_id,
+        parse_mode: 'HTML',
+        reply_markup: supportKeyboard()
+      }).catch(() => {
+        bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: supportKeyboard() });
       });
     }
   }

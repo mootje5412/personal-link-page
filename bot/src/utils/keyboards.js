@@ -1,3 +1,5 @@
+const PLANS = require('../../config/plans');
+
 function mainMenuKeyboard() {
   return {
     inline_keyboard: [
@@ -10,7 +12,8 @@ function mainMenuKeyboard() {
         { text: 'My Account', callback_data: 'menu_account' }
       ],
       [
-        { text: 'My ID', callback_data: 'menu_myid' }
+        { text: 'My ID', callback_data: 'menu_myid' },
+        { text: 'Support', url: 'https://t.me/strafbaar' }
       ]
     ]
   };
@@ -18,17 +21,27 @@ function mainMenuKeyboard() {
 
 function backToStartKeyboard() {
   return {
-    inline_keyboard: [[{ text: 'Back to Menu', callback_data: 'menu_start' }]]
+    inline_keyboard: [
+      [{ text: 'Back to Menu', callback_data: 'menu_start' }],
+      [{ text: 'Contact Support', url: 'https://t.me/strafbaar' }]
+    ]
   };
 }
 
 function pricingKeyboard() {
   return {
     inline_keyboard: [
-      [{ text: 'Basic — €12,50/month', callback_data: 'price_basic' }],
-      [{ text: 'Premium — €25,00/month', callback_data: 'price_premium' }],
+      [{ text: `Basic — €${PLANS.basic.price}/month`, callback_data: 'price_basic' }],
+      [{ text: `Premium — €${PLANS.premium.price}/month`, callback_data: 'price_premium' }],
+      [{ text: 'Contact @strafbaar', url: 'https://t.me/strafbaar' }],
       [{ text: 'Back to Menu', callback_data: 'menu_start' }]
     ]
+  };
+}
+
+function supportKeyboard() {
+  return {
+    inline_keyboard: [[{ text: 'DM @strafbaar', url: 'https://t.me/strafbaar' }]]
   };
 }
 
@@ -52,5 +65,6 @@ module.exports = {
   mainMenuKeyboard,
   backToStartKeyboard,
   pricingKeyboard,
+  supportKeyboard,
   paginationKeyboard
 };
