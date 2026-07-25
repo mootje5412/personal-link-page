@@ -70,6 +70,34 @@ NPD_FIELD_MAP: list[tuple[str, str]] = [
 ]
 
 
+NAME_FIELD_MAP: list[tuple[str, str]] = [
+    ("SSN", "SSN"),
+    ("DOB", "DOB"),
+    ("Phone", "Phone"),
+    ("Address", "Address"),
+    ("Age", "Age"),
+    ("Sex", "Sex"),
+    ("State", "State"),
+    ("Offense", "Offense"),
+    ("Offense Code", "Offense Code"),
+    ("Charges Filed", "Charges Filed"),
+    ("Agency", "Agency"),
+]
+
+
+def format_name_result(result: SearchResult, index: int | None = None) -> str:
+    prefix = f"[{index}] " if index is not None else ""
+    lines = [f"{prefix}{result.title}", RECORD_LINE]
+
+    for field_key, label in NAME_FIELD_MAP:
+        value = result.fields.get(field_key, "").strip()
+        if _is_noise(value):
+            continue
+        lines.append(f"  {label}: {value}")
+
+    return "\n".join(lines)
+
+
 def format_npd_result(result: SearchResult, index: int | None = None) -> str:
     prefix = f"[{index}] " if index is not None else ""
     lines = [f"{prefix}{result.title}", RECORD_LINE]
@@ -169,6 +197,8 @@ def format_default_result(result: SearchResult, index: int) -> str:
 
 
 def format_result(result: SearchResult, search_type: SearchType, index: int | None = None) -> str:
+    if search_type == SearchType.NAME:
+        return format_name_result(result, index)
     if search_type == SearchType.PERSON:
         return format_npd_result(result, index)
     if search_type == SearchType.ODIDO:

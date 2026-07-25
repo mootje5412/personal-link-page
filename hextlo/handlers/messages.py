@@ -46,9 +46,8 @@ async def handle_text_search(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await message.reply_text(format_detection_hint())
         return
 
-    label = detected.label or "records"
     await message.reply_chat_action("typing")
-    status = await message.reply_text(f"Searching {label.lower()}...")
+    status = await message.reply_text("Searching...")
     response = await run_detected_search(detected, _user_id(update))
     save_search_session(context, response)
     await status.edit_text(

@@ -35,14 +35,9 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     info = get_access_info(user_id, settings.owner_id)
     if info:
-        text += (
-            f"\n\nYour access\n"
-            f"Plan: {info['plan']}\n"
-            f"Expires: {info['expires_at']}\n"
-            f"Days left: {info['days_left']}"
-        )
+        text += f"\n\n{info['days_left']} days left"
     elif not is_owner(user_id, settings.owner_id):
-        text += f"\n\nNo active access. HexTLO is $5/month.\nYour ID: {user_id}"
+        text += f"\n\nNo access · your ID: {user_id}"
 
     await message.reply_text(text)
 

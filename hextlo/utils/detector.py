@@ -107,38 +107,33 @@ def _odido_search(query: str) -> DetectedSearch:
     )
 
 
-def _npd_search(first: str, last: str, state: str, zip_code: str = "00000") -> DetectedSearch:
+def _unified_name_search(
+    first: str,
+    last: str,
+    state: str = NATIONWIDE_STATE,
+    zip_code: str = "",
+    city: str = "",
+) -> DetectedSearch:
     state = state.upper()
-    if zip_code in {"00000", "*"}:
+    if city:
+        display = f"{first} {last} {city} {state}"
+    elif state != NATIONWIDE_STATE:
         display = f"{first} {last} {state}"
+        if zip_code and zip_code not in {"00000", "*"}:
+            display = f"{display} {zip_code}"
     else:
-        display = f"{first} {last} {state} {zip_code}"
-    return DetectedSearch(
-        SearchType.PERSON,
-        _comma_query([first, last, state, zip_code]),
-        display,
-        label="NPD Search",
-    )
+        display = f"{first} {last}"
 
-
-def _name_search(first: str, last: str, state: str = NATIONWIDE_STATE) -> DetectedSearch:
-    if state != NATIONWIDE_STATE:
-        return _npd_search(first, last, state)
-    display = f"{first} {last}"
     return DetectedSearch(
-        SearchType.CRIMINAL,
-        _comma_query([first, last, state.upper()]),
+        SearchType.NAME,
+        _comma_query([first, last, state, zip_code or city]),
         display,
         label="Name Search",
-    )
-
-
-def _criminal_search(first: str, last: str, city: str, state: str) -> DetectedSearch:
-    return DetectedSearch(
-        SearchType.CRIMINAL,
-        _comma_query([first, last, city, state.upper()]),
-        f"{first} {last} {city} {state.upper()}",
-        label="Criminal Lookup",
+        name_first=first,
+        name_last=last,
+        name_state=state,
+        name_zip=zip_code,
+        name_city=city,
     )
 
 
@@ -161,9 +156,13 @@ def detect_search(text: str) -> DetectedSearch | None:
         if prefix in {"person", "npd"}:
             parts = [part.strip() for part in query.split(",") if part.strip()]
             if len(parts) >= 4:
-                return _npd_search(parts[0], parts[1], parts[2], parts[3])
+                if _is_state(parts[3]):
+                    return _unified_name_search(parts[0], parts[1], parts[3], city=parts[2])
+                return _unified_name_search(parts[0], parts[1], parts[2], zip_code=parts[3])
             if len(parts) == 3 and _is_state(parts[2]):
-                return _npd_search(parts[0], parts[1], parts[2])
+                return _unified_name_search(parts[0], parts[1], parts[2])
+            if len(parts) >= 2:
+                return _unified_name_search(parts[0], parts[1])
             return None
         return _odido_search(query)
 
@@ -177,13 +176,13 @@ def detect_search(text: str) -> DetectedSearch | None:
         parts = [part.strip() for part in raw.split(",") if part.strip()]
         if len(parts) >= 4:
             if _is_state(parts[3]):
-                return _criminal_search(parts[0], parts[1], parts[2], parts[3])
-            return _npd_search(parts[0], parts[1], parts[2], parts[3])
+                return _unified_name_search(parts[0], parts[1], parts[3], city=parts[2])
+            return _unified_name_search(parts[0], parts[1], parts[2], zip_code=parts[3])
         if len(parts) == 3:
             if _looks_like_ssn(parts[0]):
                 return DetectedSearch(SearchType.SSN, normalize_ssn(parts[0]), raw, label="SSN Search")
             if _is_state(parts[2]):
-                return _name_search(parts[0], parts[1], parts[2])
+                return _unified_name_search(parts[0], parts[1], parts[2])
             return _intelius_search(parts[0], parts[1], parts[2])
         if len(parts) == 2:
             left, right = parts
@@ -198,7 +197,7 @@ def detect_search(text: str) -> DetectedSearch | None:
                     raw,
                     label="Phone Search",
                 )
-            return _name_search(left, right)
+            return _unified_name_search(left, right)
 
     compact = raw.replace(" ", "").upper()
     if _looks_like_vin(compact):
@@ -218,21 +217,21 @@ def detect_search(text: str) -> DetectedSearch | None:
 
     words = raw.split()
     if len(words) == 4 and _is_state(words[-2]) and _looks_like_zip(words[-1]):
-        return _npd_search(words[0], words[1], words[-2], words[-1])
+        return _unified_name_search(words[0], words[1], words[-2], zip_code=words[-1])
 
     if len(words) >= 4 and _is_state(words[-1]):
         state = words[-1].upper()
         if len(words) == 4:
-            return _criminal_search(words[0], words[1], words[2], state)
-        return _criminal_search(words[0], words[1], " ".join(words[2:-1]), state)
+            return _unified_name_search(words[0], words[1], state, city=words[2])
+        return _unified_name_search(words[0], words[1], state, city=" ".join(words[2:-1]))
 
     if len(words) == 3 and _is_state(words[-1]):
-        return _name_search(words[0], words[1], words[-1])
+        return _unified_name_search(words[0], words[1], words[-1])
 
     if len(words) >= 2 and all(_looks_like_name_part(word) for word in words):
         if len(words) == 2:
-            return _name_search(words[0], words[1])
-        return _name_search(words[0], " ".join(words[1:]))
+            return _unified_name_search(words[0], words[1])
+        return _unified_name_search(words[0], " ".join(words[1:]))
 
     if len(words) == 1 and re.match(r"^[A-Za-z0-9@._-]{5,}$", words[0]):
         return _odido_search(words[0])
@@ -242,17 +241,10 @@ def detect_search(text: str) -> DetectedSearch | None:
 
 def format_detection_hint() -> str:
     return (
-        "Could not detect that search.\n\n"
-        "Try one of these:\n"
-        "  418-90-8868 .............. SSN\n"
-        "  John Doe ................. name (criminal)\n"
-        "  John Doe CA .............. NPD (SSN, address)\n"
-        "  John Doe CA 90210 ........ NPD + ZIP\n"
-        "  John,Doe,CA,90210 ........ NPD\n"
-        "  John,Doe,90210 ........... Intelius\n"
-        "  example .................. Odido keyword\n"
-        "  user@email.com ............. Odido\n"
-        "  0612345678 ............... Odido (NL phone)\n"
-        "  (256) 521-1446 ........... phone\n"
-        "  1HGBH41JXMN109186 ........ VIN"
+        "Couldn't detect that.\n\n"
+        "Try:\n"
+        "  418-90-8868\n"
+        "  John Doe CA\n"
+        "  1HGBH41JXMN109186\n"
+        "  user@email.com"
     )

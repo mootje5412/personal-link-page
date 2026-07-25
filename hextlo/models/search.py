@@ -32,6 +32,7 @@ class SearchType(str, Enum):
     MOBILE = "Million_Mobile"
     ODIDO = "full_odido"
     PERSON = "person-lookup"
+    NAME = "name"
 
 
 SEARCH_LABELS: dict[SearchType, str] = {
@@ -42,6 +43,7 @@ SEARCH_LABELS: dict[SearchType, str] = {
     SearchType.MOBILE: "Phone Search",
     SearchType.ODIDO: "Odido Search",
     SearchType.PERSON: "NPD Search",
+    SearchType.NAME: "Name Search",
 }
 
 
@@ -51,6 +53,11 @@ class DetectedSearch:
     api_query: str
     display_query: str
     label: str = ""
+    name_first: str = ""
+    name_last: str = ""
+    name_state: str = ""
+    name_zip: str = ""
+    name_city: str = ""
 
 
 @dataclass

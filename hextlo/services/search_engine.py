@@ -1,5 +1,6 @@
 from models.search import DetectedSearch, SearchResponse, SearchResult, SearchType
 from services.zopztlo_client import ZopzTloClient
+from utils.detector import NATIONWIDE_STATE, _comma_query
 
 _client = ZopzTloClient()
 
@@ -12,7 +13,7 @@ def _dedupe_key(result: SearchResult) -> str:
 
     ssn = result.fields.get("SSN", "").strip()
     if ssn:
-        return f"ssn:{ssn}|{result.fields.get('Id', '')}|{result.fields.get('Address', '')}"
+        return f"ssn:{ssn}|{result.fields.get('Address', '')}"
 
     parts = [result.title.lower()]
     for key in (
@@ -36,12 +37,59 @@ def _sort_results(results: list[SearchResult]) -> list[SearchResult]:
         results,
         key=lambda item: (
             0 if item.fields.get("SSN") else 1,
+            0 if item.fields.get("Offense") else 1,
             item.title.lower(),
         ),
     )
 
 
+def _name_plans(detected: DetectedSearch) -> list[DetectedSearch]:
+    first = detected.name_first
+    last = detected.name_last
+    state = detected.name_state or NATIONWIDE_STATE
+    city = detected.name_city
+    zip_code = detected.name_zip
+    display = detected.display_query
+    label = "Name Search"
+    plans: list[DetectedSearch] = []
+
+    if city:
+        plans.append(
+            DetectedSearch(
+                SearchType.CRIMINAL,
+                _comma_query([first, last, city, state]),
+                display,
+                label=label,
+            )
+        )
+    else:
+        plans.append(
+            DetectedSearch(
+                SearchType.CRIMINAL,
+                _comma_query([first, last, state]),
+                display,
+                label=label,
+            )
+        )
+
+    if state != NATIONWIDE_STATE:
+        z = zip_code if zip_code and zip_code not in {"*", ""} else "00000"
+        plans.append(
+            DetectedSearch(
+                SearchType.PERSON,
+                _comma_query([first, last, state, z]),
+                display,
+                label=label,
+            )
+        )
+
+    return plans
+
+
 def _build_plans(detected: DetectedSearch) -> list[DetectedSearch]:
+    if detected.search_type == SearchType.NAME:
+        return _name_plans(detected)
+
     if detected.search_type == SearchType.MOBILE:
         phone = detected.api_query.split(",")[0]
         formatted = f"({phone[:3]}) {phone[3:6]}-{phone[6:]}" if len(phone) == 10 else phone
@@ -58,30 +106,13 @@ def _build_plans(detected: DetectedSearch) -> list[DetectedSearch]:
 
 def _empty_message(detected: DetectedSearch) -> str:
     if detected.search_type == SearchType.MOBILE:
-        return (
-            "No phone records found.\n"
-            "Try searching by SSN (418-90-8868) or full name (John Doe)."
-        )
+        return "No phone records found.\nTry an SSN or name + state."
     if detected.search_type == SearchType.ODIDO:
-        return (
-            "No Odido records found.\n"
-            "Try an email, Dutch phone (06xxxxxxxx), or keyword: odido example"
-        )
+        return "No Odido records found.\nTry an email or Dutch phone number."
     if detected.search_type == SearchType.INTELIUS:
-        return (
-            "No Intelius results.\n"
-            "Format: First,Last,ZIP — e.g. John,Doe,90210"
-        )
-    if detected.search_type == SearchType.PERSON:
-        return (
-            "No NPD records found.\n"
-            "Try: John Doe CA  or  John,Doe,CA,90210"
-        )
-    if detected.label == "Name Search":
-        return (
-            "No records found for that name.\n"
-            "Add a state for SSN + address: John Doe CA"
-        )
+        return "No Intelius results.\nTry: John,Doe,90210"
+    if detected.search_type == SearchType.NAME:
+        return "No records found.\nTry adding a state: John Doe CA"
     return "No results found."
 
 
@@ -91,9 +122,9 @@ async def run_detected_search(detected: DetectedSearch, user_id: int) -> SearchR
     seen: set[str] = set()
     message = ""
     api_connected = True
-    search_type = detected.search_type
-    label = detected.label
     api_total = 0
+    label = detected.label or "Search"
+    search_type = detected.search_type
 
     for plan in plans:
         response = await _client.search(plan)
@@ -112,11 +143,11 @@ async def run_detected_search(detected: DetectedSearch, user_id: int) -> SearchR
             seen.add(key)
             merged.append(result)
 
-        if response.results and plan.search_type == SearchType.SSN:
-            search_type = SearchType.SSN
-
-        if merged and plan.search_type == detected.search_type:
-            break
+        if detected.search_type != SearchType.NAME:
+            if response.results and plan.search_type == SearchType.SSN:
+                search_type = SearchType.SSN
+            if merged and plan.search_type == detected.search_type:
+                break
 
     merged = _sort_results(merged)
     total = len(merged) if merged else api_total
