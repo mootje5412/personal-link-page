@@ -1,5 +1,5 @@
 from config.settings import settings
-from models.search import SEARCH_LABELS, SearchResponse
+from models.search import SEARCH_LABELS, SearchResponse, SearchResult, SearchType
 
 
 def truncate(text: str, limit: int | None = None) -> str:
@@ -9,7 +9,14 @@ def truncate(text: str, limit: int | None = None) -> str:
     return text[: max_len - 3] + "..."
 
 
-def format_search_response(response: SearchResponse) -> str:
+def page_count(total: int, page_size: int | None = None) -> int:
+    size = page_size or settings.page_size
+    if total <= 0:
+        return 0
+    return (total + size - 1) // size
+
+
+def format_search_page(response: SearchResponse, page: int = 0) -> str:
     label = SEARCH_LABELS.get(response.search_type, "Search")
     header = f"{label}\nQuery: {response.query}\n"
 
@@ -19,20 +26,27 @@ def format_search_response(response: SearchResponse) -> str:
     if response.message and not response.results:
         return header + response.message
 
-    if response.count == 0:
+    total = response.count
+    if total == 0:
         return header + "No results found."
 
-    lines = [header, f"Found {response.count} result(s):\n"]
-    for index, result in enumerate(response.results[: settings.max_results], start=1):
+    pages = page_count(total)
+    current = min(max(page, 0), max(pages - 1, 0))
+    start = current * settings.page_size
+    end = start + settings.page_size
+    page_results = response.results[start:end]
+
+    lines = [
+        header,
+        f"Found {total} result(s) — page {current + 1}/{pages}\n",
+    ]
+
+    for index, result in enumerate(page_results, start=start + 1):
         block = result.to_text()
-        if response.search_type.value == "vinsearch":
+        if response.search_type == SearchType.VIN:
             lines.append(block + "\n")
         else:
             lines.append(f"{index}. {block}\n")
-
-    remaining = response.count - settings.max_results
-    if remaining > 0:
-        lines.append(f"... and {remaining} more result(s)")
 
     return truncate("\n".join(lines).strip())
 

@@ -35,7 +35,7 @@ class Settings:
     )
     api_timeout: float = 30.0
 
-    max_results: int = 15
+    page_size: int = 10
     message_limit: int = 3900
 
 
