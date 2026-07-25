@@ -30,14 +30,16 @@ class SearchType(str, Enum):
     CRIMINAL = "criminal-lookup"
     INTELIUS = "intelius"
     MOBILE = "Million_Mobile"
+    ODIDO = "full_odido"
 
 
 SEARCH_LABELS: dict[SearchType, str] = {
     SearchType.SSN: "SSN Search",
     SearchType.VIN: "VIN Search",
     SearchType.CRIMINAL: "Criminal Lookup",
-    SearchType.INTELIUS: "Intelius",
+    SearchType.INTELIUS: "Intelius Search",
     SearchType.MOBILE: "Phone Search",
+    SearchType.ODIDO: "Odido Search",
 }
 
 

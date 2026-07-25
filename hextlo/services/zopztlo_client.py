@@ -24,6 +24,8 @@ FIELD_ALIASES = {
     "state": "State",
     "zip": "ZIP",
     "dob": "DOB",
+    "birthdate": "DOB",
+    "birthdate__c": "DOB",
     "vin": "VIN",
     "case": "Case",
     "court": "Court",
@@ -87,6 +89,7 @@ def _record_from_mapping(record: dict[str, Any], index: int) -> SearchResult:
     title = (
         _flatten_value(record.get("fullName"))
         or _flatten_value(record.get("full_name"))
+        or _flatten_value(record.get("Name"))
         or _flatten_value(record.get("name"))
         or fields.pop("Name", None)
         or f"Result {index}"
@@ -108,8 +111,11 @@ def _extract_records(payload: Any) -> tuple[list[Any], int, str]:
 
         nested = data.get("results")
         if isinstance(nested, dict):
-            if nested.get("error"):
-                return [], 0, str(nested.get("message") or nested.get("error"))
+            if nested.get("error") and nested.get("error") is not False:
+                error_text = str(nested.get("message") or nested.get("error"))
+                if error_text == "INTELIUS_BLOCKED":
+                    error_text = "Intelius blocked (anti-bot). Try criminal lookup: John Doe CA"
+                return [], 0, error_text
 
             if isinstance(nested.get("results"), list):
                 records = nested["results"]

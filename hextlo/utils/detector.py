@@ -5,8 +5,10 @@ from models.search import DetectedSearch, SearchType
 VIN_PATTERN = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$", re.IGNORECASE)
 SSN_PATTERN = re.compile(r"^\d{3}-?\d{2}-?\d{4}$")
 PHONE_PATTERN = re.compile(r"^\+?1?[\d\s().-]{10,20}$")
+EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 ZIP_PATTERN = re.compile(r"^\d{5}(?:-\d{4})?$")
 NAME_PART_PATTERN = re.compile(r"^[A-Za-z][A-Za-z'.-]*$")
+PREFIX_PATTERN = re.compile(r"^(intelius|odido)[:\s]+(.+)$", re.IGNORECASE)
 
 US_STATES = {
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA",
@@ -67,6 +69,40 @@ def _looks_like_name_part(value: str) -> bool:
     return bool(NAME_PART_PATTERN.match(value.strip()))
 
 
+def _looks_like_email(value: str) -> bool:
+    return bool(EMAIL_PATTERN.match(value.strip()))
+
+
+def _looks_like_dutch_phone(value: str) -> bool:
+    digits = _digits(value)
+    if digits.startswith("0031") and len(digits) >= 13:
+        return True
+    if digits.startswith("31") and len(digits) == 11 and digits[2] in "6789":
+        return True
+    if digits.startswith("06") and len(digits) == 10:
+        return True
+    return False
+
+
+def _intelius_search(first: str, second: str, third: str) -> DetectedSearch:
+    display = f"{first}, {second}, {third}"
+    return DetectedSearch(
+        SearchType.INTELIUS,
+        _comma_query([first, second, third]),
+        display,
+        label="Intelius Search",
+    )
+
+
+def _odido_search(query: str) -> DetectedSearch:
+    return DetectedSearch(
+        SearchType.ODIDO,
+        query.strip(),
+        query.strip(),
+        label="Odido Search",
+    )
+
+
 def _name_search(first: str, last: str, state: str = NATIONWIDE_STATE) -> DetectedSearch:
     display = f"{first} {last}" if state == NATIONWIDE_STATE else f"{first} {last} {state}"
     label = "Name Search" if state == NATIONWIDE_STATE else "Criminal Lookup"
@@ -92,6 +128,25 @@ def detect_search(text: str) -> DetectedSearch | None:
     if not raw or raw.startswith("/"):
         return None
 
+    prefix_match = PREFIX_PATTERN.match(raw)
+    if prefix_match:
+        prefix = prefix_match.group(1).lower()
+        query = prefix_match.group(2).strip()
+        if not query:
+            return None
+        if prefix == "intelius":
+            parts = [part.strip() for part in query.split(",") if part.strip()]
+            if len(parts) >= 3:
+                return _intelius_search(parts[0], parts[1], parts[2])
+            return None
+        return _odido_search(query)
+
+    if _looks_like_email(raw):
+        return _odido_search(raw)
+
+    if _looks_like_dutch_phone(raw):
+        return _odido_search(raw)
+
     if "," in raw:
         parts = [part.strip() for part in raw.split(",") if part.strip()]
         if len(parts) >= 4:
@@ -101,7 +156,7 @@ def detect_search(text: str) -> DetectedSearch | None:
                 return DetectedSearch(SearchType.SSN, normalize_ssn(parts[0]), raw, label="SSN Search")
             if _is_state(parts[2]):
                 return _name_search(parts[0], parts[1], parts[2])
-            return _name_search(parts[0], " ".join(parts[1:]))
+            return _intelius_search(parts[0], parts[1], parts[2])
         if len(parts) == 2:
             left, right = parts
             if _looks_like_ssn(left) or _looks_like_ssn(right):
@@ -158,6 +213,9 @@ def format_detection_hint() -> str:
         "  418-90-8868 .............. SSN\n"
         "  John Doe ................. name\n"
         "  John Doe CA .............. name + state\n"
+        "  John,Doe,90210 ........... Intelius\n"
+        "  user@email.com ............. Odido\n"
+        "  0612345678 ............... Odido (NL phone)\n"
         "  (256) 521-1446 ........... phone\n"
         "  1HGBH41JXMN109186 ........ VIN"
     )
