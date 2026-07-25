@@ -141,11 +141,4 @@ def list_subscribers() -> list[dict]:
 
 
 def access_required_message(user_id: int) -> str:
-    return (
-        "Access required\n"
-        "────────────────────────────\n\n"
-        f"HexTLO is {MONTHLY_PRICE}.\n\n"
-        f"Your User ID: {user_id}\n\n"
-        "Contact the owner to purchase access.\n"
-        "Send your User ID above to get activated."
-    )
+    return f"No access.\nYour ID: {user_id}\n\n$5/mo — send your ID to the owner."

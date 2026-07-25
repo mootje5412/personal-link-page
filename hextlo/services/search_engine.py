@@ -105,15 +105,13 @@ def _build_plans(detected: DetectedSearch) -> list[DetectedSearch]:
 
 
 def _empty_message(detected: DetectedSearch) -> str:
-    if detected.search_type == SearchType.MOBILE:
-        return "No phone records found.\nTry an SSN or name + state."
-    if detected.search_type == SearchType.ODIDO:
-        return "No Odido records found.\nTry an email or Dutch phone number."
-    if detected.search_type == SearchType.INTELIUS:
-        return "No Intelius results.\nTry: John,Doe,90210"
     if detected.search_type == SearchType.NAME:
-        return "No records found.\nTry adding a state: John Doe CA"
-    return "No results found."
+        return "No results. Try adding a state: John Doe CA"
+    if detected.search_type == SearchType.MOBILE:
+        return "No results. Try SSN or name + state."
+    if detected.search_type == SearchType.ODIDO:
+        return "No results."
+    return "No results."
 
 
 async def run_detected_search(detected: DetectedSearch, user_id: int) -> SearchResponse:

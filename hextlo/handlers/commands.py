@@ -37,7 +37,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if info:
         text += f"\n\n{info['days_left']} days left"
     elif not is_owner(user_id, settings.owner_id):
-        text += f"\n\nNo access · your ID: {user_id}"
+        text += f"\n\nNo access · ID {user_id}"
 
     await message.reply_text(text)
 
@@ -48,13 +48,7 @@ async def cmd_myid(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     user_id = _track_user(update)
-    username = update.effective_user.username or "none"
-    await message.reply_text(
-        f"Your User ID: {user_id}\n"
-        f"Username: @{username}\n\n"
-        f"HexTLO access is $5/month.\n"
-        "Send this ID to the owner to get access."
-    )
+    await message.reply_text(f"Your ID: {user_id}")
 
 
 async def cmd_grant(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

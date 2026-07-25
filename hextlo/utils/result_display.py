@@ -1,210 +1,125 @@
 from __future__ import annotations
 
-import re
-
 from models.search import SearchResult, SearchType
 
-RECORD_LINE = "─" * 22
-
-ODIDO_FIELD_MAP: list[tuple[str, str]] = [
-    ("DOB", "DOB"),
-    ("Phone", "Phone"),
-    ("Mobile", "Mobile"),
-    ("Email", "Email"),
-    ("Gender", "Gender"),
-    ("Nationality", "Nationality"),
-    ("ID Number", "ID Number"),
-    ("ID Type", "ID Type"),
-    ("ID Valid", "ID Valid"),
-    ("Brand", "Brand"),
-    ("Status", "Status"),
-    ("Language", "Language"),
-    ("Segment", "Segment"),
-    ("Salutation", "Salutation"),
-]
-
-VIN_FIELD_MAP: list[tuple[str, str]] = [
-    ("VIN", "VIN"),
-    ("Model Year", "Year"),
-    ("Make", "Make"),
-    ("Model", "Model"),
-    ("Trim", "Trim"),
-    ("Body Class", "Body"),
-    ("Vehicle Type", "Type"),
-    ("Drive Type", "Drive"),
-    ("Transmission Style", "Transmission"),
-    ("Engine Number of Cylinders", "Cylinders"),
-    ("Displacement (L)", "Engine"),
-    ("Fuel Type - Primary", "Fuel"),
-    ("Doors", "Doors"),
-    ("Plant Country", "Made in"),
-    ("Manufacturer Name", "Manufacturer"),
-]
-
-SKIP_VALUES = {"", "null", "not applicable", "n/a", "none"}
+SKIP = {"", "null", "not applicable", "n/a", "none"}
 
 
-def _is_noise(value: str) -> bool:
-    text = value.strip()
-    if not text:
-        return True
-    if text.lower() in SKIP_VALUES:
-        return True
-    if text.startswith("<") and ">" in text:
-        return True
-    return False
+def _clean(value: str) -> str:
+    return value.strip()
 
 
-def _format_engine(fields: dict[str, str]) -> str | None:
-    displacement = fields.get("Displacement (L)", "").strip()
-    cylinders = fields.get("Engine Number of Cylinders", "").strip()
-    if displacement and cylinders:
-        return f"{displacement}L {cylinders}-cyl"
-    return displacement or cylinders or None
+def _ok(value: str) -> bool:
+    text = _clean(value)
+    return bool(text) and text.lower() not in SKIP
 
 
-NPD_FIELD_MAP: list[tuple[str, str]] = [
-    ("SSN", "SSN"),
-    ("Phone", "Phone"),
-    ("Address", "Address"),
-]
+def _line(label: str, value: str) -> str | None:
+    if not _ok(value):
+        return None
+    return f"{label}: {value}"
 
 
-NAME_FIELD_MAP: list[tuple[str, str]] = [
-    ("SSN", "SSN"),
-    ("DOB", "DOB"),
-    ("Phone", "Phone"),
-    ("Address", "Address"),
-    ("Age", "Age"),
-    ("Sex", "Sex"),
-    ("State", "State"),
-    ("Offense", "Offense"),
-    ("Offense Code", "Offense Code"),
-    ("Charges Filed", "Charges Filed"),
-    ("Agency", "Agency"),
-]
+def _truncate(text: str, limit: int = 80) -> str:
+    text = _clean(text)
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3] + "..."
+
+
+def _pick(result: SearchResult, *keys: str) -> str:
+    for key in keys:
+        value = result.fields.get(key, "")
+        if _ok(value):
+            return _clean(value)
+    return ""
+
+
+def _card(index: int | None, title: str, lines: list[str | None]) -> str:
+    head = f"{index}. {title}" if index is not None else title
+    body = [line for line in lines if line]
+    if not body:
+        return head
+    return "\n".join([head, *body])
 
 
 def format_name_result(result: SearchResult, index: int | None = None) -> str:
-    prefix = f"[{index}] " if index is not None else ""
-    lines = [f"{prefix}{result.title}", RECORD_LINE]
+    offense = _pick(result, "Offense")
+    return _card(
+        index,
+        result.title,
+        [
+            _line("SSN", _pick(result, "SSN")),
+            _line("DOB", _pick(result, "DOB")),
+            _line("Phone", _pick(result, "Phone")),
+            _line("Address", _pick(result, "Address")),
+            _line("Offense", _truncate(offense)) if offense else None,
+        ],
+    )
 
-    for field_key, label in NAME_FIELD_MAP:
-        value = result.fields.get(field_key, "").strip()
-        if _is_noise(value):
-            continue
-        lines.append(f"  {label}: {value}")
 
-    return "\n".join(lines)
-
-
-def format_npd_result(result: SearchResult, index: int | None = None) -> str:
-    prefix = f"[{index}] " if index is not None else ""
-    lines = [f"{prefix}{result.title}", RECORD_LINE]
-
-    for field_key, label in NPD_FIELD_MAP:
-        value = result.fields.get(field_key, "").strip()
-        if _is_noise(value):
-            continue
-        lines.append(f"  {label}: {value}")
-
-    return "\n".join(lines)
+def format_ssn_result(result: SearchResult, index: int | None = None) -> str:
+    return _card(
+        index,
+        result.title,
+        [
+            _line("SSN", _pick(result, "SSN")),
+            _line("DOB", _pick(result, "DOB")),
+            _line("Phone", _pick(result, "Phone")),
+            _line("Address", _pick(result, "Address")),
+        ],
+    )
 
 
 def format_odido_result(result: SearchResult, index: int | None = None) -> str:
-    prefix = f"[{index}] " if index is not None else ""
-    lines = [f"{prefix}{result.title}", RECORD_LINE]
-
-    for field_key, label in ODIDO_FIELD_MAP:
-        value = result.fields.get(field_key, "").strip()
-        if _is_noise(value):
-            continue
-        lines.append(f"  {label}: {value}")
-
-    return "\n".join(lines)
+    phone = _pick(result, "Phone", "Mobile")
+    email = _pick(result, "Email")
+    contact = " · ".join(part for part in (phone, email) if part)
+    return _card(
+        index,
+        result.title,
+        [
+            contact or None,
+            _line("DOB", _pick(result, "DOB")),
+            _line("Address", _pick(result, "Address", "Nationality")),
+        ],
+    )
 
 
 def format_vin_result(result: SearchResult) -> str:
-    lines = [result.title, RECORD_LINE]
+    engine = _pick(result, "Displacement (L)")
+    cylinders = _pick(result, "Engine Number of Cylinders")
+    fuel = _pick(result, "Fuel Type - Primary")
+    if engine and cylinders:
+        motor = f"{engine}L {cylinders}-cyl"
+    else:
+        motor = engine or cylinders
+    if motor and fuel:
+        motor = f"{motor} · {fuel}"
+    elif fuel:
+        motor = fuel
 
-    engine_line = _format_engine(result.fields)
-    shown: set[str] = set()
+    body = _pick(result, "Body Class")
+    drive = _pick(result, "Drive Type")
+    spec = " · ".join(part for part in (body, drive, motor) if part)
 
-    for source_key, label in VIN_FIELD_MAP:
-        if source_key in {"Displacement (L)", "Engine Number of Cylinders"}:
-            continue
-        value = result.fields.get(source_key, "").strip()
-        if _is_noise(value):
-            continue
-        if source_key == "Fuel Type - Primary" and engine_line:
-            value = f"{engine_line}, {value}"
-            shown.add("engine")
-        lines.append(f"  {label}: {value}")
-        shown.add(source_key)
-
-    if engine_line and "engine" not in shown:
-        insert_at = 2
-        for idx, line in enumerate(lines[2:], start=2):
-            if line.startswith("  Fuel:"):
-                insert_at = idx
-                break
-            if line.startswith("  Cylinders:") or line.startswith("  Engine:"):
-                insert_at = idx + 1
-        lines.insert(insert_at, f"  Engine: {engine_line}")
-
-    return "\n".join(lines)
-
-
-def format_default_result(result: SearchResult, index: int) -> str:
-    lines = [f"[{index}] {result.title}", RECORD_LINE]
-    shown: set[str] = set()
-
-    priority = (
-        "SSN",
-        "DOB",
-        "Phone",
-        "Mobile",
-        "Email",
-        "Address",
-        "City",
-        "State",
-        "ZIP",
-        "Age",
-        "Sex",
-        "Offense",
-        "Offense Code",
-        "Charges Filed",
-        "Agency",
+    return _card(
+        None,
+        result.title,
+        [
+            _line("VIN", _pick(result, "VIN")),
+            spec or None,
+        ],
     )
-
-    for key in priority:
-        value = result.fields.get(key, "").strip()
-        if value and not _is_noise(value):
-            lines.append(f"  {key}: {value}")
-            shown.add(key)
-
-    for key, value in result.fields.items():
-        if key in shown or key in {"Id", "Name"}:
-            continue
-        text = str(value).strip()
-        if _is_noise(text):
-            continue
-        if re.search(r"(?i)(created|modified|owner|accountid|photourl|systemmodstamp|__c$)", key):
-            continue
-        lines.append(f"  {key}: {text}")
-
-    return "\n".join(lines)
 
 
 def format_result(result: SearchResult, search_type: SearchType, index: int | None = None) -> str:
-    if search_type == SearchType.NAME:
-        return format_name_result(result, index)
-    if search_type == SearchType.PERSON:
-        return format_npd_result(result, index)
-    if search_type == SearchType.ODIDO:
-        return format_odido_result(result, index)
     if search_type == SearchType.VIN:
         return format_vin_result(result)
-    if index is None:
-        index = 1
-    return format_default_result(result, index)
+    if search_type in {SearchType.NAME, SearchType.PERSON, SearchType.CRIMINAL}:
+        return format_name_result(result, index)
+    if search_type == SearchType.SSN:
+        return format_ssn_result(result, index)
+    if search_type == SearchType.ODIDO:
+        return format_odido_result(result, index)
+    return format_name_result(result, index)

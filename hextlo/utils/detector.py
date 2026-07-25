@@ -240,11 +240,4 @@ def detect_search(text: str) -> DetectedSearch | None:
 
 
 def format_detection_hint() -> str:
-    return (
-        "Couldn't detect that.\n\n"
-        "Try:\n"
-        "  418-90-8868\n"
-        "  John Doe CA\n"
-        "  1HGBH41JXMN109186\n"
-        "  user@email.com"
-    )
+    return "Try:\n418-90-8868\nJohn Doe CA\n1HGBH41JXMN109186"
