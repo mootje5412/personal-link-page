@@ -1,84 +1,64 @@
 # HexTLO
 
-Telegram bot for TLO-style people and public records lookup.
+Telegram bot for TLO-style lookups powered by the ZopzTLO API.
 
-## Modules
+## How it works
 
-| Command | Description |
-|---------|-------------|
-| `/start` | Welcome menu with inline buttons |
-| `/ssn` | Social Security Number lookup |
-| `/name` | Full name search |
-| `/npd` | National Public Data records |
-| `/court` | Court and case records |
-| `/phone` | Reverse phone lookup |
-| `/email` | Email trace |
-| `/address` | Guided address search |
-| `/status` | API connection status |
-| `/help` | Command reference |
-| `/cancel` | Cancel an in-progress search |
+Only `/start` is a command. After that, just type your search and the bot auto-detects the lookup type:
 
-## Project layout
+| Input | Detected search |
+|-------|-----------------|
+| `John Smith` | SSN / name search |
+| `John Smith CA` | Intelius |
+| `John Smith Los Angeles CA` | Criminal lookup |
+| `John, Smith, Los Angeles, CA` | Criminal lookup (exact) |
+| `5551234567` | Mobile lookup |
+| `1HGBH41JXMN109186` | VIN search |
 
-```
-hextlo/
-├── main.py                 # Entry point
-├── run.sh                  # Quick start script
-├── requirements.txt
-├── .env.example
-├── config/
-│   └── settings.py         # Env-based configuration
-├── bot/
-│   ├── app.py              # Application wiring
-│   └── keyboards/
-│       └── menus.py        # Inline menus
-├── handlers/
-│   ├── commands.py         # Slash commands
-│   ├── conversations.py    # Guided search flows
-│   └── callbacks.py        # Button callbacks
-├── services/
-│   ├── base.py             # Service interface
-│   ├── search_services.py  # Per-module stubs
-│   └── registry.py         # Service registry
-├── models/
-│   └── search.py           # Request/response models
-└── utils/
-    ├── formatting.py
-    └── validators.py
-```
-
-## Quick start
-
-1. Create a bot with [@BotFather](https://t.me/BotFather) and copy the token.
-
-2. Install dependencies:
+## Setup
 
 ```bash
 cd hextlo
-python3 -m venv .venv
-source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-3. Configure:
-
-```bash
 cp .env.example .env
-# Edit .env and set HEXTLO_BOT_TOKEN
 ```
 
-4. Run:
+Set in `.env`:
+
+```
+HEXTLO_BOT_TOKEN=your_telegram_bot_token
+HEXTLO_API_KEY=your_zopztlo_api_key
+```
+
+Run:
 
 ```bash
 python main.py
 ```
 
-## Connecting APIs
+## Project layout
 
-Each search module has a stub service in `services/search_services.py`. When you're ready:
+```
+hextlo/
+├── main.py
+├── config/settings.py
+├── bot/app.py
+├── handlers/
+│   ├── commands.py      # /start only
+│   └── messages.py      # Auto-detect + search
+├── services/
+│   ├── zopztlo_client.py
+│   └── registry.py
+├── models/search.py
+└── utils/
+    ├── detector.py
+    └── formatting.py
+```
 
-1. Set the matching `HEXTLO_*_API_URL` in `.env`.
-2. Implement the HTTP call inside the service's `search()` method.
-3. Return a `SearchResponse` with `api_connected=True` and populated `results`.
+## API endpoints used
 
-The registry in `services/registry.py` routes all searches through one entry point, so wiring a new API only touches one file per module.
+- `ssnsearch` — name-based SSN search
+- `vinsearch` — VIN lookup
+- `criminal-lookup` — criminal records (4 fields)
+- `intelius` — people search (3 fields)
+- `Million_Mobile` — mobile / phone lookup

@@ -1,15 +1,5 @@
 from config.settings import settings
-from models.search import SearchResponse, SearchType
-
-SEARCH_LABELS: dict[SearchType, str] = {
-    SearchType.SSN: "SSN Lookup",
-    SearchType.NAME: "Name Search",
-    SearchType.NPD: "NPD Records",
-    SearchType.COURT: "Court Records",
-    SearchType.PHONE: "Phone Lookup",
-    SearchType.EMAIL: "Email Lookup",
-    SearchType.ADDRESS: "Address Search",
-}
+from models.search import SEARCH_LABELS, SearchResponse
 
 
 def truncate(text: str, limit: int | None = None) -> str:
@@ -24,7 +14,10 @@ def format_search_response(response: SearchResponse) -> str:
     header = f"{label}\nQuery: {response.query}\n"
 
     if not response.api_connected:
-        return header + (response.message or "API not connected yet. Check back soon.")
+        return header + (response.message or "API not configured.")
+
+    if response.message and not response.results:
+        return header + response.message
 
     if response.count == 0:
         return header + "No results found."
@@ -43,43 +36,13 @@ def format_search_response(response: SearchResponse) -> str:
 def format_welcome(first_name: str) -> str:
     return (
         f"Welcome to HexTLO, {first_name}.\n\n"
-        "Your TLO-style lookup bot for people and public records.\n\n"
-        "Search modules:\n"
-        "  /ssn — Social Security Number lookup\n"
-        "  /name — Full name search\n"
-        "  /npd — National Public Data records\n"
-        "  /court — Court & case records\n"
-        "  /phone — Reverse phone lookup\n"
-        "  /email — Email trace\n"
-        "  /address — Address lookup\n\n"
-        "Use the menu below or type a command to begin.\n"
-        "APIs are stubbed for now — we'll wire them up next."
+        "Just type what you want to search — I'll detect the lookup type automatically.\n\n"
+        "Examples:\n"
+        "• John Smith — SSN / name search\n"
+        "• John Smith CA — Intelius\n"
+        "• John Smith Los Angeles CA — criminal lookup\n"
+        "• 5551234567 — mobile lookup\n"
+        "• 1HGBH41JXMN109186 — VIN search\n\n"
+        "Use commas for exact matching:\n"
+        "John, Smith, Los Angeles, CA"
     )
-
-
-def format_help() -> str:
-    return (
-        "HexTLO Help\n\n"
-        "Commands:\n"
-        "/start — Main menu\n"
-        "/help — This message\n"
-        "/cancel — Cancel current search\n"
-        "/status — Check API connection status\n\n"
-        "Search commands:\n"
-        "/ssn <number> — e.g. /ssn 123-45-6789\n"
-        "/name <first last> — e.g. /name John Smith\n"
-        "/npd <name or id> — NPD record search\n"
-        "/court <name or case> — Court record search\n"
-        "/phone <number> — Reverse phone lookup\n"
-        "/email <address> — Email lookup\n"
-        "/address — Guided address search\n\n"
-        "Tip: Use the inline menu from /start for guided searches."
-    )
-
-
-def format_api_status(api_map: dict[str, bool]) -> str:
-    lines = ["API Connection Status\n"]
-    for name, connected in api_map.items():
-        icon = "connected" if connected else "pending"
-        lines.append(f"  {name}: {icon}")
-    return "\n".join(lines)

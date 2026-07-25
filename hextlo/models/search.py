@@ -4,21 +4,33 @@ from typing import Any
 
 
 class SearchType(str, Enum):
-    SSN = "ssn"
-    NAME = "name"
-    NPD = "npd"
-    COURT = "court"
-    PHONE = "phone"
-    EMAIL = "email"
-    ADDRESS = "address"
+    SSN = "ssnsearch"
+    VIN = "vinsearch"
+    CRIMINAL = "criminal-lookup"
+    INTELIUS = "intelius"
+    MOBILE = "Million_Mobile"
+
+
+SEARCH_LABELS: dict[SearchType, str] = {
+    SearchType.SSN: "SSN Search",
+    SearchType.VIN: "VIN Search",
+    SearchType.CRIMINAL: "Criminal Lookup",
+    SearchType.INTELIUS: "Intelius",
+    SearchType.MOBILE: "Mobile Lookup",
+}
+
+
+@dataclass
+class DetectedSearch:
+    search_type: SearchType
+    api_query: str
+    display_query: str
 
 
 @dataclass
 class SearchRequest:
-    search_type: SearchType
-    query: str
+    detected: DetectedSearch
     user_id: int
-    extra: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -43,8 +55,9 @@ class SearchResponse:
     query: str
     results: list[SearchResult] = field(default_factory=list)
     total: int = 0
-    api_connected: bool = False
+    api_connected: bool = True
     message: str = ""
+    raw: Any = None
 
     @property
     def count(self) -> int:
