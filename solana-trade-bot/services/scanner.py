@@ -47,6 +47,7 @@ class MemeCoin:
     url: str
     ai_score: float = 0.0
     ai_signals: list[str] = field(default_factory=list)
+    ai_verdict: str = "WATCH"
     is_scam: bool = False
     age_hours: float = 0.0
 

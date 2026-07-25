@@ -53,7 +53,7 @@
 </head>
 <body>
   <div class="card">
-    <div class="logo">👻</div>
+    <div class="logo">PH</div>
     <h1>Connect Phantom Wallet</h1>
     <p>Link your Phantom wallet to the Solana AI Meme Coin Trader bot. View balance and track trades.</p>
     <button class="phantom-btn" id="connectBtn" onclick="connectPhantom()">Connect Phantom</button>
@@ -95,7 +95,7 @@
         status.textContent = 'Connected! Sending to bot...';
 
         tg.sendData(JSON.stringify({ publicKey }));
-        status.textContent = '✅ Connected! Close this window.';
+        status.textContent = 'Connected. Close this window.';
       } catch (e) {
         status.textContent = 'Error: ' + (e.message || e);
         btn.disabled = false;

@@ -10,12 +10,12 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 BOT_SECRET_KEY = os.getenv("BOT_SECRET_KEY", "").strip()
 SOLANA_RPC_URL = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com").strip()
 WEBAPP_URL = os.getenv("WEBAPP_URL", "").strip()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 
-# Fallback RPCs if primary fails
 SOLANA_RPC_FALLBACKS = [
     u.strip() for u in os.getenv(
         "SOLANA_RPC_FALLBACKS",
-        "https://api.mainnet-beta.solana.com,https://solana-mainnet.g.alchemy.com/v2/demo",
+        "https://api.mainnet-beta.solana.com",
     ).split(",") if u.strip()
 ]
 
@@ -37,11 +37,8 @@ MIN_AI_SCORE = 75
 MAX_PRICE_IMPACT_PCT = 7.0
 SLIPPAGE_BPS = 300
 SELL_SLIPPAGE_BPS = 500
-
-# Entry filters — avoid chasing pumps
 MAX_M5_PUMP_ENTRY = 25.0
 MAX_H1_PUMP_ENTRY = 70.0
-MIN_H1_VOLUME = 1_000
 
 SCAM_KEYWORDS = {"honeypot", "test scam", "scam", "rug pull", "airdrop claim", "free sol", "claim reward"}
 

@@ -15,7 +15,7 @@ logging.basicConfig(
 
 def main() -> None:
     app = build_application()
-    print("🤖 Solana AI Trade Bot running — send /start on Telegram", flush=True)
+    print("Solana AI Trade Bot running — send /start on Telegram", flush=True)
     app.run_polling(drop_pending_updates=True, allowed_updates=["message", "callback_query"])
 
 

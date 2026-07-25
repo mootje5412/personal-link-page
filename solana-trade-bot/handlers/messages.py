@@ -1,119 +1,82 @@
 WELCOME = """
-<b>⚡ Solana AI Meme Trader</b>
+<b>Solana AI Trader</b>
 
-The smartest way to trade Solana meme coins — fully automatic, right here in Telegram.
+Automatic meme coin trading on Solana. The AI scans the market, finds the best coins, and trades for you.
 
-<b>What you get:</b>
-🧠 AI scans & scores every trending meme coin
-🟢 Auto-buys the best opportunities
-🔴 Auto-sells when price drops or hits profit
-🛡 Scam & rug pull protection built in
+<b>Setup:</b>
+1. Import wallet key
+2. Pick a trading mode
+3. Start auto trade
 
-<b>Ready in 3 taps:</b>
-1️⃣ Import your trading wallet
-2️⃣ Pick a mode (Safe / Balanced / Degen)
-3️⃣ Tap START Auto Trade
-
-Sit back — the bot trades 24/7 for you.
+Or ask the AI anything — just type your question.
 """
 
 WELCOME_BACK = """
-Welcome back! 👋
+Welcome back. Your bot is ready.
 
-Your bot is ready. Check your dashboard to see how you're doing, or hit START Auto Trade to get back in the action.
+Check the dashboard for performance, run a scan to see the best buys, or ask the AI a question.
 """
 
 HELP = """
-<b>📋 All Commands</b>
+<b>Commands</b>
 
-/start — Home menu
-/dashboard — Live stats & PnL
-/scan — Top meme coins + buy buttons
-/modes — Safe · Balanced · Degen
-/wallet — Connect trading wallet
+/start — Main menu
+/scan — Best coins to buy right now
+/ask — Ask the AI a question
+/dashboard — Stats and performance
+/modes — Safe, Balanced, or Degen
+/wallet — Import trading wallet
 /balance — SOL balance
-/positions — Open trades + sell
+/positions — Open trades
 /history — Past trades
-/autotrade — Start / stop bot
-/settings — Customize everything
-/tips — Pro trading tips
+/autotrade — Start or stop bot
+/settings — Adjust settings
 /stop — Emergency stop
 
-<b>🎛 Modes (easiest setup)</b>
-🛡 <b>Safe</b> — 0.02 SOL, tight stops, elite coins only
-⚖️ <b>Balanced</b> — best starting point (recommended)
-🔥 <b>Degen</b> — bigger trades, wider stops, more coins
-
-<b>🔴 Auto-sell triggers</b>
-Stop loss · Take profit · Trailing stop · Flash crash · Rug detected
+<b>Ask the AI</b>
+Type any question directly, or use /ask.
+Examples:
+- What should I buy right now?
+- How does stop loss work?
+- Which mode should I use?
 """
 
 PROFIT_INFO = """
-<b>💡 Can This Make You Money?</b>
+<b>Can This Make Money?</b>
 
-<b>Short answer:</b> It can help — but nothing is guaranteed.
+Maybe — but there are no guarantees.
 
-<b>Your edge with this bot:</b>
-✅ Finds coins faster than scrolling DexScreener
-✅ AI filters scams before you buy
-✅ Zero emotion — cuts losses automatically
-✅ Takes profit when you're up
-✅ Trades 24/7 while you sleep
+The bot finds coins faster, filters scams, and exits with discipline. Meme coins are still high risk.
 
-<b>Be realistic:</b>
-❌ Meme coins are high risk — most traders lose
-❌ No bot predicts the future
-❌ Some rugs will still slip through
-
-<b>Best approach:</b>
-→ Start with 🛡 Safe mode + 0.02 SOL trades
-→ Run for a few days, check /dashboard
-→ If winning, try ⚖️ Balanced
-→ Only use money you can lose completely
-
-⚠️ Not financial advice. DYOR.
+Start with Safe mode and small amounts. Only trade what you can afford to lose.
 """
 
 SETUP_GUIDE = """
-<b>🚀 Setup Guide — 2 Minutes</b>
+<b>Setup Guide</b>
 
-<b>Step 1 — Trading wallet</b>
-Create a fresh Phantom wallet. Send only the SOL you want to trade (e.g. 0.3–1 SOL). Never use your main wallet.
+<b>Step 1</b> — Create a new Phantom wallet. Send only the SOL you want to trade.
 
-<b>Step 2 — Connect</b>
-Tap <b>Import Wallet Key</b> → paste your private key.
-Your key is encrypted & the message is auto-deleted.
+<b>Step 2</b> — Tap Import Wallet Key and paste your private key. It is encrypted and the message is deleted.
 
-<b>Step 3 — Pick a mode</b>
-🛡 Safe — if you're new
-⚖️ Balanced — recommended
-🔥 Degen — if you know what you're doing
+<b>Step 3</b> — Pick a mode: Safe (beginners), Balanced (recommended), or Degen (aggressive).
 
-<b>Step 4 — Go</b>
-Tap <b>START Auto Trade</b>. You'll get a notification on every buy & sell.
-
-That's it! Check /dashboard anytime.
+<b>Step 4</b> — Tap Start Auto Trade.
 """
 
 AUTOTRADE_ON = """
-<b>🚀 Auto Trade is LIVE!</b>
+<b>Auto Trade Started</b>
 
-Your bot is now running 24/7:
+The bot is now:
+- Scanning every 25 seconds
+- Buying top AI-rated coins
+- Monitoring exits every 10 seconds
+- Selling on your stop loss and take profit rules
 
-🔍 Scanning meme coins every 25s
-🧠 AI scoring & filtering scams
-🟢 Buying top opportunities
-👁 Monitoring exits every 10s
-🔴 Auto-selling on your rules
-
-You'll get notified on every trade. Check /dashboard anytime.
+You will be notified on every trade.
 """
 
 AUTOTRADE_OFF = """
-<b>⏹ Auto Trade Paused</b>
+<b>Auto Trade Stopped</b>
 
-The bot stopped scanning for new buys.
-Your open positions are still held.
-
-Use /positions to sell manually, or restart anytime.
+No new buys will be made. Open positions are still held. Use Positions to sell manually.
 """

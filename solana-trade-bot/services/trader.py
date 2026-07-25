@@ -116,7 +116,7 @@ class AutoTrader:
             if time.time() - last > WARN_COOLDOWN_SEC:
                 _low_balance_warned[user_id] = time.time()
                 await self._notify_user(user_id,
-                    f"⚠️ <b>Low Balance</b>\n\n{balance:.4f} SOL available · need {needed:.4f} SOL/trade",
+                    f"<b>Low Balance</b>\n\n{balance:.4f} SOL available · need {needed:.4f} SOL per trade",
                     user)
             return
 
@@ -172,18 +172,17 @@ class AutoTrader:
             await log_trade(user_id, "BUY", coin.mint, coin.symbol, trade_sol, sig,
                 {"ai_score": coin.ai_score, "price_impact": impact})
 
-            signals = "\n".join(f"   {s}" for s in coin.ai_signals[:3])
+            signals = "\n".join(f"- {s}" for s in coin.ai_signals[:3])
             msg = (
-                f"🟢 <b>BOUGHT ${coin.symbol}</b>\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n\n"
-                f"💰 <b>{trade_sol} SOL</b> → ${coin.price_usd:.8f}\n"
-                f"🤖 AI Score: <b>{coin.ai_score}/100</b>\n"
-                f"📊 Impact: {impact:.1f}%\n\n"
-                f"💧 Liq ${coin.liquidity_usd:,.0f} │ Vol ${coin.volume_24h:,.0f}\n"
-                f"📈 1h {coin.price_change_h1:+.1f}% │ 5m {coin.price_change_m5:+.1f}%\n"
+                f"<b>BOUGHT ${coin.symbol}</b>\n\n"
+                f"Amount: {trade_sol} SOL at ${coin.price_usd:.8f}\n"
+                f"AI Score: {coin.ai_score}/100 ({getattr(coin, 'ai_verdict', 'BUY')})\n"
+                f"Impact: {impact:.1f}%\n\n"
+                f"Liquidity: ${coin.liquidity_usd:,.0f} | Volume: ${coin.volume_24h:,.0f}\n"
+                f"1h: {coin.price_change_h1:+.1f}% | 5m: {coin.price_change_m5:+.1f}%\n"
                 f"{signals}\n\n"
-                f"🛑 -{user.get('stop_loss_pct', 15)}% │ 🎯 +{user.get('take_profit_pct', 50)}%\n"
-                f"🔗 <a href='https://solscan.io/tx/{sig}'>Transaction</a> · <a href='{coin.url}'>Chart</a>"
+                f"Stop: -{user.get('stop_loss_pct', 15)}% | Target: +{user.get('take_profit_pct', 50)}%\n"
+                f"<a href='https://solscan.io/tx/{sig}'>Transaction</a> | <a href='{coin.url}'>Chart</a>"
             )
             await self._notify_user(user_id, msg, user)
             return True
@@ -226,7 +225,7 @@ class AutoTrader:
             entry = float(pos["entry_price"])
             pnl = ((coin.price_usd - entry) / entry * 100) if entry > 0 else 0
             try:
-                await self._sell(user, pos, coin, "👤 Sell All", pnl)
+                await self._sell(user, pos, coin, "Sell All", pnl)
                 ok += 1
             except Exception:
                 pass
@@ -255,19 +254,19 @@ class AutoTrader:
             should_sell, reason = False, ""
 
             if pnl_pct <= -stop_loss:
-                should_sell, reason = True, f"🛑 Stop Loss ({pnl_pct:.1f}%)"
+                should_sell, reason = True, f"Stop Loss ({pnl_pct:.1f}%)"
             elif pnl_pct >= take_profit:
-                should_sell, reason = True, f"🎯 Take Profit ({pnl_pct:+.1f}%)"
+                should_sell, reason = True, f"Take Profit ({pnl_pct:+.1f}%)"
             elif pnl_pct > 8 and drop_from_peak <= -trailing:
-                should_sell, reason = True, f"📐 Trailing Stop ({pnl_pct:+.1f}%)"
+                should_sell, reason = True, f"Trailing Stop ({pnl_pct:+.1f}%)"
             elif coin.price_change_m5 <= -15 and pnl_pct < -2:
-                should_sell, reason = True, f"📉 Flash Crash ({coin.price_change_m5:.0f}% 5m)"
+                should_sell, reason = True, f"Flash Crash ({coin.price_change_m5:.0f}% in 5m)"
             elif coin.sells_1h > coin.buys_1h * 2.2 and pnl_pct < -3:
-                should_sell, reason = True, f"🔴 Sell Pressure ({pnl_pct:.1f}%)"
+                should_sell, reason = True, f"Sell Pressure ({pnl_pct:.1f}%)"
             elif coin.liquidity_usd < 8_000:
-                should_sell, reason = True, "🚨 Liquidity Collapse"
+                should_sell, reason = True, "Liquidity Collapse"
             elif coin.is_scam:
-                should_sell, reason = True, "🚨 Scam Detected"
+                should_sell, reason = True, "Scam Detected"
 
             if should_sell:
                 await self._sell(user, pos, coin, reason, pnl_pct)
@@ -293,19 +292,18 @@ class AutoTrader:
             await log_trade(user_id, "SELL", pos["token_mint"], pos["token_symbol"], out_sol, sig,
                 {"pnl_pct": pnl_pct, "sol_pnl": sol_pnl, "reason": reason})
 
-            emoji = "💰" if pnl_pct >= 0 else "🔴"
+            tag = "PROFIT" if pnl_pct >= 0 else "LOSS"
             msg = (
-                f"{emoji} <b>SOLD ${pos['token_symbol']}</b>\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n\n"
-                f"📋 {reason}\n\n"
-                f"💰 <b>{out_sol:.4f} SOL</b> ({sol_pnl:+.4f} SOL)\n"
-                f"📊 PnL: <b>{pnl_pct:+.1f}%</b>\n"
-                f"🔗 <a href='https://solscan.io/tx/{sig}'>View Transaction</a>"
+                f"<b>SOLD ${pos['token_symbol']}</b> [{tag}]\n\n"
+                f"Reason: {reason}\n\n"
+                f"Received: {out_sol:.4f} SOL ({sol_pnl:+.4f} SOL)\n"
+                f"PnL: {pnl_pct:+.1f}%\n"
+                f"<a href='https://solscan.io/tx/{sig}'>Transaction</a>"
             )
             await self._notify_user(user_id, msg, user)
         except Exception as exc:
             logger.error("Sell fail %s: %s", pos["token_symbol"], exc)
-            await self._notify_user(user_id, f"❌ Sell failed ${pos['token_symbol']}: {exc}", user)
+            await self._notify_user(user_id, f"Sell failed ${pos['token_symbol']}: {exc}", user)
             raise
 
     async def sell_position_manual(self, user: dict, pos: dict) -> tuple[bool, str]:
@@ -315,7 +313,7 @@ class AutoTrader:
         entry = float(pos["entry_price"])
         pnl = ((coin.price_usd - entry) / entry) * 100 if entry > 0 else 0
         try:
-            await self._sell(user, pos, coin, "👤 Manual Sell", pnl)
+            await self._sell(user, pos, coin, "Manual Sell", pnl)
             return True, "Sold!"
         except Exception as exc:
             return False, str(exc)

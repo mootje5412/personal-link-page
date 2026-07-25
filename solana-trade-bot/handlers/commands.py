@@ -18,14 +18,9 @@ from db.database import (
     set_wallet,
     upsert_user,
 )
-from handlers.formatters import (
-    greeting,
-    performance_badge,
-    pnl_bar,
-    score_bar,
-    short_address,
-)
+from handlers.formatters import greeting, performance_label, short_address
 from handlers.keyboards import (
+    ask_ai_menu,
     back_button,
     confirm_disconnect,
     confirm_sell_all,
@@ -49,12 +44,12 @@ from handlers.messages import (
     WELCOME_BACK,
 )
 from handlers.presets import PRESETS, preset_summary
-from handlers.tips import random_tip
-from services.ai_scorer import format_score_emoji, rank_coins
+from services.ai_chat import ask_ai
+from services.ai_scorer import rank_coins
 from services.crypto_store import encrypt_private_key
 from services.entry_filter import entry_quality_label
 from services.portfolio import get_unrealized_pnl
-from services.scanner import get_token_price_cached, scan_meme_coins
+from services.scanner import scan_meme_coins
 from services.trader import auto_trader, cache_scan_results
 from services.wallet import get_balance_sol, keypair_from_private_key, validate_pubkey
 
@@ -62,6 +57,24 @@ logger = logging.getLogger(__name__)
 
 PENDING_IMPORT: set[int] = set()
 PENDING_SETTING: dict[int, str] = {}
+PENDING_ASK: set[int] = set()
+
+
+def _looks_like_question(text: str) -> bool:
+    t = text.lower().strip()
+    if len(t) < 4:
+        return False
+    if t.endswith("?"):
+        return True
+    if any(t.startswith(f"{s} ") or t == s for s in (
+        "what", "how", "why", "when", "which", "should", "can", "is", "are",
+        "do", "does", "tell", "explain", "help", "recommend",
+    )):
+        return True
+    return any(k in t for k in (
+        "best to buy", "what to buy", "should i buy", "top pick",
+        "auto trade", "stop loss", "take profit", "which mode",
+    ))
 
 
 async def _get_menu_kb(user_id: int):
@@ -72,32 +85,20 @@ async def _get_menu_kb(user_id: int):
     return main_menu(has_wallet, autotrade, has_key)
 
 
-def _score_bar(score: float) -> str:
-    return score_bar(score)
-
-
 async def _welcome_text(user_id: int, first_name: str | None) -> str:
     user = await get_user(user_id)
     stats = await get_stats(user_id)
-    tip = random_tip()
 
     if user and user.get("wallet_pubkey"):
-        autotrade = "🟢 LIVE" if user.get("autotrade") else "⏸ Paused"
-        lines = [
-            greeting(first_name),
-            "",
-            WELCOME_BACK,
-            "",
-            f"Status: <b>{autotrade}</b>",
-        ]
+        autotrade = "Running" if user.get("autotrade") else "Paused"
+        lines = [greeting(first_name), "", WELCOME_BACK.strip(), "", f"Status: <b>{autotrade}</b>"]
         if stats["total_trades"] > 0:
-            badge = performance_badge(stats["win_rate"], stats.get("sol_pnl", 0))
-            lines.append(f"Performance: {badge} │ {stats['win_rate']}% win rate")
-        lines.extend(["", tip])
+            label = performance_label(stats["win_rate"], stats.get("sol_pnl", 0))
+            lines.append(f"Performance: {label} | {stats['win_rate']}% win rate")
+        lines.append("\nType a question to ask the AI, or tap Best Buys to scan.")
         return "\n".join(lines)
 
-    lines = [greeting(first_name), "", WELCOME, "", tip]
-    return "\n".join(lines)
+    return f"{greeting(first_name)}\n{WELCOME}\n\nType a question anytime to ask the AI."
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -123,14 +124,29 @@ async def cmd_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await update.message.reply_text(text, parse_mode="HTML", reply_markup=dashboard_menu())
 
 
-async def cmd_tips(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.message:
+async def cmd_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message or not update.effective_user:
         return
-    await update.message.reply_text(
-        f"<b>💡 Pro Tip</b>\n\n{random_tip()}\n\n<i>Tap /tips again for another.</i>",
-        parse_mode="HTML",
-        reply_markup=back_button(),
-    )
+    question = " ".join(context.args) if context.args else ""
+    user_id = update.effective_user.id
+    user = await get_user(user_id) or {}
+
+    if not question:
+        PENDING_ASK.add(user_id)
+        await update.message.reply_text(
+            "<b>Ask the AI</b>\n\nType your question below.\n\n"
+            "Examples:\n"
+            "- What should I buy right now?\n"
+            "- How does stop loss work?\n"
+            "- Which mode should I use?",
+            parse_mode="HTML",
+            reply_markup=ask_ai_menu(),
+        )
+        return
+
+    await update.message.reply_chat_action("typing")
+    answer = await ask_ai(question, user)
+    await update.message.reply_text(f"<b>AI</b>\n\n{answer}", parse_mode="HTML", reply_markup=back_button())
 
 
 async def _format_dashboard(user_id: int) -> str:
@@ -144,51 +160,46 @@ async def _format_dashboard(user_id: int) -> str:
     if user.get("wallet_pubkey"):
         bal = await get_balance_sol(user["wallet_pubkey"])
 
-    autotrade = "🟢 LIVE" if user.get("autotrade") else "⏸ Paused"
+    autotrade = "Running" if user.get("autotrade") else "Paused"
     mode_label = PRESETS.get(user.get("risk_mode") or "balanced", PRESETS["balanced"])["label"]
-    badge = performance_badge(stats["win_rate"], stats.get("sol_pnl", 0))
+    perf = performance_label(stats["win_rate"], stats.get("sol_pnl", 0))
 
     lines = [
-        "📊 <b>Your Trading Dashboard</b>",
+        "<b>Dashboard</b>",
         "",
-        f"🤖 Bot: <b>{autotrade}</b>  │  🎛 {mode_label}",
-        f"💰 Balance: <b>{bal:.4f} SOL</b>  │  📦 {stats['open_positions']} open",
-        f"🏅 {badge}",
+        f"Bot: {autotrade} | Mode: {mode_label}",
+        f"Balance: {bal:.4f} SOL | Open: {stats['open_positions']}",
+        f"Performance: {perf}",
         "",
-        "<b>📈 Performance</b>",
-        f"├ Trades: {stats['total_trades']} ({stats['wins']}W / {stats['losses']}L)",
-        f"├ Win Rate: {stats['win_rate']}%  {pnl_bar(stats['win_rate'] - 50)}",
-        f"├ Avg PnL: {stats['avg_pnl']:+.1f}%",
-        f"└ Realized: <b>{stats.get('sol_pnl', 0):+.4f} SOL</b>",
+        "<b>Stats</b>",
+        f"Trades: {stats['total_trades']} ({stats['wins']}W / {stats['losses']}L)",
+        f"Win rate: {stats['win_rate']}%",
+        f"Avg PnL: {stats['avg_pnl']:+.1f}%",
+        f"Realized: {stats.get('sol_pnl', 0):+.4f} SOL",
     ]
 
     if unrealized and unrealized["invested_sol"] > 0:
         u = unrealized["unrealized_sol"]
         up = unrealized["unrealized_pct"]
-        emoji = "🟢" if u >= 0 else "🔴"
         lines.extend([
             "",
-            "<b>💼 Open Positions (Live)</b>",
-            f"├ Invested: {unrealized['invested_sol']:.4f} SOL",
-            f"├ Est. Value: {unrealized['current_sol']:.4f} SOL",
-            f"└ Unrealized: {emoji} <b>{u:+.4f} SOL ({up:+.1f}%)</b>",
+            "<b>Open Positions</b>",
+            f"Invested: {unrealized['invested_sol']:.4f} SOL",
+            f"Est. value: {unrealized['current_sol']:.4f} SOL",
+            f"Unrealized: {u:+.4f} SOL ({up:+.1f}%)",
         ])
 
     if best.get("best_symbol"):
-        lines.extend([
-            "",
-            "<b>🏆 Records</b>",
-            f"├ Best: ${best['best_symbol']} ({best['best_pnl']:+.1f}%)",
-        ])
+        lines.extend(["", "<b>Records</b>", f"Best: ${best['best_symbol']} ({best['best_pnl']:+.1f}%)"])
         if best.get("worst_symbol"):
-            lines.append(f"└ Worst: ${best['worst_symbol']} ({best['worst_pnl']:+.1f}%)")
+            lines.append(f"Worst: ${best['worst_symbol']} ({best['worst_pnl']:+.1f}%)")
 
     lines.extend([
         "",
-        "<b>⚙️ Active Rules</b>",
-        f"├ {float(user.get('trade_sol', 0.05))} SOL/trade",
-        f"├ Stop -{float(user.get('stop_loss_pct', 15))}% │ Target +{float(user.get('take_profit_pct', 50))}%",
-        f"└ AI min score: {float(user.get('min_ai_score', 75))}/100",
+        "<b>Rules</b>",
+        f"Trade size: {float(user.get('trade_sol', 0.05))} SOL",
+        f"Stop: -{float(user.get('stop_loss_pct', 15))}% | Target: +{float(user.get('take_profit_pct', 50))}%",
+        f"Min AI score: {float(user.get('min_ai_score', 75))}/100",
     ])
     return "\n".join(lines)
 
@@ -197,7 +208,7 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message:
         return
     await update.message.reply_chat_action("typing")
-    msg = await update.message.reply_text("🔍 Scanning Solana meme coins with AI...")
+    msg = await update.message.reply_text("Scanning market...")
     text, top5 = await _format_scan_results(update.effective_user.id if update.effective_user else None)
     kb = scan_results_menu(top5) if top5 else back_button()
     await msg.edit_text(text, parse_mode="HTML", disable_web_page_preview=True, reply_markup=kb)
@@ -209,28 +220,48 @@ async def _format_scan_results(user_id: int | None = None) -> tuple[str, list]:
     cache_scan_results(ranked)
 
     if not ranked:
-        return "❌ No quality coins found. Market may be slow — try again shortly.", []
+        return "No quality coins found. Try again in a minute.", []
 
     user = await get_user(user_id) if user_id else None
     min_score = float(user.get("min_ai_score", 75)) if user else 75
 
-    lines = ["🔥 <b>Top Meme Coins — AI Ranked</b>", f"<i>{len(ranked)} coins scanned · tap to buy</i>\n"]
-    for i, c in enumerate(ranked, 1):
-        badge = format_score_emoji(c.ai_score)
-        bar = _score_bar(c.ai_score)
-        sig = c.ai_signals[0] if c.ai_signals else ""
-        entry = entry_quality_label(c)
-        buyable = "✅" if c.ai_score >= min_score else "⏭"
-        lines.append(
-            f"{buyable} <b>{i}. ${c.symbol}</b>  {badge}\n"
-            f"   {bar} {c.ai_score}/100\n"
-            f"   💵 ${c.price_usd:.8f} │ 1h: {c.price_change_h1:+.1f}%\n"
-            f"   💧 ${c.liquidity_usd:,.0f} liq │ ${c.volume_24h:,.0f} vol\n"
-            f"   {entry} │ {sig}\n"
-            f"   🔗 <a href='{c.url}'>Chart</a>\n"
-        )
-    lines.append("\nTap a button below to buy instantly.")
-    return "\n".join(lines), ranked[:5]
+    buys = [c for c in ranked if getattr(c, "ai_verdict", "") in ("STRONG BUY", "BUY") and c.ai_score >= min_score]
+    best = buys[0] if buys else ranked[0]
+    verdict = getattr(best, "ai_verdict", "WATCH")
+    why = "; ".join(best.ai_signals[:3]) if best.ai_signals else "Mixed signals"
+
+    lines = [
+        "<b>AI Market Scan</b>",
+        f"{len(ranked)} coins analyzed",
+        "",
+        f"<b>BEST BUY: ${best.symbol}</b>",
+        f"Verdict: {verdict} | Score: {best.ai_score}/100",
+        f"Price: ${best.price_usd:.8f} | 1h: {best.price_change_h1:+.1f}% | 24h: {best.price_change_h24:+.1f}%",
+        f"Liquidity: ${best.liquidity_usd:,.0f} | Volume: ${best.volume_24h:,.0f}",
+        f"Why: {why}",
+        f"<a href='{best.url}'>Chart</a>",
+        "",
+        "<b>Also worth watching:</b>",
+    ]
+
+    shown = {best.mint}
+    for c in ranked:
+        if c.mint in shown:
+            continue
+        v = getattr(c, "ai_verdict", "WATCH")
+        if v in ("STRONG BUY", "BUY", "WATCH") and len(shown) < 6:
+            why_short = c.ai_signals[0] if c.ai_signals else ""
+            lines.append(f"${c.symbol} — {v} ({c.ai_score}/100) — {why_short}")
+            shown.add(c.mint)
+
+    avoid = [c for c in ranked if getattr(c, "ai_verdict", "") == "AVOID"][:3]
+    if avoid:
+        lines.extend(["", "<b>Avoid:</b>"])
+        for c in avoid:
+            lines.append(f"${c.symbol} — score {c.ai_score}/100")
+
+    lines.append("\nTap a button below to buy, or ask the AI for advice.")
+    return "\n".join(lines), (buys[:5] if buys else ranked[:5])
 
 
 async def cmd_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -238,13 +269,13 @@ async def cmd_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
     PENDING_IMPORT.add(update.effective_user.id)
     await update.message.reply_text(
-        "🔑 <b>Import Trading Wallet</b>\n\n"
-        "Send your Solana wallet <b>private key</b> (base58).\n\n"
-        "⚠️ <b>IMPORTANT:</b>\n"
-        "• Use a NEW dedicated wallet\n"
-        "• Only deposit what you want to trade\n"
-        "• Never use your main wallet\n\n"
-        "Your key is encrypted with AES and stored securely.\n"
+        "<b>Import Trading Wallet</b>\n\n"
+        "Send your Solana wallet private key (base58 format).\n\n"
+        "IMPORTANT:\n"
+        "- Use a NEW dedicated wallet\n"
+        "- Only deposit what you want to trade\n"
+        "- Never use your main wallet\n\n"
+        "Your key is encrypted and stored securely.\n"
         "The message with your key will be deleted automatically.",
         parse_mode="HTML",
         reply_markup=back_button(),
@@ -256,16 +287,16 @@ async def cmd_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     user = await get_user(update.effective_user.id)
     if not user or not user.get("wallet_pubkey"):
-        await update.message.reply_text("❌ No wallet connected. Use /wallet first.")
+        await update.message.reply_text("No wallet connected. Use /wallet first.")
         return
     bal = await get_balance_sol(user["wallet_pubkey"])
-    autotrade = "🟢 ON" if user.get("autotrade") else "🔴 OFF"
-    has_key = "✅ Auto-ready" if user.get("encrypted_key") else "👁 View-only"
+    autotrade = "ON" if user.get("autotrade") else "OFF"
+    has_key = "Auto-ready" if user.get("encrypted_key") else "View-only"
     await update.message.reply_text(
-        f"💰 <b>Your Wallet</b>\n\n"
+        f"<b>Wallet</b>\n\n"
         f"Address: <code>{short_address(user['wallet_pubkey'])}</code>\n\n"
-        f"Balance: <b>{bal:.4f} SOL</b>\n"
-        f"Auto Trade: {autotrade}\n"
+        f"Balance: {bal:.4f} SOL\n"
+        f"Auto trade: {autotrade}\n"
         f"Mode: {has_key}",
         parse_mode="HTML",
         reply_markup=back_button(),
@@ -285,28 +316,22 @@ async def cmd_positions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 async def _format_positions(user_id: int) -> str:
     positions = await get_open_positions(user_id)
     if not positions:
-        return (
-            "📊 <b>No Open Positions</b>\n\n"
-            "Start auto trade and the bot will find opportunities.\n"
-            "Or tap 🔍 Scan Memes to buy manually."
-        )
+        return "No open positions.\n\nStart auto trade or run a scan to buy manually."
 
     unrealized = await get_unrealized_pnl(user_id, positions)
     lines = [
-        "📊 <b>Open Positions</b>",
-        f"Unrealized: <b>{unrealized['unrealized_sol']:+.4f} SOL ({unrealized['unrealized_pct']:+.1f}%)</b>\n",
+        "<b>Open Positions</b>",
+        f"Unrealized: {unrealized['unrealized_sol']:+.4f} SOL ({unrealized['unrealized_pct']:+.1f}%)\n",
     ]
     for p, detail in zip(positions, unrealized["positions"]):
         pnl = detail["pnl_pct"]
-        emoji = "🟢" if pnl >= 0 else "🔴"
-        bar = pnl_bar(min(pnl, 50))
+        tag = "UP" if pnl >= 0 else "DOWN"
         lines.append(
-            f"{emoji} <b>${p['token_symbol']}</b>  {pnl:+.1f}%\n"
-            f"   {bar}\n"
-            f"   {detail['sol_in']:.4f} SOL in → ~{detail['est_sol']:.4f} SOL\n"
-            f"   AI score: {float(p['ai_score']):.0f}/100\n"
+            f"<b>${p['token_symbol']}</b> [{tag}] {pnl:+.1f}%\n"
+            f"  {detail['sol_in']:.4f} SOL in -> ~{detail['est_sol']:.4f} SOL\n"
+            f"  AI score: {float(p['ai_score']):.0f}/100\n"
         )
-    lines.append("\n<i>Tap below to sell any position.</i>")
+    lines.append("\nTap below to sell.")
     return "\n".join(lines)
 
 
@@ -320,11 +345,11 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def _format_history(user_id: int) -> str:
     trades = await get_trade_history(user_id, 10)
     if not trades:
-        return "📜 <b>No trades yet.</b>\n\nStart auto trade to begin!"
+        return "<b>No trades yet.</b>\n\nStart auto trade to begin."
 
-    lines = ["📜 <b>Recent Trades</b>\n"]
+    lines = ["<b>Recent Trades</b>\n"]
     for t in trades:
-        action = "🟢 BUY" if t["action"] == "BUY" else "🔴 SELL"
+        action = "BUY" if t["action"] == "BUY" else "SELL"
         sig = t.get("tx_signature") or ""
         link = f" <a href='https://solscan.io/tx/{sig}'>↗</a>" if sig else ""
         extra = ""
@@ -350,8 +375,8 @@ async def cmd_autotrade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     user = await get_user(update.effective_user.id)
     if not user or not user.get("encrypted_key"):
         await update.message.reply_text(
-            "❌ Import a wallet key first (/wallet) to enable auto trading.\n\n"
-            "Phantom connect alone is view-only — auto trade needs a signing key.",
+            "Import a wallet key first (/wallet) to enable auto trading.\n\n"
+            "Phantom connect alone is view-only.",
         )
         return
     enabled = not bool(user.get("autotrade"))
@@ -368,7 +393,7 @@ async def cmd_modes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     user = await get_user(update.effective_user.id) or {}
     current = user.get("risk_mode") or "balanced"
-    lines = ["🎛 <b>Pick a Trading Mode</b>\n\nOne tap sets everything — trade size, stops, and AI threshold.\n"]
+    lines = ["<b>Trading Modes</b>\n\nOne tap sets trade size, stops, and AI threshold.\n"]
     for key, p in PRESETS.items():
         lines.append(f"{p['label']}\n<i>{p['desc']}</i>\n{preset_summary(key)}\n")
     await update.message.reply_text(
@@ -379,16 +404,16 @@ async def cmd_modes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def _format_settings(user: dict) -> str:
-    notify = "🔔 ON" if user.get("notify_trades", 1) else "🔕 OFF"
+    notify = "ON" if user.get("notify_trades", 1) else "OFF"
     mode = PRESETS.get(user.get("risk_mode") or "balanced", PRESETS["balanced"])["label"]
     return (
-        f"⚙️ <b>Settings</b> — Mode: {mode}\n\n"
-        f"💵 Trade size: <b>{float(user.get('trade_sol', 0.05))} SOL</b>\n"
-        f"🛑 Stop loss: <b>{float(user.get('stop_loss_pct', 15))}%</b>\n"
-        f"🎯 Take profit: <b>{float(user.get('take_profit_pct', 50))}%</b>\n"
-        f"📐 Trailing stop: <b>{float(user.get('trailing_stop_pct', 10))}%</b>\n"
-        f"📦 Max positions: <b>{int(user.get('max_positions', 3))}</b>\n"
-        f"🤖 Min AI score: <b>{float(user.get('min_ai_score', 75))}/100</b>\n"
+        f"<b>Settings</b> — Mode: {mode}\n\n"
+        f"Trade size: <b>{float(user.get('trade_sol', 0.05))} SOL</b>\n"
+        f"Stop loss: {float(user.get('stop_loss_pct', 15))}%\n"
+        f"Take profit: <b>{float(user.get('take_profit_pct', 50))}%</b>\n"
+        f"Trailing stop: <b>{float(user.get('trailing_stop_pct', 10))}%</b>\n"
+        f"Max positions: <b>{int(user.get('max_positions', 3))}</b>\n"
+        f"Min AI score: <b>{float(user.get('min_ai_score', 75))}/100</b>\n"
         f"Notifications: {notify}\n\n"
         f"Tap a button to change:"
     )
@@ -410,7 +435,7 @@ async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     await set_autotrade(update.effective_user.id, False)
     await update.message.reply_text(
-        "🛑 <b>Emergency Stop</b>\n\nAuto trading halted. Positions still open — use /positions to sell.",
+        "<b>Emergency Stop</b>\n\nAuto trading halted. Use /positions to sell open trades.",
         parse_mode="HTML",
         reply_markup=await _get_menu_kb(update.effective_user.id),
     )
@@ -428,12 +453,28 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         name = update.effective_user.first_name if update.effective_user else None
         text = await _welcome_text(user_id, name)
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=await _get_menu_kb(user_id))
-    elif data == "tips":
+    elif data == "ask_ai":
+        PENDING_ASK.add(user_id)
         await query.edit_message_text(
-            f"<b>💡 Pro Tip</b>\n\n{random_tip()}",
+            "<b>Ask the AI</b>\n\nType your question, or pick one below.",
             parse_mode="HTML",
-            reply_markup=back_button(),
+            reply_markup=ask_ai_menu(),
         )
+    elif data == "ask_preset_buy":
+        await query.edit_message_text("Thinking...", parse_mode="HTML")
+        user = await get_user(user_id) or {}
+        answer = await ask_ai("What should I buy right now?", user)
+        await query.edit_message_text(f"<b>AI</b>\n\n{answer}", parse_mode="HTML", reply_markup=back_button())
+    elif data == "ask_preset_best":
+        await query.edit_message_text("Thinking...", parse_mode="HTML")
+        user = await get_user(user_id) or {}
+        answer = await ask_ai("What is the best coin to buy right now?", user)
+        await query.edit_message_text(f"<b>AI</b>\n\n{answer}", parse_mode="HTML", reply_markup=back_button())
+    elif data == "ask_preset_auto":
+        await query.edit_message_text("Thinking...", parse_mode="HTML")
+        user = await get_user(user_id) or {}
+        answer = await ask_ai("How does auto trade work?", user)
+        await query.edit_message_text(f"<b>AI</b>\n\n{answer}", parse_mode="HTML", reply_markup=back_button())
     elif data == "setup_guide":
         await query.edit_message_text(SETUP_GUIDE, parse_mode="HTML", reply_markup=setup_guide_menu())
     elif data == "profit_info":
@@ -444,7 +485,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         text = await _format_dashboard(user_id)
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=dashboard_menu())
     elif data == "scan":
-        await query.edit_message_text("🔍 Scanning with AI...", parse_mode="HTML")
+        await query.edit_message_text("Scanning market...", parse_mode="HTML")
         text, top5 = await _format_scan_results(user_id)
         kb = scan_results_menu(top5) if top5 else back_button()
         await query.edit_message_text(text, parse_mode="HTML", disable_web_page_preview=True, reply_markup=kb)
@@ -452,21 +493,21 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         mint = data.replace("buymint_", "")
         user = await get_user(user_id)
         if not user or not user.get("encrypted_key"):
-            await query.edit_message_text("❌ Import wallet key first.", reply_markup=back_button())
+            await query.edit_message_text("Import wallet key first.", reply_markup=back_button())
             return
-        await query.edit_message_text("⏳ Executing buy...", parse_mode="HTML")
+        await query.edit_message_text("Executing buy...", parse_mode="HTML")
         ok, msg = await auto_trader.buy_coin(user, mint)
-        await query.edit_message_text(f"{'✅' if ok else '❌'} {msg}", reply_markup=back_button())
+        await query.edit_message_text(f"{'Done' if ok else 'Failed'}: {msg}", reply_markup=back_button())
     elif data == "wallet_import":
         PENDING_IMPORT.add(user_id)
-        await query.edit_message_text("🔑 Send your base58 private key now.\n\n⚠️ Dedicated wallet ONLY!", reply_markup=back_button())
+        await query.edit_message_text("Send your base58 private key now.\n\nUse a dedicated trading wallet only.", reply_markup=back_button())
     elif data == "balance":
         user = await get_user(user_id)
         if not user or not user.get("wallet_pubkey"):
-            await query.edit_message_text("❌ No wallet connected.", reply_markup=back_button())
+            await query.edit_message_text("No wallet connected.", reply_markup=back_button())
             return
         bal = await get_balance_sol(user["wallet_pubkey"])
-        await query.edit_message_text(f"💰 Balance: <b>{bal:.4f} SOL</b>", parse_mode="HTML", reply_markup=back_button())
+        await query.edit_message_text(f"Balance: <b>{bal:.4f} SOL</b>", parse_mode="HTML", reply_markup=back_button())
     elif data == "positions":
         positions = await get_open_positions(user_id)
         text = await _format_positions(user_id)
@@ -478,7 +519,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     elif data == "modes":
         user = await get_user(user_id) or {}
         current = user.get("risk_mode") or "balanced"
-        lines = ["🎛 <b>Pick a Trading Mode</b>\n"]
+        lines = ["<b>Trading Modes</b>\n"]
         for key, p in PRESETS.items():
             lines.append(f"{p['label']} — <i>{p['desc']}</i>\n{preset_summary(key)}\n")
         await query.edit_message_text("\n".join(lines), parse_mode="HTML", reply_markup=modes_menu(current))
@@ -488,38 +529,38 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await apply_preset(user_id, PRESETS[mode_key], mode_key)
             p = PRESETS[mode_key]
             await query.edit_message_text(
-                f"✅ <b>{p['label']} activated!</b>\n\n{preset_summary(mode_key)}\n\n"
-                f"Ready to trade. Tap START Auto Trade when you're set.",
+                f"<b>{p['label']} activated</b>\n\n{preset_summary(mode_key)}\n\n"
+                f"Tap Start Auto Trade when ready.",
                 parse_mode="HTML",
                 reply_markup=await _get_menu_kb(user_id),
             )
     elif data == "buy_top":
         user = await get_user(user_id)
         if not user or not user.get("encrypted_key"):
-            await query.edit_message_text("❌ Import wallet key first.", reply_markup=back_button())
+            await query.edit_message_text("Import wallet key first.", reply_markup=back_button())
             return
-        await query.edit_message_text("⏳ Buying top AI pick...", parse_mode="HTML")
+        await query.edit_message_text("Buying top AI pick...", parse_mode="HTML")
         ok, msg = await auto_trader.buy_top_coin(user)
-        await query.edit_message_text(f"{'✅' if ok else '❌'} {msg}", reply_markup=back_button())
+        await query.edit_message_text(f"{'Done' if ok else 'Failed'}: {msg}", reply_markup=back_button())
     elif data == "sell_all":
         positions = await get_open_positions(user_id)
         if not positions:
             await query.edit_message_text("No open positions to sell.", reply_markup=back_button())
             return
         await query.edit_message_text(
-            f"⚠️ <b>Sell all {len(positions)} positions?</b>\n\nThis will market-sell everything in your wallet.",
+            f"<b>Sell all {len(positions)} positions?</b>\n\nThis will market-sell everything.",
             parse_mode="HTML",
             reply_markup=confirm_sell_all(),
         )
     elif data == "sell_all_confirm":
         user = await get_user(user_id)
         if not user or not user.get("encrypted_key"):
-            await query.edit_message_text("❌ No wallet.", reply_markup=back_button())
+            await query.edit_message_text("No wallet.", reply_markup=back_button())
             return
-        await query.edit_message_text("⏳ Selling all positions...", parse_mode="HTML")
+        await query.edit_message_text("Selling all positions...", parse_mode="HTML")
         ok, total = await auto_trader.sell_all(user)
         await query.edit_message_text(
-            f"✅ <b>Done!</b> Sold {ok}/{total} positions.",
+            f"<b>Done.</b> Sold {ok}/{total} positions.",
             parse_mode="HTML",
             reply_markup=back_button(),
         )
@@ -527,20 +568,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         user = await get_user(user_id) or {}
         new_val = 0 if user.get("notify_trades", 1) else 1
         await upsert_user(user_id, notify_trades=new_val)
-        status = "🔔 ON" if new_val else "🔕 OFF"
+        status = "ON" if new_val else "OFF"
         await query.answer(f"Notifications {status}")
         user = await get_user(user_id) or {}
         await query.edit_message_text(await _format_settings(user), parse_mode="HTML", reply_markup=settings_menu())
     elif data == "disconnect":
         await query.edit_message_text(
-            "⚠️ <b>Disconnect wallet?</b>\n\nThis stops auto trade and removes your wallet from the bot.",
+            "<b>Disconnect wallet?</b>\n\nThis stops auto trade and removes your wallet.",
             parse_mode="HTML",
             reply_markup=confirm_disconnect(),
         )
     elif data == "disconnect_confirm":
         await disconnect_wallet(user_id)
         await query.edit_message_text(
-            "🔓 <b>Wallet disconnected.</b>\n\nAuto trade stopped. Import again anytime to restart.",
+            "<b>Wallet disconnected.</b>\n\nAuto trade stopped.",
             parse_mode="HTML",
             reply_markup=await _get_menu_kb(user_id),
         )
@@ -550,7 +591,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     elif data == "autotrade_on":
         user = await get_user(user_id)
         if not user or not user.get("encrypted_key"):
-            await query.edit_message_text("❌ Import wallet key first (/wallet).", reply_markup=back_button())
+            await query.edit_message_text("Import wallet key first (/wallet).", reply_markup=back_button())
             return
         await set_autotrade(user_id, True)
         await query.edit_message_text(AUTOTRADE_ON, parse_mode="HTML", reply_markup=await _get_menu_kb(user_id))
@@ -562,36 +603,36 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         user = await get_user(user_id)
         pos = await get_position_by_id(pos_id, user_id)
         if not user or not pos:
-            await query.edit_message_text("❌ Position not found.", reply_markup=back_button())
+            await query.edit_message_text("Position not found.", reply_markup=back_button())
             return
-        await query.edit_message_text(f"⏳ Selling ${pos['token_symbol']}...", parse_mode="HTML")
+        await query.edit_message_text(f"Selling ${pos['token_symbol']}...", parse_mode="HTML")
         ok, msg = await auto_trader.sell_position_manual(user, pos)
-        result = f"✅ {msg}" if ok else f"❌ {msg}"
+        result = f"Done: {msg}" if ok else f"Failed: {msg}"
         await query.edit_message_text(result, reply_markup=back_button())
     elif data.startswith("quick_trade_"):
         val = float(data.replace("quick_trade_", ""))
         await upsert_user(user_id, trade_sol=val)
-        await query.edit_message_text(f"✅ Trade size → <b>{val} SOL</b>", parse_mode="HTML", reply_markup=settings_menu())
+        await query.edit_message_text(f"Trade size set to {val} SOL", parse_mode="HTML", reply_markup=settings_menu())
     elif data.startswith("quick_sl_"):
         val = float(data.replace("quick_sl_", ""))
         await upsert_user(user_id, stop_loss_pct=val)
-        await query.edit_message_text(f"✅ Stop loss → <b>{val}%</b>", parse_mode="HTML", reply_markup=settings_menu())
+        await query.edit_message_text(f"Stop loss set to {val}%", parse_mode="HTML", reply_markup=settings_menu())
     elif data == "set_trade":
-        await query.edit_message_text("💵 Pick trade size:", parse_mode="HTML", reply_markup=trade_size_quick())
+        await query.edit_message_text("Pick trade size:", parse_mode="HTML", reply_markup=trade_size_quick())
     elif data == "set_stoploss":
-        await query.edit_message_text("🛑 Pick stop loss %:", parse_mode="HTML", reply_markup=stop_loss_quick())
+        await query.edit_message_text("Pick stop loss %:", parse_mode="HTML", reply_markup=stop_loss_quick())
     elif data == "set_minscore":
         PENDING_SETTING[user_id] = "min_ai_score"
-        await query.edit_message_text("🤖 Min AI score (70-95, e.g. <code>80</code>):", parse_mode="HTML", reply_markup=back_button())
+        await query.edit_message_text("Min AI score (70-95, e.g. <code>80</code>):", parse_mode="HTML", reply_markup=back_button())
     elif data == "set_takeprofit":
         PENDING_SETTING[user_id] = "take_profit_pct"
-        await query.edit_message_text("🎯 Send take profit % (e.g. <code>50</code>):", parse_mode="HTML", reply_markup=back_button())
+        await query.edit_message_text("Send take profit % (e.g. <code>50</code>):", parse_mode="HTML", reply_markup=back_button())
     elif data == "set_trailing":
         PENDING_SETTING[user_id] = "trailing_stop_pct"
-        await query.edit_message_text("📐 Send trailing stop % (e.g. <code>10</code>):", parse_mode="HTML", reply_markup=back_button())
+        await query.edit_message_text("Send trailing stop % (e.g. <code>10</code>):", parse_mode="HTML", reply_markup=back_button())
     elif data == "set_maxpos":
         PENDING_SETTING[user_id] = "max_positions"
-        await query.edit_message_text("📦 Send max open positions (e.g. <code>3</code>):", parse_mode="HTML", reply_markup=back_button())
+        await query.edit_message_text("Send max open positions (e.g. <code>3</code>):", parse_mode="HTML", reply_markup=back_button())
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -614,9 +655,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             else:
                 val = float(text)
             await upsert_user(user_id, **{field: val})
-            await update.message.reply_text(f"✅ Updated → <b>{val}</b>", parse_mode="HTML", reply_markup=await _get_menu_kb(user_id))
+            await update.message.reply_text(f"Updated to <b>{val}</b>", parse_mode="HTML", reply_markup=await _get_menu_kb(user_id))
         except ValueError:
-            await update.message.reply_text("❌ Invalid value. Try again.")
+            await update.message.reply_text("Invalid value. Try again.")
         return
 
     if user_id in PENDING_IMPORT:
@@ -633,23 +674,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             except Exception:
                 pass
             await update.message.reply_text(
-                f"✅ <b>You're all set!</b>\n\n"
-                f"Wallet: <code>{short_address(pubkey)}</code>\n"
+                f"<b>Wallet connected</b>\n\n"
+                f"Address: <code>{short_address(pubkey)}</code>\n"
                 f"Balance: <b>{bal:.4f} SOL</b>\n"
-                f"Mode: ⚖️ Balanced\n\n"
-                f"🚀 Tap <b>START Auto Trade</b> — the bot handles the rest!",
+                f"Mode: Balanced\n\n"
+                f"Tap <b>Start Auto Trade</b> when ready, or run Best Buys to see what to buy.",
                 parse_mode="HTML",
                 reply_markup=await _get_menu_kb(user_id),
             )
         except Exception as exc:
-            await update.message.reply_text(f"❌ Invalid key: {exc}")
+            await update.message.reply_text(f"Invalid key: {exc}")
+        return
+
+    if user_id in PENDING_ASK or _looks_like_question(text):
+        PENDING_ASK.discard(user_id)
+        user = await get_user(user_id) or {}
+        await update.message.reply_chat_action("typing")
+        answer = await ask_ai(text, user)
+        await update.message.reply_text(
+            f"<b>AI</b>\n\n{answer}",
+            parse_mode="HTML",
+            reply_markup=back_button(),
+        )
         return
 
     if 32 <= len(text) <= 50 and validate_pubkey(text):
         await set_wallet(user_id, text, None)
         bal = await get_balance_sol(text)
         await update.message.reply_text(
-            f"👻 Wallet linked (view-only): {bal:.4f} SOL\n\nImport key via /wallet for auto trading.",
+            f"Wallet linked (view-only): {bal:.4f} SOL\n\nImport key via /wallet for auto trading.",
             reply_markup=await _get_menu_kb(user_id),
         )
 
@@ -667,7 +720,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await set_wallet(user_id, pubkey, None)
             bal = await get_balance_sol(pubkey)
             await update.message.reply_text(
-                f"👻 <b>Phantom Connected!</b>\n\n"
+                f"<b>Phantom Connected</b>\n\n"
                 f"<code>{pubkey[:12]}...{pubkey[-8:]}</code>\n"
                 f"Balance: <b>{bal:.4f} SOL</b>\n\n"
                 f"Import key via /wallet for auto trading.",
@@ -675,7 +728,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 reply_markup=await _get_menu_kb(user_id),
             )
     except Exception as exc:
-        await update.message.reply_text(f"❌ Phantom connect failed: {exc}")
+        await update.message.reply_text(f"Phantom connect failed: {exc}")
 
 
 async def post_init(application: Application) -> None:
@@ -709,7 +762,7 @@ def build_application() -> Application:
         ("scan", cmd_scan), ("modes", cmd_modes), ("wallet", cmd_wallet),
         ("balance", cmd_balance), ("positions", cmd_positions), ("history", cmd_history),
         ("autotrade", cmd_autotrade), ("settings", cmd_settings), ("stop", cmd_stop),
-        ("tips", cmd_tips),
+        ("ask", cmd_ask),
     ]:
         app.add_handler(CommandHandler(cmd, handler))
 

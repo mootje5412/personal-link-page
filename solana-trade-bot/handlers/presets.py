@@ -1,9 +1,9 @@
-"""One-tap trading presets — makes setup easy."""
+"""One-tap trading presets."""
 
 PRESETS = {
     "safe": {
-        "label": "🛡 Safe Mode",
-        "desc": "Small trades, tight stops, only elite coins",
+        "label": "Safe",
+        "desc": "Small trades, tight stops, elite coins only",
         "trade_sol": 0.02,
         "stop_loss_pct": 10,
         "take_profit_pct": 30,
@@ -12,7 +12,7 @@ PRESETS = {
         "min_ai_score": 85,
     },
     "balanced": {
-        "label": "⚖️ Balanced",
+        "label": "Balanced",
         "desc": "Recommended for most users",
         "trade_sol": 0.05,
         "stop_loss_pct": 15,
@@ -22,7 +22,7 @@ PRESETS = {
         "min_ai_score": 75,
     },
     "degen": {
-        "label": "🔥 Degen Mode",
+        "label": "Degen",
         "desc": "Bigger trades, wider stops, more positions",
         "trade_sol": 0.1,
         "stop_loss_pct": 20,
@@ -37,7 +37,6 @@ PRESETS = {
 def preset_summary(key: str) -> str:
     p = PRESETS[key]
     return (
-        f"{p['label']}\n"
-        f"💵 {p['trade_sol']} SOL/trade · 🛑 -{p['stop_loss_pct']}% · 🎯 +{p['take_profit_pct']}%\n"
-        f"📦 Max {p['max_positions']} positions · AI min {p['min_ai_score']}/100"
+        f"{p['trade_sol']} SOL/trade | Stop -{p['stop_loss_pct']}% | Target +{p['take_profit_pct']}%\n"
+        f"Max {p['max_positions']} positions | Min score {p['min_ai_score']}/100"
     )
