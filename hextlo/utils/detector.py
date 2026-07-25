@@ -203,7 +203,7 @@ def detect_search(text: str) -> DetectedSearch | None:
             return _name_search(words[0], words[1])
         return _name_search(words[0], " ".join(words[1:]))
 
-    if len(words) == 1 and re.match(r"^[A-Za-z0-9@._-]{3,}$", words[0]):
+    if len(words) == 1 and re.match(r"^[A-Za-z0-9@._-]{5,}$", words[0]):
         return _odido_search(words[0])
 
     return None

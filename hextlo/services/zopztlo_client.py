@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import httpx
@@ -62,6 +63,74 @@ def _format_dob(value: str) -> str:
     if len(digits) == 8:
         return f"{digits[4:6]}/{digits[6:8]}/{digits[:4]}"
     return text
+
+
+def _normalize_key(key: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", key.lower())
+
+
+ODIDO_KEY_MAP: dict[str, tuple[str, bool]] = {
+    "firstname": ("First Name", False),
+    "lastname": ("Last Name", False),
+    "birthdate": ("DOB", True),
+    "birthdatec": ("DOB", True),
+    "phone": ("Phone", False),
+    "mobilephone": ("Mobile", False),
+    "email": ("Email", False),
+    "salutation": ("Salutation", False),
+    "initialsc": ("Initials", False),
+    "genderc": ("Gender", False),
+    "vlocitycmtgenderc": ("Gender", False),
+    "nationalityc": ("Nationality", False),
+    "idnumberc": ("ID Number", False),
+    "idtypec": ("ID Type", False),
+    "idvalidc": ("ID Valid", True),
+    "brandc": ("Brand", False),
+    "vlocitycmtstatusc": ("Status", False),
+    "copslanguagec": ("Language", False),
+    "accountsegmentindicatorc": ("Segment", False),
+}
+
+
+def _odido_title(record: dict[str, Any], fields: dict[str, str]) -> str:
+    first = _flatten_value(record.get("FirstName"))
+    last = _flatten_value(record.get("LastName")) or fields.get("Last Name", "")
+    initials = fields.get("Initials", "")
+    name = _flatten_value(record.get("Name"))
+
+    if first and last:
+        return f"{first} {last}"
+    if initials and last:
+        return f"{initials} {last}".strip()
+    if name:
+        return name
+    if last:
+        return last
+    return "Odido Record"
+
+
+def _record_from_odido(record: dict[str, Any], index: int) -> SearchResult:
+    fields: dict[str, str] = {}
+
+    for key, value in record.items():
+        if value in (None, "", []):
+            continue
+        mapping = ODIDO_KEY_MAP.get(_normalize_key(key))
+        if not mapping:
+            continue
+        label, is_date = mapping
+        text = _format_dob(_flatten_value(value)) if is_date else _flatten_value(value)
+        if _normalize_key(key) in {"genderc", "vlocitycmtgenderc"} and fields.get("Gender"):
+            continue
+        if label == "DOB" and fields.get("DOB"):
+            continue
+        if text.lower() in {"false", "true", "no", "null"} and label not in {"Gender"}:
+            if text.lower() in {"false", "true"}:
+                continue
+        fields[label] = text
+
+    title = _odido_title(record, fields)
+    return SearchResult(title=title, fields=fields, raw=record)
 
 
 def _record_from_mapping(record: dict[str, Any], index: int) -> SearchResult:
@@ -140,6 +209,25 @@ def _extract_records(payload: Any) -> tuple[list[Any], int, str]:
     return [], 0, ""
 
 
+VIN_KEEP_FIELDS = {
+    "VIN",
+    "Model Year",
+    "Make",
+    "Model",
+    "Trim",
+    "Body Class",
+    "Vehicle Type",
+    "Drive Type",
+    "Transmission Style",
+    "Engine Number of Cylinders",
+    "Displacement (L)",
+    "Fuel Type - Primary",
+    "Doors",
+    "Plant Country",
+    "Manufacturer Name",
+}
+
+
 def _format_vin_results(records: list[Any]) -> SearchResult:
     fields: dict[str, str] = {}
     for item in records:
@@ -147,7 +235,11 @@ def _format_vin_results(records: list[Any]) -> SearchResult:
             continue
         variable = _flatten_value(item.get("Variable"))
         value = _flatten_value(item.get("Value"))
-        if not variable or not value or value.lower() == "null":
+        if not variable or not value:
+            continue
+        if value.lower() in {"null", "not applicable", "n/a"}:
+            continue
+        if variable not in VIN_KEEP_FIELDS:
             continue
         fields[variable] = value
 
@@ -162,7 +254,7 @@ def _format_vin_results(records: list[Any]) -> SearchResult:
         if part
     ).strip() or "VIN Lookup"
 
-    return SearchResult(title=title, fields=fields)
+    return SearchResult(title=title, fields=fields, raw={"fields": fields})
 
 
 def _parse_results(payload: Any, search_type: SearchType | None = None) -> tuple[list[SearchResult], int, str]:
@@ -181,8 +273,13 @@ def _parse_results(payload: Any, search_type: SearchType | None = None) -> tuple
             vin_result = _format_vin_results(records)
             return [vin_result], 1, ""
 
+        parse_record = (
+            _record_from_odido
+            if search_type == SearchType.ODIDO
+            else _record_from_mapping
+        )
         parsed = [
-            _record_from_mapping(item, idx)
+            parse_record(item, idx)
             for idx, item in enumerate(records, start=1)
             if isinstance(item, dict)
         ]

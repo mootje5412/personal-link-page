@@ -1,5 +1,6 @@
 from config.settings import settings
 from models.search import SEARCH_LABELS, SearchResponse, SearchType
+from utils.result_display import format_result
 
 
 def truncate(text: str, limit: int | None = None) -> str:
@@ -43,10 +44,12 @@ def format_search_page(response: SearchResponse, page: int = 0) -> str:
     ]
 
     for index, result in enumerate(page_results, start=start + 1):
-        if response.search_type == SearchType.VIN:
-            lines.append(result.to_text() + "\n")
-        else:
-            lines.append(f"[{index}] {result.to_text()}\n")
+        card = format_result(
+            result,
+            response.search_type,
+            index=None if response.search_type == SearchType.VIN else index,
+        )
+        lines.append(card + "\n")
 
     return truncate("\n".join(lines).strip())
 
