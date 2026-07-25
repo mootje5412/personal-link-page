@@ -53,6 +53,32 @@ def _record_from_mapping(record: dict[str, Any], index: int) -> SearchResult:
     return SearchResult(title=title, fields=fields, raw=record)
 
 
+def _extract_records(payload: Any) -> tuple[list[Any], int]:
+    if not isinstance(payload, dict):
+        return [], 0
+
+    data = payload.get("data")
+    if isinstance(data, dict):
+        nested = data.get("results")
+        if isinstance(nested, dict) and isinstance(nested.get("results"), list):
+            records = nested["results"]
+            total = int(nested.get("returned") or len(records))
+            return records, total
+        if isinstance(nested, list):
+            return nested, len(nested)
+        for key in ("records", "matches", "items"):
+            if isinstance(data.get(key), list):
+                records = data[key]
+                return records, len(records)
+
+    for key in ("results", "data", "records", "matches", "items"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            return value, len(value)
+
+    return [], 0
+
+
 def _parse_results(payload: Any) -> tuple[list[SearchResult], int, str]:
     if payload is None:
         return [], 0, "No data returned."
@@ -61,16 +87,24 @@ def _parse_results(payload: Any) -> tuple[list[SearchResult], int, str]:
         if payload.get("success") is False:
             return [], 0, str(payload.get("error") or payload.get("message") or "Search failed.")
 
-        for key in ("results", "data", "records", "matches", "items"):
-            if key in payload and isinstance(payload[key], list):
-                records = payload[key]
-                parsed = [_record_from_mapping(item, idx) for idx, item in enumerate(records, start=1) if isinstance(item, dict)]
-                total = int(payload.get("total") or payload.get("count") or len(parsed))
-                return parsed, total, ""
+        records, total = _extract_records(payload)
+        if records:
+            parsed = [
+                _record_from_mapping(item, idx)
+                for idx, item in enumerate(records, start=1)
+                if isinstance(item, dict)
+            ]
+            if parsed:
+                return parsed, total or len(parsed), ""
+            text_rows = [SearchResult(title=str(item)) for item in records if item]
+            return text_rows, len(text_rows), ""
 
         message = str(payload.get("message") or payload.get("result") or "").strip()
         if message:
             return [SearchResult(title=message)], 1, ""
+
+        if payload.get("success") is True:
+            return [], 0, ""
 
         if any(not str(key).startswith("_") for key in payload.keys()):
             parsed = [_record_from_mapping(payload, 1)]
@@ -104,7 +138,8 @@ class ZopzTloClient:
         params = {"q": detected.api_query, "key": settings.api_key}
 
         try:
-            async with httpx.AsyncClient(timeout=settings.api_timeout) as client:
+            transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
+            async with httpx.AsyncClient(timeout=settings.api_timeout, transport=transport) as client:
                 response = await client.get(url, params=params)
                 response.raise_for_status()
                 payload = response.json()
