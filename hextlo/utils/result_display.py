@@ -63,6 +63,26 @@ def _format_engine(fields: dict[str, str]) -> str | None:
     return displacement or cylinders or None
 
 
+NPD_FIELD_MAP: list[tuple[str, str]] = [
+    ("SSN", "SSN"),
+    ("Phone", "Phone"),
+    ("Address", "Address"),
+]
+
+
+def format_npd_result(result: SearchResult, index: int | None = None) -> str:
+    prefix = f"[{index}] " if index is not None else ""
+    lines = [f"{prefix}{result.title}", RECORD_LINE]
+
+    for field_key, label in NPD_FIELD_MAP:
+        value = result.fields.get(field_key, "").strip()
+        if _is_noise(value):
+            continue
+        lines.append(f"  {label}: {value}")
+
+    return "\n".join(lines)
+
+
 def format_odido_result(result: SearchResult, index: int | None = None) -> str:
     prefix = f"[{index}] " if index is not None else ""
     lines = [f"{prefix}{result.title}", RECORD_LINE]
@@ -149,6 +169,8 @@ def format_default_result(result: SearchResult, index: int) -> str:
 
 
 def format_result(result: SearchResult, search_type: SearchType, index: int | None = None) -> str:
+    if search_type == SearchType.PERSON:
+        return format_npd_result(result, index)
     if search_type == SearchType.ODIDO:
         return format_odido_result(result, index)
     if search_type == SearchType.VIN:

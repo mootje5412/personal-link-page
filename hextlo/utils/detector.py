@@ -8,7 +8,7 @@ PHONE_PATTERN = re.compile(r"^\+?1?[\d\s().-]{10,20}$")
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 ZIP_PATTERN = re.compile(r"^\d{5}(?:-\d{4})?$")
 NAME_PART_PATTERN = re.compile(r"^[A-Za-z][A-Za-z'.-]*$")
-PREFIX_PATTERN = re.compile(r"^(intelius|odido|person)[:\s]+(.+)$", re.IGNORECASE)
+PREFIX_PATTERN = re.compile(r"^(intelius|odido|person|npd)[:\s]+(.+)$", re.IGNORECASE)
 
 US_STATES = {
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA",
@@ -107,24 +107,29 @@ def _odido_search(query: str) -> DetectedSearch:
     )
 
 
-def _person_search(first: str, last: str, third: str, fourth: str) -> DetectedSearch:
-    display = f"{first} {last} {third} {fourth}"
+def _npd_search(first: str, last: str, state: str, zip_code: str = "00000") -> DetectedSearch:
+    state = state.upper()
+    if zip_code in {"00000", "*"}:
+        display = f"{first} {last} {state}"
+    else:
+        display = f"{first} {last} {state} {zip_code}"
     return DetectedSearch(
         SearchType.PERSON,
-        _comma_query([first, last, third, fourth]),
+        _comma_query([first, last, state, zip_code]),
         display,
-        label="Person Lookup",
+        label="NPD Search",
     )
 
 
 def _name_search(first: str, last: str, state: str = NATIONWIDE_STATE) -> DetectedSearch:
-    display = f"{first} {last}" if state == NATIONWIDE_STATE else f"{first} {last} {state}"
-    label = "Name Search" if state == NATIONWIDE_STATE else "Criminal Lookup"
+    if state != NATIONWIDE_STATE:
+        return _npd_search(first, last, state)
+    display = f"{first} {last}"
     return DetectedSearch(
         SearchType.CRIMINAL,
         _comma_query([first, last, state.upper()]),
         display,
-        label=label,
+        label="Name Search",
     )
 
 
@@ -153,10 +158,12 @@ def detect_search(text: str) -> DetectedSearch | None:
             if len(parts) >= 3:
                 return _intelius_search(parts[0], parts[1], parts[2])
             return None
-        if prefix == "person":
+        if prefix in {"person", "npd"}:
             parts = [part.strip() for part in query.split(",") if part.strip()]
             if len(parts) >= 4:
-                return _person_search(parts[0], parts[1], parts[2], parts[3])
+                return _npd_search(parts[0], parts[1], parts[2], parts[3])
+            if len(parts) == 3 and _is_state(parts[2]):
+                return _npd_search(parts[0], parts[1], parts[2])
             return None
         return _odido_search(query)
 
@@ -171,7 +178,7 @@ def detect_search(text: str) -> DetectedSearch | None:
         if len(parts) >= 4:
             if _is_state(parts[3]):
                 return _criminal_search(parts[0], parts[1], parts[2], parts[3])
-            return _person_search(parts[0], parts[1], parts[2], parts[3])
+            return _npd_search(parts[0], parts[1], parts[2], parts[3])
         if len(parts) == 3:
             if _looks_like_ssn(parts[0]):
                 return DetectedSearch(SearchType.SSN, normalize_ssn(parts[0]), raw, label="SSN Search")
@@ -211,7 +218,7 @@ def detect_search(text: str) -> DetectedSearch | None:
 
     words = raw.split()
     if len(words) == 4 and _is_state(words[-2]) and _looks_like_zip(words[-1]):
-        return _person_search(words[0], words[1], words[-2], words[-1])
+        return _npd_search(words[0], words[1], words[-2], words[-1])
 
     if len(words) >= 4 and _is_state(words[-1]):
         state = words[-1].upper()
@@ -238,10 +245,10 @@ def format_detection_hint() -> str:
         "Could not detect that search.\n\n"
         "Try one of these:\n"
         "  418-90-8868 .............. SSN\n"
-        "  John Doe ................. name\n"
-        "  John Doe CA .............. name + state\n"
-        "  John Doe CA 90210 ........ person lookup\n"
-        "  John,Doe,CA,90210 ........ person lookup\n"
+        "  John Doe ................. name (criminal)\n"
+        "  John Doe CA .............. NPD (SSN, address)\n"
+        "  John Doe CA 90210 ........ NPD + ZIP\n"
+        "  John,Doe,CA,90210 ........ NPD\n"
         "  John,Doe,90210 ........... Intelius\n"
         "  example .................. Odido keyword\n"
         "  user@email.com ............. Odido\n"

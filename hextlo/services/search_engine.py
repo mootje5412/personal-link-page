@@ -74,13 +74,13 @@ def _empty_message(detected: DetectedSearch) -> str:
         )
     if detected.search_type == SearchType.PERSON:
         return (
-            "No person records found.\n"
-            "Format: First,Last,State,ZIP — e.g. John,Doe,CA,90210"
+            "No NPD records found.\n"
+            "Try: John Doe CA  or  John,Doe,CA,90210"
         )
     if detected.label == "Name Search":
         return (
             "No records found for that name.\n"
-            "Try adding a state: John Doe CA"
+            "Add a state for SSN + address: John Doe CA"
         )
     return "No results found."
 

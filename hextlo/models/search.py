@@ -41,7 +41,7 @@ SEARCH_LABELS: dict[SearchType, str] = {
     SearchType.INTELIUS: "Intelius Search",
     SearchType.MOBILE: "Phone Search",
     SearchType.ODIDO: "Odido Search",
-    SearchType.PERSON: "Person Lookup",
+    SearchType.PERSON: "NPD Search",
 }
 
 
