@@ -46,6 +46,7 @@ async def check_all_apis() -> list[tuple[str, bool, str, int]]:
     checks = [
         ("SSN Search", SearchType.SSN.value, "418-90-8868"),
         ("Name Search", SearchType.CRIMINAL.value, "John,Doe,XX"),
+        ("Person Lookup", SearchType.PERSON.value, "John,Doe,CA,90210"),
         ("Intelius", SearchType.INTELIUS.value, "John,Doe,90210"),
         ("Odido", SearchType.ODIDO.value, "example"),
         ("VIN Search", SearchType.VIN.value, "1HGBH41JXMN109186"),

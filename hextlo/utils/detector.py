@@ -8,7 +8,7 @@ PHONE_PATTERN = re.compile(r"^\+?1?[\d\s().-]{10,20}$")
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 ZIP_PATTERN = re.compile(r"^\d{5}(?:-\d{4})?$")
 NAME_PART_PATTERN = re.compile(r"^[A-Za-z][A-Za-z'.-]*$")
-PREFIX_PATTERN = re.compile(r"^(intelius|odido)[:\s]+(.+)$", re.IGNORECASE)
+PREFIX_PATTERN = re.compile(r"^(intelius|odido|person)[:\s]+(.+)$", re.IGNORECASE)
 
 US_STATES = {
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA",
@@ -65,6 +65,10 @@ def _is_state(value: str) -> bool:
     return value.upper() in US_STATES
 
 
+def _looks_like_zip(value: str) -> bool:
+    return bool(ZIP_PATTERN.match(value.strip()))
+
+
 def _looks_like_name_part(value: str) -> bool:
     return bool(NAME_PART_PATTERN.match(value.strip()))
 
@@ -100,6 +104,16 @@ def _odido_search(query: str) -> DetectedSearch:
         query.strip(),
         query.strip(),
         label="Odido Search",
+    )
+
+
+def _person_search(first: str, last: str, third: str, fourth: str) -> DetectedSearch:
+    display = f"{first} {last} {third} {fourth}"
+    return DetectedSearch(
+        SearchType.PERSON,
+        _comma_query([first, last, third, fourth]),
+        display,
+        label="Person Lookup",
     )
 
 
@@ -139,6 +153,11 @@ def detect_search(text: str) -> DetectedSearch | None:
             if len(parts) >= 3:
                 return _intelius_search(parts[0], parts[1], parts[2])
             return None
+        if prefix == "person":
+            parts = [part.strip() for part in query.split(",") if part.strip()]
+            if len(parts) >= 4:
+                return _person_search(parts[0], parts[1], parts[2], parts[3])
+            return None
         return _odido_search(query)
 
     if _looks_like_email(raw):
@@ -150,7 +169,9 @@ def detect_search(text: str) -> DetectedSearch | None:
     if "," in raw:
         parts = [part.strip() for part in raw.split(",") if part.strip()]
         if len(parts) >= 4:
-            return _criminal_search(parts[0], parts[1], parts[2], parts[3])
+            if _is_state(parts[3]):
+                return _criminal_search(parts[0], parts[1], parts[2], parts[3])
+            return _person_search(parts[0], parts[1], parts[2], parts[3])
         if len(parts) == 3:
             if _looks_like_ssn(parts[0]):
                 return DetectedSearch(SearchType.SSN, normalize_ssn(parts[0]), raw, label="SSN Search")
@@ -189,6 +210,9 @@ def detect_search(text: str) -> DetectedSearch | None:
         )
 
     words = raw.split()
+    if len(words) == 4 and _is_state(words[-2]) and _looks_like_zip(words[-1]):
+        return _person_search(words[0], words[1], words[-2], words[-1])
+
     if len(words) >= 4 and _is_state(words[-1]):
         state = words[-1].upper()
         if len(words) == 4:
@@ -216,6 +240,8 @@ def format_detection_hint() -> str:
         "  418-90-8868 .............. SSN\n"
         "  John Doe ................. name\n"
         "  John Doe CA .............. name + state\n"
+        "  John Doe CA 90210 ........ person lookup\n"
+        "  John,Doe,CA,90210 ........ person lookup\n"
         "  John,Doe,90210 ........... Intelius\n"
         "  example .................. Odido keyword\n"
         "  user@email.com ............. Odido\n"

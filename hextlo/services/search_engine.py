@@ -72,6 +72,11 @@ def _empty_message(detected: DetectedSearch) -> str:
             "No Intelius results.\n"
             "Format: First,Last,ZIP — e.g. John,Doe,90210"
         )
+    if detected.search_type == SearchType.PERSON:
+        return (
+            "No person records found.\n"
+            "Format: First,Last,State,ZIP — e.g. John,Doe,CA,90210"
+        )
     if detected.label == "Name Search":
         return (
             "No records found for that name.\n"
