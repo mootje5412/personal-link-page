@@ -1,5 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const config = require('../config/config');
+const apiClient = require('./services/apiClient');
 const commandHandler = require('./handlers/commandHandler');
 const messageHandler = require('./handlers/messageHandler');
 const paginationHandler = require('./handlers/paginationHandler');
@@ -80,8 +81,37 @@ class ApexSearchBot {
       }
     });
 
+    this.checkApiHealth().catch((error) => {
+      console.error('API health check failed:', error.message);
+    });
+
     console.log('Bot is running and ready.');
   }
+
+  async checkApiHealth() {
+    if (!config.intelApiKey) {
+      console.warn('INTEL_API_KEY is not set. Searches will fail until configured.');
+      return;
+    }
+
+    const health = await apiClient.healthCheck();
+    if (!health.ok) {
+      if (isAuthBlocked(health.message)) {
+        console.error(`API BLOCKED: ${health.message}`);
+        console.error('Whitelist this server IP with the API provider or contact support.');
+      } else {
+        console.warn(`API health check warning: ${health.message}`);
+      }
+      return;
+    }
+
+    console.log('API connection OK.');
+  }
+}
+
+function isAuthBlocked(message) {
+  const lower = String(message || '').toLowerCase();
+  return lower.includes('whitelist') || lower.includes('unauthorized');
 }
 
 module.exports = ApexSearchBot;

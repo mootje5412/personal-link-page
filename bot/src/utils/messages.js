@@ -160,17 +160,38 @@ function errorMessage(title, detail) {
   ].join('\n');
 }
 
-function noResultsMessage(query) {
-  return [
+function noResultsMessage(query, meta = {}) {
+  const lines = [
     header('No Results'),
     '',
     `Query: <code>${escapeHtml(query)}</code>`,
-    '',
-    'Nothing found across active sources.',
-    'Try a different term or format.',
-    '',
-    supportLine()
-  ].join('\n');
+    ''
+  ];
+
+  if (meta.allAuth) {
+    lines.push('API connection blocked. The server IP may not be whitelisted.');
+    lines.push('Contact support to restore database access.');
+  } else if (meta.anyTimeout) {
+    lines.push('No records found. Some sources timed out during the scan.');
+    lines.push('Try again in a moment or contact support if this keeps happening.');
+  } else {
+    lines.push('Nothing found across active sources.');
+    lines.push('Try a different term or format.');
+  }
+
+  if (meta.failures?.length && !meta.allAuth) {
+    const issueNames = meta.failures
+      .map(({ name, status }) => `${name} (${status})`)
+      .slice(0, 6);
+
+    if (issueNames.length) {
+      lines.push('');
+      lines.push(`Source status: ${issueNames.join(', ')}`);
+    }
+  }
+
+  lines.push('', supportLine());
+  return lines.join('\n');
 }
 
 function machineNoResultsMessage(query) {

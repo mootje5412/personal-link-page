@@ -1,5 +1,6 @@
 const config = require('../../config/config');
 const apiClient = require('./apiClient');
+const { isAuthError, isTimeoutError, isNoResultError } = require('./apiClient');
 const { formatRecordFields, formatBytes } = require('../utils/recordFormatter');
 const {
   extractAllRecords,
@@ -11,6 +12,7 @@ const {
 const SOURCE_LABELS = {
   breach: 'BREACH',
   stealer: 'STEALER',
+  'stealer-db': 'STEALER',
   discord: 'DISCORD',
   roblox: 'ROBLOX',
   'discord-to-roblox': 'DISCORD-ROBLOX',
@@ -29,6 +31,14 @@ const SOURCE_LABELS = {
 };
 
 class IntelligenceService {
+  normalizeQuery(query) {
+    const trimmed = query.trim();
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      return trimmed.toLowerCase();
+    }
+    return trimmed;
+  }
+
   detectQueryTypes(query) {
     const types = [];
     const trimmed = query.trim();
@@ -56,6 +66,19 @@ class IntelligenceService {
     return types;
   }
 
+  addUsernameSources(tasks, username, add) {
+    if (!username || username.length < 3) return;
+
+    add('roblox', () => apiClient.roblox(username));
+    add('minecraft', () => apiClient.minecraft(username));
+    add('minecraft-osint', () => apiClient.minecraftOsint(username));
+    add('tiktok', () => apiClient.tiktok(username));
+    add('instagram', () => apiClient.instagram(username));
+    add('gta', () => apiClient.gtaPlayers(username));
+    add('gta-spotted', () => apiClient.gtaSpotted(username));
+    add('footprint', () => this.fetchFootprint(username));
+  }
+
   buildTasks(query, types) {
     const tasks = [];
     const add = (name, run) => tasks.push({ name, run });
@@ -80,6 +103,18 @@ class IntelligenceService {
       return tasks;
     }
 
+    if (types.includes('email')) {
+      add('stealer', () => apiClient.stealer(query, 'email'));
+      add('stealer-db', () => apiClient.stealer(query));
+
+      const [localPart, domainPart] = query.split('@');
+      if (domainPart) {
+        add('domain', () => apiClient.domain(domainPart));
+      }
+      this.addUsernameSources(tasks, localPart, add);
+      return tasks;
+    }
+
     const stealerType = query.includes('@') ? 'email' : 'domain';
     add('stealer', () => apiClient.stealer(query, stealerType));
 
@@ -92,14 +127,7 @@ class IntelligenceService {
     }
 
     if (types.includes('username') || types.includes('general')) {
-      add('roblox', () => apiClient.roblox(query));
-      add('minecraft', () => apiClient.minecraft(query));
-      add('minecraft-osint', () => apiClient.minecraftOsint(query));
-      add('tiktok', () => apiClient.tiktok(query));
-      add('instagram', () => apiClient.instagram(query));
-      add('gta', () => apiClient.gtaPlayers(query));
-      add('gta-spotted', () => apiClient.gtaSpotted(query));
-      add('footprint', () => this.fetchFootprint(query));
+      this.addUsernameSources(tasks, query, add);
     }
 
     if (types.includes('name')) {
@@ -107,6 +135,44 @@ class IntelligenceService {
     }
 
     return tasks;
+  }
+
+  classifySourceStatus(data) {
+    if (!data) {
+      return 'failed';
+    }
+
+    if (data.error === true) {
+      const message = data.message || '';
+      if (isAuthError(message)) return 'auth';
+      if (isTimeoutError(message)) return 'timeout';
+      return 'failed';
+    }
+
+    if (typeof data.error === 'string') {
+      if (isNoResultError(data.error)) return 'empty';
+      if (isTimeoutError(data.error)) return 'timeout';
+      if (isAuthError(data.error)) return 'auth';
+      return 'failed';
+    }
+
+    return 'empty';
+  }
+
+  buildMeta(sourceStatus) {
+    const entries = Object.entries(sourceStatus);
+    const statuses = entries.map(([, status]) => status);
+    const failures = entries
+      .filter(([, status]) => ['failed', 'timeout', 'auth'].includes(status))
+      .map(([name, status]) => ({ name, status }));
+
+    return {
+      sourcesChecked: entries.length,
+      failures,
+      allAuth: statuses.length > 0 && statuses.every((status) => status === 'auth'),
+      anyTimeout: statuses.some((status) => status === 'timeout'),
+      anyFailed: failures.length > 0
+    };
   }
 
   async fetchFootprint(query) {
@@ -250,8 +316,7 @@ class IntelligenceService {
   processResponse(name, data, results, seen) {
     if (!data || data.error === true) return;
     if (typeof data.error === 'string') {
-      const lower = data.error.toLowerCase();
-      if (lower.includes('no matches') || lower.includes('not found') || lower.includes('no results')) return;
+      if (isNoResultError(data.error)) return;
       return;
     }
 
@@ -310,18 +375,21 @@ class IntelligenceService {
       return;
     }
 
+    const stealerSources = new Set(['stealer', 'stealer-db']);
     const records = extractAllRecords(data);
     if (records.length) {
       records.forEach(({ item }) => {
         const text = formatRecordFields(item);
-        if (text) this.pushResult(results, seen, name === 'stealer' ? 'stealer' : name, text);
+        const source = stealerSources.has(name) ? 'stealer' : name;
+        if (text) this.pushResult(results, seen, source, text);
       });
       return;
     }
 
     if (!hasOnlyMetadata(data) && isUsefulRecord(data)) {
       const text = formatRecordFields(data);
-      if (text) this.pushResult(results, seen, name, text);
+      const source = stealerSources.has(name) ? 'stealer' : name;
+      if (text) this.pushResult(results, seen, source, text);
     }
   }
 
@@ -330,10 +398,12 @@ class IntelligenceService {
       throw new Error('INTEL_API_KEY is not configured.');
     }
 
+    const normalizedQuery = this.normalizeQuery(query);
     const results = [];
     const seen = new Set();
-    const types = this.detectQueryTypes(query);
-    const tasks = this.buildTasks(query, types);
+    const sourceStatus = {};
+    const types = this.detectQueryTypes(normalizedQuery);
+    const tasks = this.buildTasks(normalizedQuery, types);
 
     const notify = () => {
       if (typeof onProgress === 'function') onProgress(results.length);
@@ -341,15 +411,32 @@ class IntelligenceService {
 
     await Promise.all(tasks.map(async ({ name, run }) => {
       try {
+        const beforeCount = results.length;
         const data = await run();
         this.processResponse(name, data, results, seen);
+
+        if (results.length > beforeCount) {
+          sourceStatus[name] = 'ok';
+        } else {
+          sourceStatus[name] = this.classifySourceStatus(data);
+        }
+
+        if (sourceStatus[name] === 'failed' || sourceStatus[name] === 'timeout' || sourceStatus[name] === 'auth') {
+          const message = data?.message || data?.error || 'unknown error';
+          console.error(`Source ${name} issue (${sourceStatus[name]}): ${message}`);
+        }
+
         notify();
       } catch (error) {
+        sourceStatus[name] = 'failed';
         console.error(`Source ${name} failed:`, error.message);
       }
     }));
 
-    return results;
+    return {
+      results,
+      meta: this.buildMeta(sourceStatus)
+    };
   }
 
   normalizeMachine(machine) {

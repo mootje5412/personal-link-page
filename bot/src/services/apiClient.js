@@ -1,6 +1,28 @@
 const https = require('https');
 const config = require('../../config/config');
 
+const NO_RESULT_PATTERNS = ['no matches', 'not found', 'no results'];
+
+function isNoResultError(message) {
+  const lower = String(message || '').toLowerCase();
+  return NO_RESULT_PATTERNS.some((pattern) => lower.includes(pattern));
+}
+
+function isTimeoutError(message) {
+  return String(message || '').toLowerCase().includes('timeout');
+}
+
+function isAuthError(message) {
+  const lower = String(message || '').toLowerCase();
+  return lower.includes('whitelist')
+    || lower.includes('unauthorized')
+    || lower.includes('ip_unauthorized');
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 class ApiClient {
   get(endpoint, query, extraParams = {}, timeoutMs = config.apiTimeoutMs) {
     const params = new URLSearchParams({ query, ...extraParams });
@@ -44,13 +66,18 @@ class ApiClient {
           }
 
           if (res.statusCode < 200 || res.statusCode >= 300) {
+            const message = (parsed && (parsed.message || parsed.error)) || `HTTP ${res.statusCode}`;
             resolve({
               error: true,
               statusCode: res.statusCode,
-              message: (parsed && (parsed.message || parsed.error)) || `HTTP ${res.statusCode}`,
+              message,
               data: parsed
             });
             return;
+          }
+
+          if (parsed && typeof parsed.error === 'string' && !isNoResultError(parsed.error)) {
+            console.error(`API string error (${urlObj.pathname}): ${parsed.error}`);
           }
 
           resolve(parsed);
@@ -70,6 +97,30 @@ class ApiClient {
     });
   }
 
+  async stealer(query, type) {
+    const timeout = config.stealerTimeoutMs;
+    const retries = config.stealerRetries;
+    let last = null;
+
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      last = await this.get('/database-search', query, type ? { type } : {}, timeout);
+
+      const message = last?.error === true
+        ? last.message
+        : (typeof last?.error === 'string' ? last.error : null);
+
+      if (message && isTimeoutError(message) && attempt < retries) {
+        console.warn(`Stealer search timed out, retry ${attempt + 1}/${retries}...`);
+        await delay(1500);
+        continue;
+      }
+
+      break;
+    }
+
+    return last;
+  }
+
   breach(query) { return this.get('/breach', query); }
   discord(query) { return this.get('/discord', query); }
   roblox(query) { return this.get('/roblox', query); }
@@ -78,7 +129,6 @@ class ApiClient {
   ip(query) { return this.get('/ip', query); }
   vin(query) { return this.get('/vin', query, { type: 'decode' }); }
   domain(query) { return this.get('/domain', query); }
-  stealer(query, type) { return this.get('/database-search', query, type ? { type } : {}); }
   minecraft(query) { return this.get('/minecraft', query); }
   minecraftOsint(query) { return this.get('/minecraft-lookup', query); }
   dns(query) { return this.get('/dns-resolver', query); }
@@ -148,6 +198,28 @@ class ApiClient {
       return true;
     });
   }
+
+  async healthCheck() {
+    const result = await this.breach('healthcheck@apexsearch.local');
+    if (result?.error === true) {
+      return {
+        ok: false,
+        message: result.message || 'API request failed'
+      };
+    }
+
+    if (typeof result?.error === 'string' && !isNoResultError(result.error)) {
+      return {
+        ok: false,
+        message: result.error
+      };
+    }
+
+    return { ok: true };
+  }
 }
 
 module.exports = new ApiClient();
+module.exports.isAuthError = isAuthError;
+module.exports.isTimeoutError = isTimeoutError;
+module.exports.isNoResultError = isNoResultError;

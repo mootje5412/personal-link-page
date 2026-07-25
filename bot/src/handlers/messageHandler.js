@@ -61,12 +61,12 @@ class MessageHandler {
     };
 
     try {
-      const results = await searchService.search(query, onProgress);
+      const { results, meta } = await searchService.search(query, onProgress);
 
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
 
       if (results.length === 0) {
-        bot.sendMessage(chatId, noResultsMessage(query), {
+        bot.sendMessage(chatId, noResultsMessage(query, meta), {
           parse_mode: 'HTML',
           reply_markup: supportKeyboard()
         });

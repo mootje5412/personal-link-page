@@ -52,6 +52,8 @@ fi
 npm install --production
 
 pm2 delete apexsearch 2>/dev/null || true
+pm2 delete findnow 2>/dev/null || true
+pkill -f "/root/findnow-bot" 2>/dev/null || true
 pkill -f "node index.js" 2>/dev/null || true
 sleep 1
 
