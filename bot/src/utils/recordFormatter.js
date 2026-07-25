@@ -185,6 +185,7 @@ function formatStealerFields(item) {
   };
 
   set('Site', normalized.url || normalized.host || normalized.website);
+  set('Entry', normalized.entry || normalized.log || normalized.line);
   set('Email', normalized.email);
   set('Username', normalized.username);
   set('Password', normalized.password);

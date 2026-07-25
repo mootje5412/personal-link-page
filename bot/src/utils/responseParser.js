@@ -2,14 +2,20 @@ const METADATA_KEYS = new Set([
   '_meta', 'api', 'elapsed_ms', 'timestamp', 'results_count',
   'execution_time', 'query', 'total', 'success', 'message', 'mode',
   'Count', 'Message', 'SearchCriteria', 'count', 'status', 'type',
-  'error', 'errors', 'ok', 'took', 'took_ms'
+  'error', 'errors', 'ok', 'took', 'took_ms',
+  'endpoint', 'search_type', 'search_query', 'found'
 ]);
 
 const RECORD_ARRAY_KEYS = [
   'breach_data', 'results', 'data', 'records', 'hits', 'items',
   'leaks', 'logs', 'entries', 'rows', 'stealer_logs', 'stealer_data',
-  'matches', 'found', 'compromises'
+  'matches', 'found', 'compromises', 'credentials', 'logins', 'passwords',
+  'players', 'spotted', 'accounts', 'users'
 ];
+
+const API_SHELL_KEYS = new Set([
+  'endpoint', 'search_type', 'search_query', 'mode', 'method', 'path'
+]);
 
 const IP_INFO_KEYS = [
   'ip', 'ip_address', 'query', 'country', 'country_code', 'region',
@@ -22,6 +28,23 @@ function isPlainObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value);
 }
 
+function isApiShellRecord(item) {
+  if (!isPlainObject(item)) {
+    return false;
+  }
+
+  const keys = Object.keys(item).filter((key) => {
+    const value = item[key];
+    return value !== null && value !== undefined && value !== '';
+  });
+
+  if (keys.length === 0) {
+    return true;
+  }
+
+  return keys.every((key) => METADATA_KEYS.has(key) || API_SHELL_KEYS.has(key));
+}
+
 function isUsefulRecord(item) {
   if (!item) {
     return false;
@@ -30,6 +53,10 @@ function isUsefulRecord(item) {
     return item.trim().length > 0;
   }
   if (!isPlainObject(item)) {
+    return false;
+  }
+
+  if (isApiShellRecord(item)) {
     return false;
   }
 
@@ -283,31 +310,64 @@ function extractSnusbaseWhois(response, query) {
 
 function extractStealerRecords(response) {
   const records = [];
+  const seen = new Set();
+
+  const push = (item) => {
+    if (!isUsefulRecord(item)) {
+      return;
+    }
+
+    let key;
+    try {
+      key = JSON.stringify(item);
+    } catch {
+      key = String(item);
+    }
+
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    records.push(item);
+  };
 
   if (!response || typeof response !== 'object') {
     return records;
   }
 
-  extractAllRecords(response).forEach(({ item }) => {
-    if (isUsefulRecord(item)) {
-      records.push(item);
-    }
-  });
+  if (Array.isArray(response)) {
+    response.forEach(push);
+    return records;
+  }
+
+  extractAllRecords(response).forEach(({ item }) => push(item));
 
   const nested = response.results || response.data;
-  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+  if (Array.isArray(nested)) {
+    nested.forEach(push);
+  } else if (nested && typeof nested === 'object') {
     Object.entries(nested).forEach(([bucket, items]) => {
-      if (!Array.isArray(items)) {
-        return;
+      if (Array.isArray(items)) {
+        items.forEach((item) => push({ ...item, source: item.source || bucket }));
+      } else if (isUsefulRecord(items)) {
+        push({ ...items, source: items.source || bucket });
       }
-
-      items.forEach((item) => {
-        if (isUsefulRecord(item)) {
-          records.push({ ...item, source: item.source || bucket });
-        }
-      });
     });
   }
+
+  ['logs', 'credentials', 'logins', 'stealer_logs', 'stealer_data', 'compromises'].forEach((key) => {
+    const value = response[key];
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (typeof item === 'string') {
+          push({ entry: item, source: key });
+        } else {
+          push(item);
+        }
+      });
+    }
+  });
 
   return records;
 }
@@ -315,6 +375,7 @@ function extractStealerRecords(response) {
 module.exports = {
   METADATA_KEYS,
   isUsefulRecord,
+  isApiShellRecord,
   formatIpInfo,
   extractAllRecords,
   extractStealerRecords,

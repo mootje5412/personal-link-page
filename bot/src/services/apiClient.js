@@ -152,6 +152,8 @@ class ApiClient {
     });
   }
 
+  usernameOsint(query) { return this.get('/username-osint', query); }
+
   discord(query) { return this.get('/discord', query); }
   roblox(query) { return this.get('/roblox', query); }
   discordToRoblox(query) { return this.get('/discord-to-roblox', query); }

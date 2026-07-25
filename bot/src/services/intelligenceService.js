@@ -7,7 +7,8 @@ const {
   extractStealerRecords,
   extractIpSections,
   hasOnlyMetadata,
-  isUsefulRecord
+  isUsefulRecord,
+  isApiShellRecord
 } = require('../utils/responseParser');
 
 const SOURCE_LABELS = {
@@ -15,7 +16,8 @@ const SOURCE_LABELS = {
   stealer: 'STEALER',
   'database-search': 'STEALER',
   'database-search-auto': 'STEALER',
-  'database-search-domain': 'STEALER',
+  'database-search-user': 'STEALER',
+  'username-osint': 'STEALER',
   discord: 'DISCORD',
   roblox: 'ROBLOX',
   'discord-to-roblox': 'DISCORD-ROBLOX',
@@ -77,23 +79,40 @@ class IntelligenceService {
     add('minecraft-osint', () => apiClient.minecraftOsint(username));
     add('tiktok', () => apiClient.tiktok(username));
     add('instagram', () => apiClient.instagram(username));
-    add('gta', () => apiClient.gtaPlayers(username));
-    add('gta-spotted', () => apiClient.gtaSpotted(username));
+
+    if (!options.skipGta) {
+      add('gta', () => apiClient.gtaPlayers(username));
+      add('gta-spotted', () => apiClient.gtaSpotted(username));
+    }
 
     if (!options.skipFootprint) {
       add('footprint', () => this.fetchFootprint(username));
     }
   }
 
-  addDatabaseSearchTasks(tasks, query, add) {
+  addDatabaseSearchTasks(tasks, query, types, add) {
     const detectedType = apiClient.detectDatabaseSearchType(query);
 
-    if (detectedType) {
-      add('database-search', () => apiClient.databaseSearch(query, detectedType));
+    if (detectedType === 'email') {
+      add('database-search', () => apiClient.databaseSearch(query, 'email'));
+      const localPart = query.split('@')[0];
+      if (localPart && localPart.length >= 3) {
+        add('database-search-user', () => apiClient.databaseSearch(localPart));
+        add('username-osint', () => apiClient.usernameOsint(localPart));
+      }
+      return;
+    }
+
+    if (detectedType === 'domain') {
+      add('database-search', () => apiClient.databaseSearch(query, 'domain'));
       return;
     }
 
     add('database-search', () => apiClient.databaseSearch(query));
+
+    if (types.includes('username') || types.includes('general')) {
+      add('username-osint', () => apiClient.usernameOsint(query));
+    }
   }
 
   buildTasks(query, types) {
@@ -105,35 +124,35 @@ class IntelligenceService {
     if (types.includes('discord')) {
       add('discord', () => apiClient.discord(query));
       add('discord-to-roblox', () => apiClient.discordToRoblox(query));
-      this.addDatabaseSearchTasks(tasks, query, add);
+      this.addDatabaseSearchTasks(tasks, query, types, add);
       return tasks;
     }
 
     if (types.includes('vin')) {
       add('vin', () => apiClient.vin(query));
-      this.addDatabaseSearchTasks(tasks, query, add);
+      this.addDatabaseSearchTasks(tasks, query, types, add);
       return tasks;
     }
 
     if (types.includes('ip')) {
       add('ip', () => apiClient.ip(query));
       add('dns', () => apiClient.dns(query));
-      this.addDatabaseSearchTasks(tasks, query, add);
+      this.addDatabaseSearchTasks(tasks, query, types, add);
       return tasks;
     }
 
     if (types.includes('email')) {
-      this.addDatabaseSearchTasks(tasks, query, add);
+      this.addDatabaseSearchTasks(tasks, query, types, add);
 
       const [localPart, domainPart] = query.split('@');
       if (domainPart) {
         add('domain', () => apiClient.domain(domainPart));
       }
-      this.addUsernameSources(tasks, localPart, add, { skipFootprint: true });
+      this.addUsernameSources(tasks, localPart, add, { skipFootprint: true, skipGta: true });
       return tasks;
     }
 
-    this.addDatabaseSearchTasks(tasks, query, add);
+    this.addDatabaseSearchTasks(tasks, query, types, add);
 
     if (types.includes('phone')) {
       add('phone', () => apiClient.phone(query));
@@ -241,7 +260,7 @@ class IntelligenceService {
   }
 
   getTaskTimeout(name) {
-    if (name === 'database-search' || name.startsWith('database-search')) {
+    if (name.startsWith('database-search') || name === 'username-osint') {
       return config.stealerTimeoutMs;
     }
 
@@ -256,17 +275,15 @@ class IntelligenceService {
     return config.fastSourceTimeoutMs;
   }
 
-  isSlowTask(name) {
-    return name === 'database-search'
-      || name.startsWith('database-search')
-      || name === 'footprint';
+  isStealerTask(name) {
+    return name.startsWith('database-search') || name === 'username-osint';
   }
 
   async runTask({ name, run }, results, seen, sourceStatus, notify) {
     const beforeCount = results.length;
     const timeoutMs = this.getTaskTimeout(name);
 
-    if (this.isSlowTask(name)) {
+    if (this.isStealerTask(name)) {
       notify('stealer');
     }
 
@@ -402,6 +419,51 @@ class IntelligenceService {
     return null;
   }
 
+  formatGtaRecord(item, sourceName) {
+    if (!item || typeof item !== 'object' || isApiShellRecord(item)) {
+      return null;
+    }
+
+    const fields = {};
+    const set = (label, value) => {
+      if (value !== null && value !== undefined && String(value).trim() !== '') {
+        fields[label] = String(value).trim();
+      }
+    };
+
+    set('Player', item.name || item.player || item.username || item.display_name);
+    set('Platform', item.platform || item.service || sourceName.replace('gta-', '').toUpperCase());
+    set('Rockstar ID', item.rockstar_id || item.rid || item.id);
+    set('Last Seen', item.last_seen || item.spotted_at || item.seen_at || item.date);
+    set('Server', item.server || item.session);
+    set('IP', item.ip || item.last_ip);
+
+    if (Object.keys(fields).length <= 1 && !fields.Player) {
+      const text = formatRecordFields(item);
+      if (!text) return null;
+      return this.textToFields(text);
+    }
+
+    return Object.keys(fields).length ? fields : null;
+  }
+
+  processGtaResponse(name, data, results, seen) {
+    if (!data || data.error === true) return;
+    if (typeof data.error === 'string' && !isNoResultError(data.error)) return;
+
+    const collections = [data.players, data.spotted, data.results, data.data, data.matches]
+      .filter((value) => Array.isArray(value) && value.length > 0);
+
+    collections.forEach((items) => {
+      items.forEach((item) => {
+        const fields = this.formatGtaRecord(item, name);
+        if (fields) {
+          this.pushResultFields(results, seen, 'gta', fields);
+        }
+      });
+    });
+  }
+
   processDatabaseSearchResponse(data, results, seen) {
     const records = extractStealerRecords(data);
     let added = 0;
@@ -435,8 +497,13 @@ class IntelligenceService {
       }
     }
 
-    if (name === 'database-search' || name === 'database-search-auto' || name === 'database-search-domain' || name === 'stealer' || name === 'stealer-db') {
+    if (name.startsWith('database-search') || name === 'username-osint' || name === 'stealer' || name === 'stealer-db') {
       this.processDatabaseSearchResponse(data, results, seen);
+      return;
+    }
+
+    if (name === 'gta' || name === 'gta-spotted') {
+      this.processGtaResponse(name, data, results, seen);
       return;
     }
 
@@ -506,7 +573,7 @@ class IntelligenceService {
       return;
     }
 
-    if (!hasOnlyMetadata(data) && isUsefulRecord(data)) {
+    if (!hasOnlyMetadata(data) && isUsefulRecord(data) && !isApiShellRecord(data)) {
       const text = formatRecordFields(data);
       const source = stealerSources.has(name) ? 'stealer' : name;
       if (text) this.pushResult(results, seen, source, text);
@@ -524,9 +591,6 @@ class IntelligenceService {
     const sourceStatus = {};
     const types = this.detectQueryTypes(normalizedQuery);
     const tasks = this.buildTasks(normalizedQuery, types);
-    const fastTasks = tasks.filter(({ name }) => !this.isSlowTask(name));
-    const slowTasks = tasks.filter(({ name }) => this.isSlowTask(name));
-    const deadline = Date.now() + config.searchMaxWaitMs;
 
     const notify = (status) => {
       if (typeof onProgress === 'function') {
@@ -534,23 +598,11 @@ class IntelligenceService {
       }
     };
 
-    await Promise.all(fastTasks.map((task) => this.runTask(task, results, seen, sourceStatus, notify)));
-
-    const remainingMs = deadline - Date.now();
-    if (remainingMs > 0 && slowTasks.length > 0) {
-      notify('stealer');
-      await Promise.all(
-        slowTasks.map((task) => this.withTimeout(
-          this.runTask(task, results, seen, sourceStatus, notify),
-          remainingMs,
-          task.name
-        ))
-      );
-    } else if (slowTasks.length > 0) {
-      slowTasks.forEach(({ name }) => {
-        sourceStatus[name] = 'timeout';
-      });
-    }
+    await this.withTimeout(
+      Promise.all(tasks.map((task) => this.runTask(task, results, seen, sourceStatus, notify))),
+      config.searchMaxWaitMs,
+      'search'
+    );
 
     return {
       results,
