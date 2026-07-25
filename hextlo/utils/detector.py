@@ -108,11 +108,12 @@ def detect_search(text: str) -> DetectedSearch | None:
                 ssn = left if _looks_like_ssn(left) else right
                 return DetectedSearch(SearchType.SSN, normalize_ssn(ssn), raw, label="SSN Search")
             if _looks_like_phone(left) or _looks_like_phone(right):
+                phone = normalize_phone(left if _looks_like_phone(left) else right)
                 return DetectedSearch(
                     SearchType.MOBILE,
-                    _comma_query([normalize_phone(left if _looks_like_phone(left) else right), ""]),
+                    f"{phone},*",
                     raw,
-                    label="Mobile Lookup",
+                    label="Phone Search",
                 )
             return _name_search(left, right)
 
@@ -127,9 +128,9 @@ def detect_search(text: str) -> DetectedSearch | None:
         phone = normalize_phone(raw)
         return DetectedSearch(
             SearchType.MOBILE,
-            _comma_query([phone, phone]),
+            f"{phone},*",
             raw,
-            label="Mobile Lookup",
+            label="Phone Search",
         )
 
     words = raw.split()
@@ -152,13 +153,11 @@ def detect_search(text: str) -> DetectedSearch | None:
 
 def format_detection_hint() -> str:
     return (
-        "Could not detect that search. Try:\n\n"
-        "• 418-90-8868 — SSN lookup\n"
-        "• John Doe — name search\n"
-        "• John Doe CA — name + state\n"
-        "• John Doe Los Angeles CA — criminal\n"
-        "• 5551234567 — phone lookup\n"
-        "• 1HGBH41JXMN109186 — VIN\n\n"
-        "Comma format:\n"
-        "John, Doe, CA"
+        "Could not detect that search.\n\n"
+        "Try one of these:\n"
+        "  418-90-8868 .............. SSN\n"
+        "  John Doe ................. name\n"
+        "  John Doe CA .............. name + state\n"
+        "  (256) 521-1446 ........... phone\n"
+        "  1HGBH41JXMN109186 ........ VIN"
     )

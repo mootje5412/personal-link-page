@@ -2,6 +2,27 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+FIELD_ORDER = (
+    "SSN",
+    "DOB",
+    "Phone",
+    "Mobile",
+    "Email",
+    "Address",
+    "City",
+    "State",
+    "ZIP",
+    "Age",
+    "Sex",
+    "Height",
+    "Weight",
+    "Offense",
+    "Offense Code",
+    "Charges Filed",
+    "Agency",
+    "Id",
+)
+
 
 class SearchType(str, Enum):
     SSN = "ssnsearch"
@@ -16,7 +37,7 @@ SEARCH_LABELS: dict[SearchType, str] = {
     SearchType.VIN: "VIN Search",
     SearchType.CRIMINAL: "Criminal Lookup",
     SearchType.INTELIUS: "Intelius",
-    SearchType.MOBILE: "Mobile Lookup",
+    SearchType.MOBILE: "Phone Search",
 }
 
 
@@ -41,12 +62,19 @@ class SearchResult:
     raw: dict[str, Any] = field(default_factory=dict)
 
     def to_text(self) -> str:
-        if not self.fields:
-            return self.title
         lines = [self.title]
-        for key, value in self.fields.items():
+        shown: set[str] = set()
+
+        for key in FIELD_ORDER:
+            value = self.fields.get(key)
             if value:
                 lines.append(f"  {key}: {value}")
+                shown.add(key)
+
+        for key, value in self.fields.items():
+            if key not in shown and value:
+                lines.append(f"  {key}: {value}")
+
         return "\n".join(lines)
 
 

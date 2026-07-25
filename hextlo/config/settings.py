@@ -20,7 +20,7 @@ def _parse_admin_ids(raw: str) -> set[int]:
 class Settings:
     bot_token: str = field(default_factory=lambda: os.getenv("HEXTLO_BOT_TOKEN", "").strip())
     bot_name: str = "HexTLO"
-    bot_version: str = "0.3.0"
+    bot_version: str = "0.4.0"
     admin_ids: set[int] = field(
         default_factory=lambda: _parse_admin_ids(os.getenv("HEXTLO_ADMIN_IDS", ""))
     )

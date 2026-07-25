@@ -49,10 +49,16 @@ def _flatten_value(value: Any) -> str:
 
 
 def _format_dob(value: str) -> str:
-    digits = "".join(ch for ch in value if ch.isdigit())
+    text = value.strip()
+    if not text:
+        return text
+    if len(text) == 10 and text[4] == "-" and text[7] == "-":
+        year, month, day = text.split("-")
+        return f"{month}/{day}/{year}"
+    digits = "".join(ch for ch in text if ch.isdigit())
     if len(digits) == 8:
         return f"{digits[4:6]}/{digits[6:8]}/{digits[:4]}"
-    return value
+    return text
 
 
 def _record_from_mapping(record: dict[str, Any], index: int) -> SearchResult:
@@ -73,9 +79,17 @@ def _record_from_mapping(record: dict[str, Any], index: int) -> SearchResult:
         text = _flatten_value(value)
         if label.lower() == "dob":
             text = _format_dob(text)
+        if label == "Name":
+            continue
         fields[label] = text
 
-    title = fields.pop("Name", None) or f"Result {index}"
+    title = (
+        _flatten_value(record.get("fullName"))
+        or _flatten_value(record.get("full_name"))
+        or _flatten_value(record.get("name"))
+        or fields.pop("Name", None)
+        or f"Result {index}"
+    )
     return SearchResult(title=title, fields=fields, raw=record)
 
 

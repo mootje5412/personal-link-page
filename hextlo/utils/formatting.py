@@ -1,5 +1,5 @@
 from config.settings import settings
-from models.search import SEARCH_LABELS, SearchResponse, SearchResult, SearchType
+from models.search import SEARCH_LABELS, SearchResponse, SearchType
 
 
 def truncate(text: str, limit: int | None = None) -> str:
@@ -18,7 +18,8 @@ def page_count(total: int, page_size: int | None = None) -> int:
 
 def format_search_page(response: SearchResponse, page: int = 0) -> str:
     label = response.label or SEARCH_LABELS.get(response.search_type, "Search")
-    header = f"{label}\nQuery: {response.query}\n"
+    divider = "─" * 28
+    header = f"{label}\n{divider}\nQuery: {response.query}\n"
 
     if not response.api_connected:
         return header + (response.message or "API not configured.")
@@ -38,29 +39,29 @@ def format_search_page(response: SearchResponse, page: int = 0) -> str:
 
     lines = [
         header,
-        f"Found {total} result(s) — page {current + 1}/{pages}\n",
+        f"Found {total} record(s)  •  page {current + 1}/{pages}\n",
     ]
 
     for index, result in enumerate(page_results, start=start + 1):
-        block = result.to_text()
         if response.search_type == SearchType.VIN:
-            lines.append(block + "\n")
+            lines.append(result.to_text() + "\n")
         else:
-            lines.append(f"{index}. {block}\n")
+            lines.append(f"[{index}] {result.to_text()}\n")
 
     return truncate("\n".join(lines).strip())
 
 
 def format_welcome(first_name: str) -> str:
     return (
-        f"Welcome to HexTLO, {first_name}.\n\n"
-        "Type anything to search. I auto-detect the lookup type.\n\n"
+        f"Welcome to HexTLO, {first_name}.\n"
+        f"{'─' * 28}\n\n"
+        "Send anything — I detect the search type automatically.\n\n"
         "Examples:\n"
-        "• 418-90-8868 — SSN lookup\n"
-        "• John Smith — name search\n"
-        "• John Smith CA — name + state\n"
-        "• John Smith Los Angeles CA — criminal\n"
-        "• 5551234567 — phone lookup\n"
-        "• 1HGBH41JXMN109186 — VIN\n\n"
-        "John, Smith, Los Angeles, CA"
+        "  418-90-8868 .............. SSN lookup\n"
+        "  John Doe ................. name search\n"
+        "  John Doe CA .............. name + state\n"
+        "  (256) 521-1446 ........... phone lookup\n"
+        "  1HGBH41JXMN109186 ........ VIN decode\n\n"
+        "SSN searches return the most detail:\n"
+        "name, SSN, DOB, phone, and address."
     )
