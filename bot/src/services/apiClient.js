@@ -30,6 +30,14 @@ class ApiClient {
     return this.request(url, { method: 'GET' }, timeoutMs);
   }
 
+  /**
+   * GET https://www.osintcat.net/api/breach?query=<term>
+   * Header: X-API-KEY: <api-key>
+   */
+  breach(query) {
+    return this.get('/breach', query, {}, config.breachTimeoutMs || config.apiTimeoutMs);
+  }
+
   request(url, options = {}, timeoutMs = config.apiTimeoutMs) {
     return new Promise((resolve) => {
       const urlObj = new URL(url);
@@ -121,7 +129,6 @@ class ApiClient {
     return last;
   }
 
-  breach(query) { return this.get('/breach', query); }
   discord(query) { return this.get('/discord', query); }
   roblox(query) { return this.get('/roblox', query); }
   discordToRoblox(query) { return this.get('/discord-to-roblox', query); }

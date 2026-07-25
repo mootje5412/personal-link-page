@@ -320,6 +320,17 @@ class IntelligenceService {
       return;
     }
 
+    if (name === 'breach') {
+      const breachRecords = Array.isArray(data.breach_data) ? data.breach_data : [];
+      if (breachRecords.length) {
+        breachRecords.forEach((item) => {
+          const text = formatRecordFields(item);
+          if (text) this.pushResult(results, seen, 'breach', text);
+        });
+        return;
+      }
+    }
+
     if (name === 'discord') {
       if (data.user_info) {
         const text = this.formatDiscordProfile(data.user_info);
