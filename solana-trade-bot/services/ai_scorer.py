@@ -1,118 +1,124 @@
 from services.scanner import MemeCoin
 
 
-def _score_bar(score: float) -> str:
-    filled = round(score / 10)
-    return "🟩" * filled + "⬜" * (10 - filled)
-
-
 def score_meme_coin(coin: MemeCoin) -> tuple[float, list[str]]:
-    """AI scoring — calibrated so 85+ is genuinely elite."""
-    signals: list[str] = []
-    score = 35.0
-
+    """Weighted AI score — properly calibrated, 90+ is rare elite."""
     if coin.is_scam:
-        return 0.0, ["🚨 Flagged as scam/honeypot"]
+        return 0.0, ["🚨 Scam / honeypot"]
 
-    # ── Liquidity (max +18) ──
-    if coin.liquidity_usd >= 500_000:
-        score += 18; signals.append("💎 Deep liquidity")
-    elif coin.liquidity_usd >= 150_000:
-        score += 14; signals.append("✅ Strong liquidity")
-    elif coin.liquidity_usd >= 50_000:
-        score += 10; signals.append("🟢 Good liquidity")
+    signals: list[str] = []
+    weights: list[tuple[float, float, str | None]] = []  # score, weight, signal
+
+    # Liquidity safety (weight 20)
+    if coin.liquidity_usd >= 300_000:
+        weights.append((95, 20, "💎 Deep liquidity"))
+    elif coin.liquidity_usd >= 100_000:
+        weights.append((85, 20, "✅ Strong liquidity"))
+    elif coin.liquidity_usd >= 40_000:
+        weights.append((72, 20, "🟢 Good liquidity"))
     elif coin.liquidity_usd >= 20_000:
-        score += 6
+        weights.append((58, 20, None))
     elif coin.liquidity_usd >= 15_000:
-        score += 3
+        weights.append((45, 20, None))
     else:
-        score -= 15; signals.append("⚠️ Thin liquidity")
+        weights.append((15, 20, "⚠️ Thin liquidity"))
 
-    # ── Volume momentum (max +18) ──
-    vol_ratio = coin.volume_24h / max(coin.liquidity_usd, 1)
-    if vol_ratio >= 3:
-        score += 18; signals.append("🔥 Volume explosion")
-    elif vol_ratio >= 1.5:
-        score += 14; signals.append("📈 High vol/liq")
-    elif vol_ratio >= 0.8:
-        score += 10
-    elif vol_ratio >= 0.4:
-        score += 5
+    # Volume momentum (weight 18)
+    vr = coin.volume_24h / max(coin.liquidity_usd, 1)
+    if vr >= 2.5:
+        weights.append((92, 18, "🔥 Volume explosion"))
+    elif vr >= 1.2:
+        weights.append((80, 18, "📈 High vol/liq"))
+    elif vr >= 0.6:
+        weights.append((65, 18, None))
+    elif vr >= 0.3:
+        weights.append((50, 18, None))
     else:
-        score -= 3
+        weights.append((30, 18, None))
 
-    # ── Buy pressure (max +16) ──
-    total_24h = coin.buys_24h + coin.sells_24h
-    if total_24h >= 50:
-        buy_ratio = coin.buys_24h / total_24h
-        if buy_ratio >= 0.62:
-            score += 12; signals.append("🟢 Strong buy pressure")
-        elif buy_ratio >= 0.55:
-            score += 8; signals.append("📊 Bullish flow")
-        elif buy_ratio >= 0.48:
-            score += 3
+    # Buy pressure (weight 18)
+    t24 = coin.buys_24h + coin.sells_24h
+    if t24 >= 30:
+        br = coin.buys_24h / t24
+        if br >= 0.60:
+            weights.append((88, 18, "🟢 Strong buy pressure"))
+        elif br >= 0.54:
+            weights.append((72, 18, "📊 Bullish flow"))
+        elif br >= 0.48:
+            weights.append((55, 18, None))
         else:
-            score -= 10; signals.append("🔴 Sellers dominating")
+            weights.append((25, 18, "🔴 Sellers winning"))
+    else:
+        weights.append((40, 18, None))
 
-    total_1h = coin.buys_1h + coin.sells_1h
-    if total_1h >= 10:
-        br1h = coin.buys_1h / total_1h
-        if br1h >= 0.58:
-            score += 8; signals.append("⚡ 1h buy surge")
-        elif br1h < 0.42:
-            score -= 6
+    # 1h momentum (weight 15) — sweet spot 5-30%
+    h1 = coin.price_change_h1
+    if 5 <= h1 <= 30:
+        weights.append((90, 15, "🚀 Ideal 1h momentum"))
+    elif 2 <= h1 < 5:
+        weights.append((70, 15, "📈 Building"))
+    elif 30 < h1 <= 50:
+        weights.append((55, 15, "⚠️ Getting hot"))
+    elif h1 > 50:
+        weights.append((30, 15, "⚠️ Overextended"))
+    elif -8 <= h1 < 2:
+        weights.append((50, 15, None))
+    else:
+        weights.append((20, 15, "📉 Dumping"))
 
-    # ── Price momentum (max +16) ──
-    if 8 <= coin.price_change_h1 <= 40:
-        score += 12; signals.append("🚀 Healthy 1h pump")
-    elif 3 <= coin.price_change_h1 < 8:
-        score += 6; signals.append("📈 Building momentum")
-    elif coin.price_change_h1 > 60:
-        score -= 8; signals.append("⚠️ Overextended 1h")
-    elif coin.price_change_h1 <= -12:
-        score -= 14; signals.append("📉 Dumping hard")
-    elif coin.price_change_h1 <= -5:
-        score -= 6
+    # 5m timing (weight 10)
+    m5 = coin.price_change_m5
+    if 1 <= m5 <= 12:
+        weights.append((85, 10, "⚡ Good 5m entry"))
+    elif m5 > 20:
+        weights.append((25, 10, "💨 Already pumping 5m"))
+    elif m5 < -8:
+        weights.append((15, 10, "💀 5m crash"))
+    else:
+        weights.append((55, 10, None))
 
-    if 2 <= coin.price_change_m5 <= 15:
-        score += 5; signals.append("⚡ 5m momentum")
-    elif coin.price_change_m5 <= -10:
-        score -= 10; signals.append("💀 5m crash")
+    # Rug safety (weight 12)
+    if coin.fdv > 0:
+        ratio = coin.liquidity_usd / coin.fdv
+        if ratio >= 0.10:
+            weights.append((90, 12, "🛡️ Safe liq/FDV"))
+        elif ratio >= 0.05:
+            weights.append((65, 12, None))
+        elif ratio >= 0.02:
+            weights.append((40, 12, None))
+        else:
+            weights.append((5, 12, "🚨 Rug risk"))
+    else:
+        weights.append((50, 12, None))
 
-    # ── Rug detection (max +12 / min -25) ──
-    if coin.fdv > 0 and coin.liquidity_usd > 0:
-        liq_fdv = coin.liquidity_usd / coin.fdv
-        if liq_fdv >= 0.12:
-            score += 12; signals.append("🛡️ Safe liq/FDV ratio")
-        elif liq_fdv >= 0.06:
-            score += 5
-        elif liq_fdv < 0.015:
-            score -= 25; signals.append("🚨 RUG RISK — exit liquidity")
+    # Market cap (weight 7)
+    mc = coin.market_cap
+    if 25_000 <= mc <= 2_000_000:
+        weights.append((85, 7, "🎯 Meme sweet spot"))
+    elif 2_000_000 < mc <= 10_000_000:
+        weights.append((60, 7, None))
+    elif mc > 30_000_000:
+        weights.append((35, 7, "🐋 Too large"))
+    else:
+        weights.append((45, 7, None))
 
-    # ── Market cap zone (max +10) ──
-    if 30_000 <= coin.market_cap <= 3_000_000:
-        score += 10; signals.append("🎯 Sweet spot mcap")
-    elif 3_000_000 < coin.market_cap <= 15_000_000:
-        score += 4
-    elif coin.market_cap > 50_000_000:
-        score -= 6; signals.append("🐋 Too big for memes")
+    total_w = sum(w for _, w, _ in weights)
+    score = sum(s * w for s, w, _ in weights) / total_w if total_w else 0
 
-    # ── Late entry penalty ──
-    if coin.price_change_h24 >= 300:
-        score -= 15; signals.append("⚠️ Already 3x+ today — late")
-    elif coin.price_change_h24 >= 150:
-        score -= 8; signals.append("⚠️ Big run already")
+    # Penalties
+    if coin.price_change_h24 >= 200:
+        score -= 12; signals.append("⚠️ Already 2x+ today")
+    if coin.buys_1h + coin.sells_1h >= 80:
+        score += 3; signals.append("🔥 Very active")
+    if coin.dex in ("pumpfun", "pumpswap") and coin.liquidity_usd >= 30_000:
+        score += 4; signals.append("🎰 Pump.fun verified")
 
-    # ── Activity bonus ──
-    if coin.buys_1h + coin.sells_1h >= 100:
-        score += 5; signals.append("🔥 Active trading")
+    for _, _, sig in weights:
+        if sig:
+            signals.append(sig)
 
-    # Pump.fun bonus
-    if coin.dex in ("pumpfun", "pumpswap"):
-        score += 4; signals.append("🎰 Pump.fun token")
-
-    score = max(0.0, min(100.0, score))
-    return round(score, 1), signals[:4]  # cap signals for clean display
+    score = max(0.0, min(100.0, round(score, 1)))
+    return score, signals[:4]
 
 
 def rank_coins(coins: list[MemeCoin]) -> list[MemeCoin]:
@@ -122,12 +128,12 @@ def rank_coins(coins: list[MemeCoin]) -> list[MemeCoin]:
 
 
 def format_score_emoji(score: float) -> str:
-    if score >= 85:
+    if score >= 88:
         return "🔥 ELITE"
-    if score >= 75:
+    if score >= 78:
         return "✅ STRONG"
-    if score >= 65:
+    if score >= 68:
         return "🟡 DECENT"
     if score >= 50:
         return "🟠 WEAK"
-    return "🔴 AVOID"
+    return "🔴 SKIP"

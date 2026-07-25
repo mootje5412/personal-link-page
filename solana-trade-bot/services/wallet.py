@@ -4,9 +4,10 @@ import base58
 from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 from solana.rpc.async_api import AsyncClient
-from solana.rpc.commitment import Confirmed, Finalized
+from solana.rpc.commitment import Confirmed
+from solana.rpc.types import TokenAccountOpts
 
-from config import LAMPORTS_PER_SOL, SOLANA_RPC_URL
+from config import LAMPORTS_PER_SOL, SOLANA_RPC_FALLBACKS, SOLANA_RPC_URL
 
 
 @dataclass
@@ -22,7 +23,7 @@ def keypair_from_private_key(private_key_b58: str) -> Keypair:
         return Keypair.from_bytes(raw)
     if len(raw) == 32:
         return Keypair.from_seed(raw)
-    raise ValueError("Invalid private key length. Paste your full base58 secret key.")
+    raise ValueError("Invalid private key. Paste your full base58 secret key.")
 
 
 def validate_pubkey(pubkey: str) -> bool:
@@ -33,63 +34,70 @@ def validate_pubkey(pubkey: str) -> bool:
         return False
 
 
-async def _client() -> AsyncClient:
-    return AsyncClient(SOLANA_RPC_URL)
+async def _with_rpc(coro_factory):
+    rpcs = [SOLANA_RPC_URL] + [r for r in SOLANA_RPC_FALLBACKS if r != SOLANA_RPC_URL]
+    last_err = None
+    for rpc in rpcs:
+        client = AsyncClient(rpc)
+        try:
+            return await coro_factory(client)
+        except Exception as exc:
+            last_err = exc
+        finally:
+            await client.close()
+    raise last_err or RuntimeError("All RPCs failed")
 
 
 async def get_balance_sol(pubkey: str) -> float:
-    client = await _client()
-    try:
-        resp = await client.get_balance(Pubkey.from_string(pubkey), commitment=Confirmed)
+    pk = Pubkey.from_string(pubkey)
+
+    async def _fetch(client):
+        resp = await client.get_balance(pk, commitment=Confirmed)
         return (resp.value or 0) / LAMPORTS_PER_SOL
-    finally:
-        await client.close()
+
+    return await _with_rpc(_fetch)
 
 
 async def get_token_balance_raw(owner_pubkey: str, token_mint: str) -> int:
-    """Get raw token balance (smallest units) from on-chain."""
     owner = Pubkey.from_string(owner_pubkey)
     mint = Pubkey.from_string(token_mint)
-    from solana.rpc.types import TokenAccountOpts
 
-    client = await _client()
-    try:
+    async def _fetch(client):
         resp = await client.get_token_accounts_by_owner(
-            owner,
-            TokenAccountOpts(mint=mint),
-            commitment=Confirmed,
+            owner, TokenAccountOpts(mint=mint), commitment=Confirmed,
         )
         if not resp.value:
             return 0
         total = 0
         for acct in resp.value:
-            bal_resp = await client.get_token_account_balance(acct.pubkey, commitment=Confirmed)
-            if bal_resp.value:
-                total += int(bal_resp.value.amount)
+            bal = await client.get_token_account_balance(acct.pubkey, commitment=Confirmed)
+            if bal.value:
+                total += int(bal.value.amount)
         return total
-    finally:
-        await client.close()
+
+    return await _with_rpc(_fetch)
 
 
 async def confirm_transaction(signature: str, timeout_sec: int = 45) -> bool:
     import asyncio
 
-    client = await _client()
-    try:
+    async def _check(client):
         for _ in range(timeout_sec // 2):
             resp = await client.get_signature_statuses([signature])
             statuses = resp.value
             if statuses and statuses[0]:
-                status = statuses[0]
-                if status.err:
+                st = statuses[0]
+                if st.err:
                     return False
-                conf = status.confirmation_status
-                if conf in ("confirmed", "finalized") or status.confirmations is None:
+                if st.confirmation_status in ("confirmed", "finalized") or st.confirmations is None:
                     return True
             await asyncio.sleep(2)
         return False
-    finally:
-        await client.close()
+
+    try:
+        return await _with_rpc(_check)
+    except Exception:
+        return False
 
 
 async def get_wallet_info(pubkey: str, keypair: Keypair | None = None) -> WalletInfo:

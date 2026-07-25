@@ -22,6 +22,7 @@ from handlers.keyboards import (
     main_menu,
     modes_menu,
     positions_menu,
+    scan_results_menu,
     settings_menu,
     setup_guide_menu,
     stop_loss_quick,
@@ -31,8 +32,9 @@ from handlers.messages import HELP, PROFIT_INFO, SETUP_GUIDE, WELCOME
 from handlers.presets import PRESETS, preset_summary
 from services.ai_scorer import format_score_emoji, rank_coins
 from services.crypto_store import encrypt_private_key
+from services.entry_filter import entry_quality_label
 from services.scanner import get_token_price_cached, scan_meme_coins
-from services.trader import auto_trader
+from services.trader import auto_trader, cache_scan_results
 from services.wallet import get_balance_sol, keypair_from_private_key, validate_pubkey
 
 logger = logging.getLogger(__name__)
@@ -96,7 +98,8 @@ async def _format_dashboard(user_id: int) -> str:
         f"├ Wins: {stats['wins']} │ Losses: {stats['losses']}\n"
         f"├ Win Rate: {stats['win_rate']}%\n"
         f"├ Avg PnL: {stats['avg_pnl']:+.1f}%\n"
-        f"└ Total PnL: {stats['total_pnl']:+.1f}%\n\n"
+        f"├ Total PnL: {stats['total_pnl']:+.1f}%\n"
+        f"└ SOL PnL: <b>{stats.get('sol_pnl', 0):+.4f} SOL</b>\n\n"
         f"<b>Active Settings</b>\n"
         f"├ Trade: {float(user.get('trade_sol', 0.05))} SOL\n"
         f"├ Stop Loss: -{float(user.get('stop_loss_pct', 15))}%\n"
@@ -111,30 +114,39 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     await update.message.reply_chat_action("typing")
     msg = await update.message.reply_text("🔍 Scanning Solana meme coins with AI...")
-    text = await _format_scan_results()
-    await msg.edit_text(text, parse_mode="HTML", disable_web_page_preview=True, reply_markup=back_button())
+    text, top5 = await _format_scan_results(update.effective_user.id if update.effective_user else None)
+    kb = scan_results_menu(top5) if top5 else back_button()
+    await msg.edit_text(text, parse_mode="HTML", disable_web_page_preview=True, reply_markup=kb)
 
 
-async def _format_scan_results() -> str:
+async def _format_scan_results(user_id: int | None = None) -> tuple[str, list]:
     coins = await scan_meme_coins()
     ranked = rank_coins(coins)[:10]
+    cache_scan_results(ranked)
+
     if not ranked:
-        return "❌ No quality meme coins found right now. Market may be slow — try again in a minute."
+        return "❌ No quality coins found. Market may be slow — try again shortly.", []
+
+    user = await get_user(user_id) if user_id else None
+    min_score = float(user.get("min_ai_score", 75)) if user else 75
 
     lines = ["🔥 <b>Top Meme Coins — AI Ranked</b>\n"]
     for i, c in enumerate(ranked, 1):
         badge = format_score_emoji(c.ai_score)
         bar = _score_bar(c.ai_score)
         sig = c.ai_signals[0] if c.ai_signals else ""
+        entry = entry_quality_label(c)
+        buyable = "✅" if c.ai_score >= min_score else "⏭"
         lines.append(
-            f"<b>{i}. ${c.symbol}</b>  {badge}\n"
+            f"{buyable} <b>{i}. ${c.symbol}</b>  {badge}\n"
             f"   {bar} {c.ai_score}/100\n"
-            f"   💵 ${c.price_usd:.8f} │ 1h: {c.price_change_h1:+.1f}% │ 24h: {c.price_change_h24:+.1f}%\n"
+            f"   💵 ${c.price_usd:.8f} │ 1h: {c.price_change_h1:+.1f}%\n"
             f"   💧 ${c.liquidity_usd:,.0f} liq │ ${c.volume_24h:,.0f} vol\n"
-            f"   {sig}\n"
+            f"   {entry} │ {sig}\n"
             f"   🔗 <a href='{c.url}'>Chart</a>\n"
         )
-    return "\n".join(lines)
+    lines.append("\nTap a button below to buy instantly.")
+    return "\n".join(lines), ranked[:5]
 
 
 async def cmd_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -332,8 +344,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=back_button())
     elif data == "scan":
         await query.edit_message_text("🔍 Scanning with AI...", parse_mode="HTML")
-        text = await _format_scan_results()
-        await query.edit_message_text(text, parse_mode="HTML", disable_web_page_preview=True, reply_markup=back_button())
+        text, top5 = await _format_scan_results(user_id)
+        kb = scan_results_menu(top5) if top5 else back_button()
+        await query.edit_message_text(text, parse_mode="HTML", disable_web_page_preview=True, reply_markup=kb)
+    elif data.startswith("buymint_"):
+        mint = data.replace("buymint_", "")
+        user = await get_user(user_id)
+        if not user or not user.get("encrypted_key"):
+            await query.edit_message_text("❌ Import wallet key first.", reply_markup=back_button())
+            return
+        await query.edit_message_text("⏳ Executing buy...", parse_mode="HTML")
+        ok, msg = await auto_trader.buy_coin(user, mint)
+        await query.edit_message_text(f"{'✅' if ok else '❌'} {msg}", reply_markup=back_button())
     elif data == "wallet_import":
         PENDING_IMPORT.add(user_id)
         await query.edit_message_text("🔑 Send your base58 private key now.\n\n⚠️ Dedicated wallet ONLY!", reply_markup=back_button())
@@ -483,6 +505,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             pubkey = str(kp.pubkey())
             encrypted = encrypt_private_key(user_id, text)
             await set_wallet(user_id, pubkey, encrypted)
+            await apply_preset(user_id, PRESETS["balanced"], "balanced")
             bal = await get_balance_sol(pubkey)
             try:
                 await update.message.delete()
@@ -491,9 +514,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await update.message.reply_text(
                 f"✅ <b>Wallet Connected!</b>\n\n"
                 f"<code>{pubkey[:12]}...{pubkey[-8:]}</code>\n"
-                f"Balance: <b>{bal:.4f} SOL</b>\n\n"
-                f"Next: tap <b>🎛 Trading Modes</b> → pick Safe/Balanced/Degen\n"
-                f"Then tap <b>START Auto Trade</b>!",
+                f"Balance: <b>{bal:.4f} SOL</b>\n"
+                f"Mode: ⚖️ Balanced (auto-set)\n\n"
+                f"Tap <b>START Auto Trade</b> to go!",
                 parse_mode="HTML",
                 reply_markup=await _get_menu_kb(user_id),
             )

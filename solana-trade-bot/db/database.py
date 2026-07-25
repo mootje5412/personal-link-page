@@ -240,6 +240,19 @@ async def get_trade_history(user_id: int, limit: int = 10) -> list[dict[str, Any
             return [dict(r) for r in await cur.fetchall()]
 
 
+async def get_cooldown_mints(user_id: int, hours: int = 4) -> set[str]:
+    """Mints traded recently — skip rebuying."""
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT DISTINCT token_mint FROM trade_log WHERE user_id = ? AND created_at > ?",
+            (user_id, cutoff),
+        ) as cur:
+            rows = await cur.fetchall()
+            return {r[0] for r in rows}
+
+
 async def get_stats(user_id: int) -> dict[str, Any]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -263,6 +276,23 @@ async def get_stats(user_id: int) -> dict[str, Any]:
         ) as cur:
             open_row = await cur.fetchone()
 
+        # Estimate SOL PnL from sell logs
+        async with db.execute(
+            """
+            SELECT details FROM trade_log
+            WHERE user_id = ? AND action = 'SELL' ORDER BY created_at DESC LIMIT 50
+            """,
+            (user_id,),
+        ) as cur:
+            sell_rows = await cur.fetchall()
+        sol_pnl = 0.0
+        for row in sell_rows:
+            try:
+                d = json.loads(row[0] or "{}")
+                sol_pnl += float(d.get("sol_pnl", 0))
+            except Exception:
+                pass
+
     return {
         "total_trades": total,
         "wins": wins,
@@ -270,5 +300,6 @@ async def get_stats(user_id: int) -> dict[str, Any]:
         "win_rate": round(wins / total * 100, 1) if total > 0 else 0,
         "avg_pnl": round(pnl_row["avg_pnl"] or 0, 1),
         "total_pnl": round(pnl_row["total_pnl"] or 0, 1),
+        "sol_pnl": round(sol_pnl, 4),
         "open_positions": open_row["open_count"] or 0,
     }

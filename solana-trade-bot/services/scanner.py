@@ -6,16 +6,20 @@ import httpx
 
 from config import MIN_LIQUIDITY_USD, MIN_VOLUME_24H_USD, SCAM_KEYWORDS, SOL_MINT
 
-# Skip known non-meme / system tokens
 BLOCKED_MINTS = {
     SOL_MINT,
-    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  # USDC
-    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",  # USDT
-    "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",   # JUP
-    "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",   # mSOL
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+    "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+    "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",  # BONK
+    "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t1GHn2aUaj4q2j2",  # WIF
 }
 
-SCAN_QUERIES = ["pump", "meme", "bonk", "pepe", "dog", "cat", "ai", "trump", "moon"]
+SCAN_QUERIES = [
+    "pump", "meme", "bonk", "pepe", "dog", "cat", "ai", "trump", "moon",
+    "solana meme", "degen", "based", "frog", "wif", "popcat",
+]
 
 
 @dataclass
@@ -44,6 +48,7 @@ class MemeCoin:
     ai_score: float = 0.0
     ai_signals: list[str] = field(default_factory=list)
     is_scam: bool = False
+    age_hours: float = 0.0
 
 
 async def _fetch_json(url: str) -> list | dict:
@@ -57,16 +62,25 @@ def _is_scam(coin: MemeCoin) -> bool:
     text = f"{coin.name} {coin.symbol}".lower()
     if any(kw in text for kw in SCAM_KEYWORDS):
         return True
-    # Liquidity too low vs volume (possible wash trading)
     if coin.liquidity_usd < 5_000 and coin.volume_24h > 50_000:
         return True
-    # Extreme liq/fdv mismatch
     if coin.fdv > 0 and coin.liquidity_usd / coin.fdv < 0.005:
         return True
-    # Dead token — no recent activity
     if coin.buys_1h + coin.sells_1h < 3 and coin.volume_1h < 500:
         return True
+    # Suspicious: huge mcap but tiny liq
+    if coin.market_cap > 1_000_000 and coin.liquidity_usd < 20_000:
+        return True
+    # Single txn dominance
+    if coin.buys_24h + coin.sells_24h < 10:
+        return True
     return False
+
+
+def _token_age_hours(created_at: int | None) -> float:
+    if not created_at:
+        return 999.0
+    return max(0, (time.time() * 1000 - created_at) / 3_600_000)
 
 
 def _parse_pair(pair: dict) -> MemeCoin | None:
@@ -90,6 +104,7 @@ def _parse_pair(pair: dict) -> MemeCoin | None:
     tx24 = txns.get("h24") or {}
     tx1 = txns.get("h1") or {}
 
+    created = pair.get("pairCreatedAt")
     coin = MemeCoin(
         symbol=(base.get("symbol") or "?")[:12],
         name=(base.get("name") or base.get("symbol") or "?")[:32],
@@ -109,10 +124,11 @@ def _parse_pair(pair: dict) -> MemeCoin | None:
         sells_24h=int(tx24.get("sells") or 0),
         buys_1h=int(tx1.get("buys") or 0),
         sells_1h=int(tx1.get("sells") or 0),
-        pair_created_at=pair.get("pairCreatedAt"),
+        pair_created_at=created,
         dex=pair.get("dexId") or "",
         url=pair.get("url") or f"https://dexscreener.com/solana/{pair.get('pairAddress', mint)}",
     )
+    coin.age_hours = _token_age_hours(created)
     coin.is_scam = _is_scam(coin)
     return coin
 
@@ -160,7 +176,7 @@ async def scan_meme_coins(limit: int = 30) -> list[MemeCoin]:
     ]
     await asyncio.gather(*tasks)
 
-    mint_list = list(mints)[:80]
+    mint_list = list(mints)[:100]
     for i in range(0, len(mint_list), 30):
         batch = ",".join(mint_list[i : i + 30])
         try:

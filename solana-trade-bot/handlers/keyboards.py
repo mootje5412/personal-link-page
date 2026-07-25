@@ -123,5 +123,17 @@ def positions_menu(positions: list[dict]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
+def scan_results_menu(coins: list) -> InlineKeyboardMarkup:
+    rows = []
+    for c in coins[:5]:
+        rows.append([InlineKeyboardButton(
+            f"🟢 Buy ${c.symbol} ({c.ai_score:.0f})",
+            callback_data=f"buymint_{c.mint}",
+        )])
+    rows.append([InlineKeyboardButton("🔄 Refresh Scan", callback_data="scan")])
+    rows.append([InlineKeyboardButton("« Menu", callback_data="menu")])
+    return InlineKeyboardMarkup(rows)
+
+
 def back_button() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton("« Back to Menu", callback_data="menu")]])
