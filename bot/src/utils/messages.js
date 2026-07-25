@@ -63,7 +63,9 @@ function aiSearchMessage() {
     'Username — cross-platform matching',
     'Discord ID — profile enrichment',
     '',
-    'Results are ranked and deduplicated before delivery.'
+    'Results are ranked and deduplicated before delivery.',
+    '',
+    'Live sources: breach, stealer, social, network, gaming, and footprint databases.'
   ].join('\n');
 }
 

@@ -243,7 +243,7 @@ class CommandHandler {
     });
 
     try {
-      const machines = await machineSearchService.mockMachineSearch(query);
+      const machines = await machineSearchService.searchMachines(query);
 
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
 

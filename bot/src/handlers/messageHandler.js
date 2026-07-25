@@ -58,7 +58,7 @@ class MessageHandler {
     };
 
     try {
-      const results = await searchService.mockSearch(query, onProgress);
+      const results = await searchService.search(query, onProgress);
 
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
 
