@@ -303,3 +303,32 @@ async def get_stats(user_id: int) -> dict[str, Any]:
         "sol_pnl": round(sol_pnl, 4),
         "open_positions": open_row["open_count"] or 0,
     }
+
+
+async def get_best_worst_trade(user_id: int) -> dict[str, Any]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """
+            SELECT token_symbol, pnl_pct FROM positions
+            WHERE user_id = ? AND status = 'closed' AND pnl_pct IS NOT NULL
+            ORDER BY pnl_pct DESC LIMIT 1
+            """,
+            (user_id,),
+        ) as cur:
+            best = await cur.fetchone()
+        async with db.execute(
+            """
+            SELECT token_symbol, pnl_pct FROM positions
+            WHERE user_id = ? AND status = 'closed' AND pnl_pct IS NOT NULL
+            ORDER BY pnl_pct ASC LIMIT 1
+            """,
+            (user_id,),
+        ) as cur:
+            worst = await cur.fetchone()
+    return {
+        "best_symbol": best["token_symbol"] if best else None,
+        "best_pnl": round(best["pnl_pct"], 1) if best else None,
+        "worst_symbol": worst["token_symbol"] if worst else None,
+        "worst_pnl": round(worst["pnl_pct"], 1) if worst else None,
+    }

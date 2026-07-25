@@ -7,6 +7,7 @@ from config import TELEGRAM_BOT_TOKEN
 from db.database import (
     apply_preset,
     disconnect_wallet,
+    get_best_worst_trade,
     get_open_positions,
     get_position_by_id,
     get_stats,
@@ -17,8 +18,18 @@ from db.database import (
     set_wallet,
     upsert_user,
 )
+from handlers.formatters import (
+    greeting,
+    performance_badge,
+    pnl_bar,
+    score_bar,
+    short_address,
+)
 from handlers.keyboards import (
     back_button,
+    confirm_disconnect,
+    confirm_sell_all,
+    dashboard_menu,
     main_menu,
     modes_menu,
     positions_menu,
@@ -28,11 +39,21 @@ from handlers.keyboards import (
     stop_loss_quick,
     trade_size_quick,
 )
-from handlers.messages import HELP, PROFIT_INFO, SETUP_GUIDE, WELCOME
+from handlers.messages import (
+    AUTOTRADE_OFF,
+    AUTOTRADE_ON,
+    HELP,
+    PROFIT_INFO,
+    SETUP_GUIDE,
+    WELCOME,
+    WELCOME_BACK,
+)
 from handlers.presets import PRESETS, preset_summary
+from handlers.tips import random_tip
 from services.ai_scorer import format_score_emoji, rank_coins
 from services.crypto_store import encrypt_private_key
 from services.entry_filter import entry_quality_label
+from services.portfolio import get_unrealized_pnl
 from services.scanner import get_token_price_cached, scan_meme_coins
 from services.trader import auto_trader, cache_scan_results
 from services.wallet import get_balance_sol, keypair_from_private_key, validate_pubkey
@@ -52,16 +73,41 @@ async def _get_menu_kb(user_id: int):
 
 
 def _score_bar(score: float) -> str:
-    filled = round(score / 10)
-    return "█" * filled + "░" * (10 - filled)
+    return score_bar(score)
+
+
+async def _welcome_text(user_id: int, first_name: str | None) -> str:
+    user = await get_user(user_id)
+    stats = await get_stats(user_id)
+    tip = random_tip()
+
+    if user and user.get("wallet_pubkey"):
+        autotrade = "🟢 LIVE" if user.get("autotrade") else "⏸ Paused"
+        lines = [
+            greeting(first_name),
+            "",
+            WELCOME_BACK,
+            "",
+            f"Status: <b>{autotrade}</b>",
+        ]
+        if stats["total_trades"] > 0:
+            badge = performance_badge(stats["win_rate"], stats.get("sol_pnl", 0))
+            lines.append(f"Performance: {badge} │ {stats['win_rate']}% win rate")
+        lines.extend(["", tip])
+        return "\n".join(lines)
+
+    lines = [greeting(first_name), "", WELCOME, "", tip]
+    return "\n".join(lines)
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.effective_user or not update.message:
         return
     user_id = update.effective_user.id
+    name = update.effective_user.first_name
     await upsert_user(user_id)
-    await update.message.reply_text(WELCOME, parse_mode="HTML", reply_markup=await _get_menu_kb(user_id))
+    text = await _welcome_text(user_id, name)
+    await update.message.reply_text(text, parse_mode="HTML", reply_markup=await _get_menu_kb(user_id))
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -74,39 +120,77 @@ async def cmd_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if not update.message or not update.effective_user:
         return
     text = await _format_dashboard(update.effective_user.id)
-    await update.message.reply_text(text, parse_mode="HTML", reply_markup=await _get_menu_kb(update.effective_user.id))
+    await update.message.reply_text(text, parse_mode="HTML", reply_markup=dashboard_menu())
+
+
+async def cmd_tips(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message:
+        return
+    await update.message.reply_text(
+        f"<b>💡 Pro Tip</b>\n\n{random_tip()}\n\n<i>Tap /tips again for another.</i>",
+        parse_mode="HTML",
+        reply_markup=back_button(),
+    )
 
 
 async def _format_dashboard(user_id: int) -> str:
     user = await get_user(user_id) or {}
     stats = await get_stats(user_id)
+    best = await get_best_worst_trade(user_id)
+    positions = await get_open_positions(user_id)
+    unrealized = await get_unrealized_pnl(user_id, positions) if positions else None
+
     bal = 0.0
     if user.get("wallet_pubkey"):
         bal = await get_balance_sol(user["wallet_pubkey"])
-    autotrade = "🟢 RUNNING" if user.get("autotrade") else "🔴 STOPPED"
-    mode = user.get("risk_mode") or "balanced"
-    mode_label = PRESETS.get(mode, PRESETS["balanced"])["label"]
 
-    return (
-        f"📊 <b>Trading Dashboard</b>\n\n"
-        f"🤖 Auto Trade: <b>{autotrade}</b>\n"
-        f"🎛 Mode: <b>{mode_label}</b>\n"
-        f"💰 Balance: <b>{bal:.4f} SOL</b>\n"
-        f"📦 Open Positions: {stats['open_positions']}\n\n"
-        f"<b>Performance</b>\n"
-        f"├ Total Trades: {stats['total_trades']}\n"
-        f"├ Wins: {stats['wins']} │ Losses: {stats['losses']}\n"
-        f"├ Win Rate: {stats['win_rate']}%\n"
-        f"├ Avg PnL: {stats['avg_pnl']:+.1f}%\n"
-        f"├ Total PnL: {stats['total_pnl']:+.1f}%\n"
-        f"└ SOL PnL: <b>{stats.get('sol_pnl', 0):+.4f} SOL</b>\n\n"
-        f"<b>Active Settings</b>\n"
-        f"├ Trade: {float(user.get('trade_sol', 0.05))} SOL\n"
-        f"├ Stop Loss: -{float(user.get('stop_loss_pct', 15))}%\n"
-        f"├ Take Profit: +{float(user.get('take_profit_pct', 50))}%\n"
-        f"├ Trailing: -{float(user.get('trailing_stop_pct', 10))}%\n"
-        f"└ Min AI Score: {float(user.get('min_ai_score', 75))}/100"
-    )
+    autotrade = "🟢 LIVE" if user.get("autotrade") else "⏸ Paused"
+    mode_label = PRESETS.get(user.get("risk_mode") or "balanced", PRESETS["balanced"])["label"]
+    badge = performance_badge(stats["win_rate"], stats.get("sol_pnl", 0))
+
+    lines = [
+        "📊 <b>Your Trading Dashboard</b>",
+        "",
+        f"🤖 Bot: <b>{autotrade}</b>  │  🎛 {mode_label}",
+        f"💰 Balance: <b>{bal:.4f} SOL</b>  │  📦 {stats['open_positions']} open",
+        f"🏅 {badge}",
+        "",
+        "<b>📈 Performance</b>",
+        f"├ Trades: {stats['total_trades']} ({stats['wins']}W / {stats['losses']}L)",
+        f"├ Win Rate: {stats['win_rate']}%  {pnl_bar(stats['win_rate'] - 50)}",
+        f"├ Avg PnL: {stats['avg_pnl']:+.1f}%",
+        f"└ Realized: <b>{stats.get('sol_pnl', 0):+.4f} SOL</b>",
+    ]
+
+    if unrealized and unrealized["invested_sol"] > 0:
+        u = unrealized["unrealized_sol"]
+        up = unrealized["unrealized_pct"]
+        emoji = "🟢" if u >= 0 else "🔴"
+        lines.extend([
+            "",
+            "<b>💼 Open Positions (Live)</b>",
+            f"├ Invested: {unrealized['invested_sol']:.4f} SOL",
+            f"├ Est. Value: {unrealized['current_sol']:.4f} SOL",
+            f"└ Unrealized: {emoji} <b>{u:+.4f} SOL ({up:+.1f}%)</b>",
+        ])
+
+    if best.get("best_symbol"):
+        lines.extend([
+            "",
+            "<b>🏆 Records</b>",
+            f"├ Best: ${best['best_symbol']} ({best['best_pnl']:+.1f}%)",
+        ])
+        if best.get("worst_symbol"):
+            lines.append(f"└ Worst: ${best['worst_symbol']} ({best['worst_pnl']:+.1f}%)")
+
+    lines.extend([
+        "",
+        "<b>⚙️ Active Rules</b>",
+        f"├ {float(user.get('trade_sol', 0.05))} SOL/trade",
+        f"├ Stop -{float(user.get('stop_loss_pct', 15))}% │ Target +{float(user.get('take_profit_pct', 50))}%",
+        f"└ AI min score: {float(user.get('min_ai_score', 75))}/100",
+    ])
+    return "\n".join(lines)
 
 
 async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -130,7 +214,7 @@ async def _format_scan_results(user_id: int | None = None) -> tuple[str, list]:
     user = await get_user(user_id) if user_id else None
     min_score = float(user.get("min_ai_score", 75)) if user else 75
 
-    lines = ["🔥 <b>Top Meme Coins — AI Ranked</b>\n"]
+    lines = ["🔥 <b>Top Meme Coins — AI Ranked</b>", f"<i>{len(ranked)} coins scanned · tap to buy</i>\n"]
     for i, c in enumerate(ranked, 1):
         badge = format_score_emoji(c.ai_score)
         bar = _score_bar(c.ai_score)
@@ -178,8 +262,8 @@ async def cmd_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     autotrade = "🟢 ON" if user.get("autotrade") else "🔴 OFF"
     has_key = "✅ Auto-ready" if user.get("encrypted_key") else "👁 View-only"
     await update.message.reply_text(
-        f"💰 <b>Wallet</b>\n\n"
-        f"<code>{user['wallet_pubkey']}</code>\n\n"
+        f"💰 <b>Your Wallet</b>\n\n"
+        f"Address: <code>{short_address(user['wallet_pubkey'])}</code>\n\n"
         f"Balance: <b>{bal:.4f} SOL</b>\n"
         f"Auto Trade: {autotrade}\n"
         f"Mode: {has_key}",
@@ -201,22 +285,28 @@ async def cmd_positions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 async def _format_positions(user_id: int) -> str:
     positions = await get_open_positions(user_id)
     if not positions:
-        return "📊 No open positions.\n\nStart auto trade or wait for the bot to find opportunities."
-
-    lines = ["📊 <b>Open Positions</b>\n"]
-    for p in positions:
-        coin = await get_token_price_cached(p["token_mint"])
-        entry = float(p["entry_price"])
-        current = coin.price_usd if coin else entry
-        pnl = ((current - entry) / entry * 100) if entry > 0 else 0
-        emoji = "🟢" if pnl >= 0 else "🔴"
-        lines.append(
-            f"{emoji} <b>${p['token_symbol']}</b>\n"
-            f"   Entry: ${entry:.8f} → Now: ${current:.8f}\n"
-            f"   PnL: <b>{pnl:+.1f}%</b> │ {float(p['entry_amount_sol'])} SOL\n"
-            f"   AI Score: {float(p['ai_score'])}/100\n"
+        return (
+            "📊 <b>No Open Positions</b>\n\n"
+            "Start auto trade and the bot will find opportunities.\n"
+            "Or tap 🔍 Scan Memes to buy manually."
         )
-    lines.append("\nTap a button below to manually sell.")
+
+    unrealized = await get_unrealized_pnl(user_id, positions)
+    lines = [
+        "📊 <b>Open Positions</b>",
+        f"Unrealized: <b>{unrealized['unrealized_sol']:+.4f} SOL ({unrealized['unrealized_pct']:+.1f}%)</b>\n",
+    ]
+    for p, detail in zip(positions, unrealized["positions"]):
+        pnl = detail["pnl_pct"]
+        emoji = "🟢" if pnl >= 0 else "🔴"
+        bar = pnl_bar(min(pnl, 50))
+        lines.append(
+            f"{emoji} <b>${p['token_symbol']}</b>  {pnl:+.1f}%\n"
+            f"   {bar}\n"
+            f"   {detail['sol_in']:.4f} SOL in → ~{detail['est_sol']:.4f} SOL\n"
+            f"   AI score: {float(p['ai_score']):.0f}/100\n"
+        )
+    lines.append("\n<i>Tap below to sell any position.</i>")
     return "\n".join(lines)
 
 
@@ -228,17 +318,28 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def _format_history(user_id: int) -> str:
-    trades = await get_trade_history(user_id, 8)
+    trades = await get_trade_history(user_id, 10)
     if not trades:
-        return "📜 No trades yet."
+        return "📜 <b>No trades yet.</b>\n\nStart auto trade to begin!"
 
     lines = ["📜 <b>Recent Trades</b>\n"]
     for t in trades:
         action = "🟢 BUY" if t["action"] == "BUY" else "🔴 SELL"
         sig = t.get("tx_signature") or ""
-        link = f"<a href='https://solscan.io/tx/{sig}'>TX</a>" if sig else ""
+        link = f" <a href='https://solscan.io/tx/{sig}'>↗</a>" if sig else ""
+        extra = ""
+        if t["action"] == "SELL":
+            try:
+                import json
+                d = json.loads(t.get("details") or "{}")
+                pnl = d.get("pnl_pct")
+                if pnl is not None:
+                    extra = f" ({pnl:+.1f}%)"
+            except Exception:
+                pass
         lines.append(
-            f"{action} ${t['token_symbol']} — {float(t['amount_sol']):.4f} SOL {link}\n"
+            f"{action} <b>${t['token_symbol']}</b>{extra}\n"
+            f"   {float(t['amount_sol']):.4f} SOL{link}\n"
         )
     return "\n".join(lines)
 
@@ -256,17 +357,9 @@ async def cmd_autotrade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     enabled = not bool(user.get("autotrade"))
     await set_autotrade(update.effective_user.id, enabled)
     if enabled:
-        msg = (
-            "🚀 <b>Auto Trade STARTED!</b>\n\n"
-            "The bot is now:\n"
-            "• Scanning meme coins every 30s\n"
-            "• Buying top AI picks (score ≥ 75)\n"
-            "• Monitoring exits every 15s\n"
-            "• Auto-selling on stop loss / take profit\n\n"
-            "You'll get notified on every trade."
-        )
+        msg = AUTOTRADE_ON
     else:
-        msg = "⏹ <b>Auto Trade STOPPED.</b>\n\nOpen positions are still held — sell manually via /positions."
+        msg = AUTOTRADE_OFF
     await update.message.reply_text(msg, parse_mode="HTML", reply_markup=await _get_menu_kb(update.effective_user.id))
 
 
@@ -332,7 +425,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     data = query.data
 
     if data == "menu":
-        await query.edit_message_text(WELCOME, parse_mode="HTML", reply_markup=await _get_menu_kb(user_id))
+        name = update.effective_user.first_name if update.effective_user else None
+        text = await _welcome_text(user_id, name)
+        await query.edit_message_text(text, parse_mode="HTML", reply_markup=await _get_menu_kb(user_id))
+    elif data == "tips":
+        await query.edit_message_text(
+            f"<b>💡 Pro Tip</b>\n\n{random_tip()}",
+            parse_mode="HTML",
+            reply_markup=back_button(),
+        )
     elif data == "setup_guide":
         await query.edit_message_text(SETUP_GUIDE, parse_mode="HTML", reply_markup=setup_guide_menu())
     elif data == "profit_info":
@@ -341,7 +442,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.edit_message_text(HELP, parse_mode="HTML", reply_markup=back_button())
     elif data == "dashboard":
         text = await _format_dashboard(user_id)
-        await query.edit_message_text(text, parse_mode="HTML", reply_markup=back_button())
+        await query.edit_message_text(text, parse_mode="HTML", reply_markup=dashboard_menu())
     elif data == "scan":
         await query.edit_message_text("🔍 Scanning with AI...", parse_mode="HTML")
         text, top5 = await _format_scan_results(user_id)
@@ -401,13 +502,27 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         ok, msg = await auto_trader.buy_top_coin(user)
         await query.edit_message_text(f"{'✅' if ok else '❌'} {msg}", reply_markup=back_button())
     elif data == "sell_all":
+        positions = await get_open_positions(user_id)
+        if not positions:
+            await query.edit_message_text("No open positions to sell.", reply_markup=back_button())
+            return
+        await query.edit_message_text(
+            f"⚠️ <b>Sell all {len(positions)} positions?</b>\n\nThis will market-sell everything in your wallet.",
+            parse_mode="HTML",
+            reply_markup=confirm_sell_all(),
+        )
+    elif data == "sell_all_confirm":
         user = await get_user(user_id)
         if not user or not user.get("encrypted_key"):
             await query.edit_message_text("❌ No wallet.", reply_markup=back_button())
             return
         await query.edit_message_text("⏳ Selling all positions...", parse_mode="HTML")
         ok, total = await auto_trader.sell_all(user)
-        await query.edit_message_text(f"✅ Sold {ok}/{total} positions.", reply_markup=back_button())
+        await query.edit_message_text(
+            f"✅ <b>Done!</b> Sold {ok}/{total} positions.",
+            parse_mode="HTML",
+            reply_markup=back_button(),
+        )
     elif data == "toggle_notify":
         user = await get_user(user_id) or {}
         new_val = 0 if user.get("notify_trades", 1) else 1
@@ -417,8 +532,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         user = await get_user(user_id) or {}
         await query.edit_message_text(await _format_settings(user), parse_mode="HTML", reply_markup=settings_menu())
     elif data == "disconnect":
+        await query.edit_message_text(
+            "⚠️ <b>Disconnect wallet?</b>\n\nThis stops auto trade and removes your wallet from the bot.",
+            parse_mode="HTML",
+            reply_markup=confirm_disconnect(),
+        )
+    elif data == "disconnect_confirm":
         await disconnect_wallet(user_id)
-        await query.edit_message_text("🔓 Wallet disconnected. Auto trade stopped.", reply_markup=await _get_menu_kb(user_id))
+        await query.edit_message_text(
+            "🔓 <b>Wallet disconnected.</b>\n\nAuto trade stopped. Import again anytime to restart.",
+            parse_mode="HTML",
+            reply_markup=await _get_menu_kb(user_id),
+        )
     elif data == "settings":
         user = await get_user(user_id) or {}
         await query.edit_message_text(await _format_settings(user), parse_mode="HTML", reply_markup=settings_menu())
@@ -428,14 +553,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await query.edit_message_text("❌ Import wallet key first (/wallet).", reply_markup=back_button())
             return
         await set_autotrade(user_id, True)
-        await query.edit_message_text(
-            "🚀 <b>Auto Trade STARTED!</b>\n\nScanning & trading automatically.",
-            parse_mode="HTML",
-            reply_markup=await _get_menu_kb(user_id),
-        )
+        await query.edit_message_text(AUTOTRADE_ON, parse_mode="HTML", reply_markup=await _get_menu_kb(user_id))
     elif data == "autotrade_off":
         await set_autotrade(user_id, False)
-        await query.edit_message_text("⏹ Auto Trade STOPPED.", reply_markup=await _get_menu_kb(user_id))
+        await query.edit_message_text(AUTOTRADE_OFF, parse_mode="HTML", reply_markup=await _get_menu_kb(user_id))
     elif data.startswith("sell_"):
         pos_id = int(data.split("_")[1])
         user = await get_user(user_id)
@@ -512,11 +633,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             except Exception:
                 pass
             await update.message.reply_text(
-                f"✅ <b>Wallet Connected!</b>\n\n"
-                f"<code>{pubkey[:12]}...{pubkey[-8:]}</code>\n"
+                f"✅ <b>You're all set!</b>\n\n"
+                f"Wallet: <code>{short_address(pubkey)}</code>\n"
                 f"Balance: <b>{bal:.4f} SOL</b>\n"
-                f"Mode: ⚖️ Balanced (auto-set)\n\n"
-                f"Tap <b>START Auto Trade</b> to go!",
+                f"Mode: ⚖️ Balanced\n\n"
+                f"🚀 Tap <b>START Auto Trade</b> — the bot handles the rest!",
                 parse_mode="HTML",
                 reply_markup=await _get_menu_kb(user_id),
             )
@@ -588,6 +709,7 @@ def build_application() -> Application:
         ("scan", cmd_scan), ("modes", cmd_modes), ("wallet", cmd_wallet),
         ("balance", cmd_balance), ("positions", cmd_positions), ("history", cmd_history),
         ("autotrade", cmd_autotrade), ("settings", cmd_settings), ("stop", cmd_stop),
+        ("tips", cmd_tips),
     ]:
         app.add_handler(CommandHandler(cmd, handler))
 

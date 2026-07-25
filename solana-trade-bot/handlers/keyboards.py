@@ -37,8 +37,40 @@ def main_menu(has_wallet: bool, autotrade: bool, has_key: bool = False) -> Inlin
         if has_key:
             rows.append([InlineKeyboardButton("🟢 Buy Top Coin Now", callback_data="buy_top")])
 
-    rows.append([InlineKeyboardButton("❓ Help", callback_data="help")])
+        rows.append([
+            InlineKeyboardButton("💡 Tips", callback_data="tips"),
+            InlineKeyboardButton("❓ Help", callback_data="help"),
+        ])
+
     return InlineKeyboardMarkup(rows)
+
+
+def confirm_sell_all() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ Yes, Sell All", callback_data="sell_all_confirm"),
+            InlineKeyboardButton("❌ Cancel", callback_data="positions"),
+        ],
+    ])
+
+
+def confirm_disconnect() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ Yes, Disconnect", callback_data="disconnect_confirm"),
+            InlineKeyboardButton("❌ Cancel", callback_data="settings"),
+        ],
+    ])
+
+
+def dashboard_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🔄 Refresh", callback_data="dashboard"),
+            InlineKeyboardButton("📈 Positions", callback_data="positions"),
+        ],
+        [InlineKeyboardButton("« Menu", callback_data="menu")],
+    ])
 
 
 def setup_guide_menu() -> InlineKeyboardMarkup:

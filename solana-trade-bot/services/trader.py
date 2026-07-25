@@ -174,15 +174,16 @@ class AutoTrader:
 
             signals = "\n".join(f"   {s}" for s in coin.ai_signals[:3])
             msg = (
-                f"🟢 <b>BOUGHT ${coin.symbol}</b>\n\n"
-                f"💰 {trade_sol} SOL → entry ${coin.price_usd:.8f}\n"
-                f"🤖 AI: <b>{coin.ai_score}/100</b> │ Impact: {impact:.1f}%\n"
+                f"🟢 <b>BOUGHT ${coin.symbol}</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"💰 <b>{trade_sol} SOL</b> → ${coin.price_usd:.8f}\n"
+                f"🤖 AI Score: <b>{coin.ai_score}/100</b>\n"
+                f"📊 Impact: {impact:.1f}%\n\n"
                 f"💧 Liq ${coin.liquidity_usd:,.0f} │ Vol ${coin.volume_24h:,.0f}\n"
-                f"📈 1h: {coin.price_change_h1:+.1f}% │ 5m: {coin.price_change_m5:+.1f}%\n"
-                f"{signals}\n"
-                f"🛑 Stop: -{user.get('stop_loss_pct', 15)}% │ "
-                f"🎯 Target: +{user.get('take_profit_pct', 50)}%\n"
-                f"🔗 <a href='https://solscan.io/tx/{sig}'>TX</a> · <a href='{coin.url}'>Chart</a>"
+                f"📈 1h {coin.price_change_h1:+.1f}% │ 5m {coin.price_change_m5:+.1f}%\n"
+                f"{signals}\n\n"
+                f"🛑 -{user.get('stop_loss_pct', 15)}% │ 🎯 +{user.get('take_profit_pct', 50)}%\n"
+                f"🔗 <a href='https://solscan.io/tx/{sig}'>Transaction</a> · <a href='{coin.url}'>Chart</a>"
             )
             await self._notify_user(user_id, msg, user)
             return True
@@ -294,11 +295,12 @@ class AutoTrader:
 
             emoji = "💰" if pnl_pct >= 0 else "🔴"
             msg = (
-                f"{emoji} <b>SOLD ${pos['token_symbol']}</b>\n\n"
-                f"📋 {reason}\n"
-                f"💰 {out_sol:.4f} SOL ({sol_pnl:+.4f} SOL)\n"
+                f"{emoji} <b>SOLD ${pos['token_symbol']}</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"📋 {reason}\n\n"
+                f"💰 <b>{out_sol:.4f} SOL</b> ({sol_pnl:+.4f} SOL)\n"
                 f"📊 PnL: <b>{pnl_pct:+.1f}%</b>\n"
-                f"🔗 <a href='https://solscan.io/tx/{sig}'>View TX</a>"
+                f"🔗 <a href='https://solscan.io/tx/{sig}'>View Transaction</a>"
             )
             await self._notify_user(user_id, msg, user)
         except Exception as exc:
