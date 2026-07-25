@@ -61,7 +61,11 @@ def dashboard_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("Refresh", callback_data="dashboard"),
+            InlineKeyboardButton("Best Buys", callback_data="scan"),
+        ],
+        [
             InlineKeyboardButton("Positions", callback_data="positions"),
+            InlineKeyboardButton("History", callback_data="history"),
         ],
         [InlineKeyboardButton("Back", callback_data="menu")],
     ])
@@ -135,13 +139,53 @@ def stop_loss_quick() -> InlineKeyboardMarkup:
     ])
 
 
+def scan_results_menu(coins: list) -> InlineKeyboardMarkup:
+    rows = []
+    for c in coins[:5]:
+        verdict = getattr(c, "ai_verdict", "BUY")
+        rows.append([
+            InlineKeyboardButton(
+                f"Buy ${c.symbol} ({verdict})",
+                callback_data=f"buymint_{c.mint}",
+            ),
+            InlineKeyboardButton(
+                f"Details ${c.symbol}",
+                callback_data=f"coin_{c.mint}",
+            ),
+        ])
+    rows.append([
+        InlineKeyboardButton("Ask AI", callback_data="ask_ai"),
+        InlineKeyboardButton("Refresh Scan", callback_data="scan"),
+    ])
+    rows.append([InlineKeyboardButton("Back", callback_data="menu")])
+    return InlineKeyboardMarkup(rows)
+
+
+def coin_detail_menu(mint: str, has_key: bool = False) -> InlineKeyboardMarkup:
+    rows = []
+    if has_key:
+        rows.append([InlineKeyboardButton("Buy This Coin", callback_data=f"buymint_{mint}")])
+    rows.append([
+        InlineKeyboardButton("Ask AI About This", callback_data=f"askcoin_{mint}"),
+        InlineKeyboardButton("Back to Scan", callback_data="scan"),
+    ])
+    rows.append([InlineKeyboardButton("Menu", callback_data="menu")])
+    return InlineKeyboardMarkup(rows)
+
+
 def positions_menu(positions: list[dict]) -> InlineKeyboardMarkup:
     rows = []
     for p in positions[:5]:
-        rows.append([InlineKeyboardButton(
-            f"Sell ${p['token_symbol']}",
-            callback_data=f"sell_{p['id']}",
-        )])
+        rows.append([
+            InlineKeyboardButton(
+                f"Details ${p['token_symbol']}",
+                callback_data=f"pos_{p['id']}",
+            ),
+            InlineKeyboardButton(
+                f"Sell ${p['token_symbol']}",
+                callback_data=f"sell_{p['id']}",
+            ),
+        ])
     if positions:
         rows.append([InlineKeyboardButton("Sell All", callback_data="sell_all")])
     rows.append([InlineKeyboardButton("Refresh", callback_data="positions")])
@@ -149,20 +193,15 @@ def positions_menu(positions: list[dict]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
-def scan_results_menu(coins: list) -> InlineKeyboardMarkup:
-    rows = []
-    for c in coins[:5]:
-        verdict = getattr(c, "ai_verdict", "BUY")
-        rows.append([InlineKeyboardButton(
-            f"Buy ${c.symbol} ({verdict})",
-            callback_data=f"buymint_{c.mint}",
-        )])
-    rows.append([
-        InlineKeyboardButton("Ask AI", callback_data="ask_ai"),
-        InlineKeyboardButton("Refresh", callback_data="scan"),
+def position_detail_menu(pos_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("Sell Now", callback_data=f"sell_{pos_id}")],
+        [
+            InlineKeyboardButton("All Positions", callback_data="positions"),
+            InlineKeyboardButton("Dashboard", callback_data="dashboard"),
+        ],
+        [InlineKeyboardButton("Menu", callback_data="menu")],
     ])
-    rows.append([InlineKeyboardButton("Back", callback_data="menu")])
-    return InlineKeyboardMarkup(rows)
 
 
 def ask_ai_menu() -> InlineKeyboardMarkup:

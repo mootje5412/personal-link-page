@@ -18,15 +18,26 @@ from db.database import (
     set_wallet,
     upsert_user,
 )
-from handlers.formatters import greeting, performance_label, short_address
+from handlers.formatters import (
+    format_coin_detail,
+    format_dashboard,
+    format_position_detail,
+    format_position_line,
+    format_scan_results,
+    format_trade_history,
+    greeting,
+    short_address,
+)
 from handlers.keyboards import (
     ask_ai_menu,
     back_button,
+    coin_detail_menu,
     confirm_disconnect,
     confirm_sell_all,
     dashboard_menu,
     main_menu,
     modes_menu,
+    position_detail_menu,
     positions_menu,
     scan_results_menu,
     settings_menu,
@@ -44,13 +55,12 @@ from handlers.messages import (
     WELCOME_BACK,
 )
 from handlers.presets import PRESETS, preset_summary
-from services.ai_chat import ask_ai
+from services.ai_chat import analyze_coin, ask_ai
 from services.ai_scorer import rank_coins
 from services.crypto_store import encrypt_private_key
-from services.entry_filter import entry_quality_label
 from services.portfolio import get_unrealized_pnl
-from services.scanner import scan_meme_coins
-from services.trader import auto_trader, cache_scan_results
+from services.scanner import scan_meme_coins, get_token_price_cached
+from services.trader import auto_trader, cache_scan_results, get_cached_coin
 from services.wallet import get_balance_sol, keypair_from_private_key, validate_pubkey
 
 logger = logging.getLogger(__name__)
@@ -93,6 +103,7 @@ async def _welcome_text(user_id: int, first_name: str | None) -> str:
         autotrade = "Running" if user.get("autotrade") else "Paused"
         lines = [greeting(first_name), "", WELCOME_BACK.strip(), "", f"Status: <b>{autotrade}</b>"]
         if stats["total_trades"] > 0:
+            from handlers.formatters import performance_label
             label = performance_label(stats["win_rate"], stats.get("sol_pnl", 0))
             lines.append(f"Performance: {label} | {stats['win_rate']}% win rate")
         lines.append("\nType a question to ask the AI, or tap Best Buys to scan.")
@@ -130,6 +141,7 @@ async def cmd_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     question = " ".join(context.args) if context.args else ""
     user_id = update.effective_user.id
     user = await get_user(user_id) or {}
+    user["user_id"] = user_id
 
     if not question:
         PENDING_ASK.add(user_id)
@@ -149,59 +161,60 @@ async def cmd_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(f"<b>AI</b>\n\n{answer}", parse_mode="HTML", reply_markup=back_button())
 
 
+async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message or not update.effective_user:
+        return
+    symbol = " ".join(context.args).strip().lstrip("$") if context.args else ""
+    user_id = update.effective_user.id
+    user = await get_user(user_id) or {}
+    user["user_id"] = user_id
+
+    if not symbol:
+        await update.message.reply_text(
+            "<b>Analyze a Coin</b>\n\nUsage: /analyze SYMBOL\nExample: /analyze BONK",
+            parse_mode="HTML",
+            reply_markup=back_button(),
+        )
+        return
+
+    await update.message.reply_chat_action("typing")
+    ranked = rank_coins(await scan_meme_coins())
+    cache_scan_results(ranked[:12])
+    coin = None
+    sym = symbol.upper()
+    for c in ranked:
+        if c.symbol.upper() == sym or sym in c.name.upper():
+            coin = c
+            break
+    if not coin:
+        answer = await ask_ai(f"Should I buy ${symbol}?", user)
+    else:
+        answer = await analyze_coin(coin.mint, user)
+        kb = coin_detail_menu(coin.mint, bool(user.get("encrypted_key")))
+        await update.message.reply_text(
+            f"<b>Analysis: ${coin.symbol}</b>\n\n{answer}",
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+            reply_markup=kb,
+        )
+        return
+    await update.message.reply_text(f"<b>AI</b>\n\n{answer}", parse_mode="HTML", reply_markup=back_button())
+
+
 async def _format_dashboard(user_id: int) -> str:
     user = await get_user(user_id) or {}
+    user["user_id"] = user_id
     stats = await get_stats(user_id)
     best = await get_best_worst_trade(user_id)
     positions = await get_open_positions(user_id)
-    unrealized = await get_unrealized_pnl(user_id, positions) if positions else None
+    unrealized = await get_unrealized_pnl(user_id, positions, user) if positions else None
+    position_details = unrealized["positions"] if unrealized else []
 
     bal = 0.0
     if user.get("wallet_pubkey"):
         bal = await get_balance_sol(user["wallet_pubkey"])
 
-    autotrade = "Running" if user.get("autotrade") else "Paused"
-    mode_label = PRESETS.get(user.get("risk_mode") or "balanced", PRESETS["balanced"])["label"]
-    perf = performance_label(stats["win_rate"], stats.get("sol_pnl", 0))
-
-    lines = [
-        "<b>Dashboard</b>",
-        "",
-        f"Bot: {autotrade} | Mode: {mode_label}",
-        f"Balance: {bal:.4f} SOL | Open: {stats['open_positions']}",
-        f"Performance: {perf}",
-        "",
-        "<b>Stats</b>",
-        f"Trades: {stats['total_trades']} ({stats['wins']}W / {stats['losses']}L)",
-        f"Win rate: {stats['win_rate']}%",
-        f"Avg PnL: {stats['avg_pnl']:+.1f}%",
-        f"Realized: {stats.get('sol_pnl', 0):+.4f} SOL",
-    ]
-
-    if unrealized and unrealized["invested_sol"] > 0:
-        u = unrealized["unrealized_sol"]
-        up = unrealized["unrealized_pct"]
-        lines.extend([
-            "",
-            "<b>Open Positions</b>",
-            f"Invested: {unrealized['invested_sol']:.4f} SOL",
-            f"Est. value: {unrealized['current_sol']:.4f} SOL",
-            f"Unrealized: {u:+.4f} SOL ({up:+.1f}%)",
-        ])
-
-    if best.get("best_symbol"):
-        lines.extend(["", "<b>Records</b>", f"Best: ${best['best_symbol']} ({best['best_pnl']:+.1f}%)"])
-        if best.get("worst_symbol"):
-            lines.append(f"Worst: ${best['worst_symbol']} ({best['worst_pnl']:+.1f}%)")
-
-    lines.extend([
-        "",
-        "<b>Rules</b>",
-        f"Trade size: {float(user.get('trade_sol', 0.05))} SOL",
-        f"Stop: -{float(user.get('stop_loss_pct', 15))}% | Target: +{float(user.get('take_profit_pct', 50))}%",
-        f"Min AI score: {float(user.get('min_ai_score', 75))}/100",
-    ])
-    return "\n".join(lines)
+    return format_dashboard(user, stats, best, bal, unrealized, positions, position_details)
 
 
 async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -216,7 +229,7 @@ async def cmd_scan(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def _format_scan_results(user_id: int | None = None) -> tuple[str, list]:
     coins = await scan_meme_coins()
-    ranked = rank_coins(coins)[:10]
+    ranked = rank_coins(coins)[:12]
     cache_scan_results(ranked)
 
     if not ranked:
@@ -224,44 +237,20 @@ async def _format_scan_results(user_id: int | None = None) -> tuple[str, list]:
 
     user = await get_user(user_id) if user_id else None
     min_score = float(user.get("min_ai_score", 75)) if user else 75
-
     buys = [c for c in ranked if getattr(c, "ai_verdict", "") in ("STRONG BUY", "BUY") and c.ai_score >= min_score]
-    best = buys[0] if buys else ranked[0]
-    verdict = getattr(best, "ai_verdict", "WATCH")
-    why = "; ".join(best.ai_signals[:3]) if best.ai_signals else "Mixed signals"
 
-    lines = [
-        "<b>AI Market Scan</b>",
-        f"{len(ranked)} coins analyzed",
-        "",
-        f"<b>BEST BUY: ${best.symbol}</b>",
-        f"Verdict: {verdict} | Score: {best.ai_score}/100",
-        f"Price: ${best.price_usd:.8f} | 1h: {best.price_change_h1:+.1f}% | 24h: {best.price_change_h24:+.1f}%",
-        f"Liquidity: ${best.liquidity_usd:,.0f} | Volume: ${best.volume_24h:,.0f}",
-        f"Why: {why}",
-        f"<a href='{best.url}'>Chart</a>",
-        "",
-        "<b>Also worth watching:</b>",
-    ]
+    text = format_scan_results(ranked, min_score, buys)
+    return text, (buys[:5] if buys else ranked[:5])
 
-    shown = {best.mint}
-    for c in ranked:
-        if c.mint in shown:
-            continue
-        v = getattr(c, "ai_verdict", "WATCH")
-        if v in ("STRONG BUY", "BUY", "WATCH") and len(shown) < 6:
-            why_short = c.ai_signals[0] if c.ai_signals else ""
-            lines.append(f"${c.symbol} — {v} ({c.ai_score}/100) — {why_short}")
-            shown.add(c.mint)
 
-    avoid = [c for c in ranked if getattr(c, "ai_verdict", "") == "AVOID"][:3]
-    if avoid:
-        lines.extend(["", "<b>Avoid:</b>"])
-        for c in avoid:
-            lines.append(f"${c.symbol} — score {c.ai_score}/100")
-
-    lines.append("\nTap a button below to buy, or ask the AI for advice.")
-    return "\n".join(lines), (buys[:5] if buys else ranked[:5])
+async def _resolve_coin(mint: str):
+    coin = get_cached_coin(mint)
+    if coin:
+        return coin
+    coin = await get_token_price_cached(mint)
+    if coin:
+        rank_coins([coin])
+    return coin
 
 
 async def cmd_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -314,25 +303,31 @@ async def cmd_positions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def _format_positions(user_id: int) -> str:
+    user = await get_user(user_id) or {}
     positions = await get_open_positions(user_id)
     if not positions:
-        return "No open positions.\n\nStart auto trade or run a scan to buy manually."
+        return "No open positions.\n\nStart auto trade or run Best Buys to buy manually."
 
-    unrealized = await get_unrealized_pnl(user_id, positions)
+    unrealized = await get_unrealized_pnl(user_id, positions, user)
     lines = [
         "<b>Open Positions</b>",
-        f"Unrealized: {unrealized['unrealized_sol']:+.4f} SOL ({unrealized['unrealized_pct']:+.1f}%)\n",
+        f"Total: {unrealized['unrealized_sol']:+.4f} SOL ({unrealized['unrealized_pct']:+.1f}%)",
+        f"Invested: {unrealized['invested_sol']:.4f} SOL -> Est. {unrealized['current_sol']:.4f} SOL\n",
     ]
-    for p, detail in zip(positions, unrealized["positions"]):
-        pnl = detail["pnl_pct"]
-        tag = "UP" if pnl >= 0 else "DOWN"
-        lines.append(
-            f"<b>${p['token_symbol']}</b> [{tag}] {pnl:+.1f}%\n"
-            f"  {detail['sol_in']:.4f} SOL in -> ~{detail['est_sol']:.4f} SOL\n"
-            f"  AI score: {float(p['ai_score']):.0f}/100\n"
-        )
-    lines.append("\nTap below to sell.")
+    for pos, detail in zip(positions, unrealized["positions"]):
+        lines.append(format_position_line(pos, detail))
+    lines.append("\nTap Details for full breakdown, or Sell to exit.")
     return "\n".join(lines)
+
+
+async def _format_position_detail(user_id: int, pos_id: int) -> str | None:
+    user = await get_user(user_id) or {}
+    pos = await get_position_by_id(pos_id, user_id)
+    if not pos:
+        return None
+    unrealized = await get_unrealized_pnl(user_id, [pos], user)
+    detail = unrealized["positions"][0]
+    return format_position_detail(pos, detail, user)
 
 
 async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -343,30 +338,8 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def _format_history(user_id: int) -> str:
-    trades = await get_trade_history(user_id, 10)
-    if not trades:
-        return "<b>No trades yet.</b>\n\nStart auto trade to begin."
-
-    lines = ["<b>Recent Trades</b>\n"]
-    for t in trades:
-        action = "BUY" if t["action"] == "BUY" else "SELL"
-        sig = t.get("tx_signature") or ""
-        link = f" <a href='https://solscan.io/tx/{sig}'>↗</a>" if sig else ""
-        extra = ""
-        if t["action"] == "SELL":
-            try:
-                import json
-                d = json.loads(t.get("details") or "{}")
-                pnl = d.get("pnl_pct")
-                if pnl is not None:
-                    extra = f" ({pnl:+.1f}%)"
-            except Exception:
-                pass
-        lines.append(
-            f"{action} <b>${t['token_symbol']}</b>{extra}\n"
-            f"   {float(t['amount_sol']):.4f} SOL{link}\n"
-        )
-    return "\n".join(lines)
+    trades = await get_trade_history(user_id, 15)
+    return format_trade_history(trades)
 
 
 async def cmd_autotrade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -489,6 +462,41 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         text, top5 = await _format_scan_results(user_id)
         kb = scan_results_menu(top5) if top5 else back_button()
         await query.edit_message_text(text, parse_mode="HTML", disable_web_page_preview=True, reply_markup=kb)
+    elif data.startswith("coin_"):
+        mint = data.replace("coin_", "", 1)
+        user = await get_user(user_id) or {}
+        min_score = float(user.get("min_ai_score", 75))
+        coin = await _resolve_coin(mint)
+        if not coin:
+            await query.edit_message_text("Coin not found.", reply_markup=back_button())
+            return
+        text = format_coin_detail(coin, min_score, user)
+        has_key = bool(user.get("encrypted_key"))
+        await query.edit_message_text(
+            text, parse_mode="HTML", disable_web_page_preview=True,
+            reply_markup=coin_detail_menu(mint, has_key),
+        )
+    elif data.startswith("pos_"):
+        pos_id = int(data.replace("pos_", ""))
+        text = await _format_position_detail(user_id, pos_id)
+        if not text:
+            await query.edit_message_text("Position not found.", reply_markup=back_button())
+            return
+        await query.edit_message_text(
+            text, parse_mode="HTML", disable_web_page_preview=True,
+            reply_markup=position_detail_menu(pos_id),
+        )
+    elif data.startswith("askcoin_"):
+        mint = data.replace("askcoin_", "", 1)
+        user = await get_user(user_id) or {}
+        user["user_id"] = user_id
+        await query.edit_message_text("Analyzing...", parse_mode="HTML")
+        answer = await analyze_coin(mint, user)
+        await query.edit_message_text(
+            f"<b>AI Analysis</b>\n\n{answer}",
+            parse_mode="HTML",
+            reply_markup=coin_detail_menu(mint, bool(user.get("encrypted_key"))),
+        )
     elif data.startswith("buymint_"):
         mint = data.replace("buymint_", "")
         user = await get_user(user_id)
@@ -689,6 +697,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if user_id in PENDING_ASK or _looks_like_question(text):
         PENDING_ASK.discard(user_id)
         user = await get_user(user_id) or {}
+        user["user_id"] = user_id
         await update.message.reply_chat_action("typing")
         answer = await ask_ai(text, user)
         await update.message.reply_text(
@@ -762,7 +771,7 @@ def build_application() -> Application:
         ("scan", cmd_scan), ("modes", cmd_modes), ("wallet", cmd_wallet),
         ("balance", cmd_balance), ("positions", cmd_positions), ("history", cmd_history),
         ("autotrade", cmd_autotrade), ("settings", cmd_settings), ("stop", cmd_stop),
-        ("ask", cmd_ask),
+        ("ask", cmd_ask), ("analyze", cmd_analyze),
     ]:
         app.add_handler(CommandHandler(cmd, handler))
 

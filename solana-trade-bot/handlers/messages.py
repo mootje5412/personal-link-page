@@ -21,14 +21,15 @@ HELP = """
 <b>Commands</b>
 
 /start — Main menu
-/scan — Best coins to buy right now
+/scan — Best coins with full market breakdown
 /ask — Ask the AI a question
-/dashboard — Stats and performance
+/analyze SYMBOL — Deep analysis on any coin
+/dashboard — Full portfolio, stats, and open positions
 /modes — Safe, Balanced, or Degen
 /wallet — Import trading wallet
 /balance — SOL balance
-/positions — Open trades
-/history — Past trades
+/positions — Open trades with live PnL
+/history — Past trades with exit reasons
 /autotrade — Start or stop bot
 /settings — Adjust settings
 /stop — Emergency stop
@@ -37,7 +38,8 @@ HELP = """
 Type any question directly, or use /ask.
 Examples:
 - What should I buy right now?
-- How does stop loss work?
+- Should I buy $BONK?
+- How does trailing stop work?
 - Which mode should I use?
 """
 

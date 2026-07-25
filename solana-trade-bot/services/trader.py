@@ -326,3 +326,7 @@ def cache_scan_results(coins: list[MemeCoin]) -> None:
     global _last_scan
     for c in coins:
         _last_scan[c.mint] = c
+
+
+def get_cached_coin(mint: str) -> MemeCoin | None:
+    return _last_scan.get(mint)
