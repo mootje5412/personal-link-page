@@ -9,7 +9,7 @@ const machinePaginationHandler = require('./handlers/machinePaginationHandler');
 class ApexSearchBot {
   constructor() {
     if (!config.botToken) {
-      throw new Error('TELEGRAM_BOT_TOKEN is missing. Copy bot/.env.example to bot/.env');
+      throw new Error('TELEGRAM_BOT_TOKEN is missing. Set it in bot/.env');
     }
 
     this.bot = new TelegramBot(config.botToken, { polling: config.polling });

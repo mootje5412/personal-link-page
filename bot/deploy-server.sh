@@ -46,7 +46,9 @@ if ! command -v pm2 >/dev/null 2>&1; then
 fi
 
 if [ ! -f .env ]; then
-  echo "WARNING: .env not found on server — create it before first deploy or copy manually."
+  echo "WARNING: .env not found on server — create it before first deploy."
+else
+  grep -q '^INTEL_BASE_URL=' .env || echo 'INTEL_BASE_URL=https://www.osintcat.net/api' >> .env
 fi
 
 npm install --production

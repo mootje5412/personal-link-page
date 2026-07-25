@@ -4,9 +4,19 @@ OSINT intelligence platform with plan-based access, unlimited searches, and Mach
 
 ## Setup
 
+Create `bot/.env` with:
+
+```
+TELEGRAM_BOT_TOKEN=
+OWNER_ID=
+INTEL_API_KEY=
+INTEL_BASE_URL=https://www.osintcat.net/api
+```
+
+Then:
+
 ```bash
 cd bot
-cp .env.example .env
 npm install
 npm start
 ```
