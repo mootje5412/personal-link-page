@@ -388,7 +388,7 @@ async def _format_settings(user: dict) -> str:
         f"Stop loss: {float(user.get('stop_loss_pct', 15))}%\n"
         f"Take profit: <b>{float(user.get('take_profit_pct', 50))}%</b>\n"
         f"Trailing stop: <b>{float(user.get('trailing_stop_pct', 10))}%</b>\n"
-        f"Max positions: <b>{int(user.get('max_positions', 3))}</b>\n"
+        f"Max positions: <b>1</b> (one coin at a time)\n"
         f"Min AI score: <b>{float(user.get('min_ai_score', 75))}/100</b>\n"
         f"Notifications: {notify}\n\n"
         f"Tap a button to change:"
@@ -656,7 +656,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         field = PENDING_SETTING.pop(user_id)
         try:
             if field == "max_positions":
-                val = max(1, min(10, int(text)))
+                val = 1
             elif field == "trade_sol":
                 val = max(0.01, min(5.0, float(text)))
             elif field == "min_ai_score":

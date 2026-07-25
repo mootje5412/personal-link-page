@@ -77,6 +77,25 @@ async def init_db() -> None:
             except Exception:
                 pass
         await db.commit()
+        await apply_focused_trading_defaults()
+
+
+async def apply_focused_trading_defaults() -> None:
+    """One-time safety migration: 1 coin, smaller size, tighter stops."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            UPDATE users SET
+                max_positions = 1,
+                trade_sol = MIN(trade_sol, 0.02),
+                stop_loss_pct = MIN(stop_loss_pct, 12),
+                take_profit_pct = MIN(take_profit_pct, 40),
+                trailing_stop_pct = MIN(trailing_stop_pct, 8),
+                min_ai_score = MAX(min_ai_score, 80)
+            WHERE wallet_pubkey IS NOT NULL
+            """
+        )
+        await db.commit()
 
 
 def _now() -> str:

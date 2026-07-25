@@ -117,11 +117,11 @@ def trade_size_quick() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("0.01 SOL", callback_data="quick_trade_0.01"),
-            InlineKeyboardButton("0.05 SOL", callback_data="quick_trade_0.05"),
+            InlineKeyboardButton("0.02 SOL", callback_data="quick_trade_0.02"),
         ],
         [
-            InlineKeyboardButton("0.1 SOL", callback_data="quick_trade_0.1"),
-            InlineKeyboardButton("0.25 SOL", callback_data="quick_trade_0.25"),
+            InlineKeyboardButton("0.03 SOL", callback_data="quick_trade_0.03"),
+            InlineKeyboardButton("0.05 SOL", callback_data="quick_trade_0.05"),
         ],
         [InlineKeyboardButton("Back", callback_data="settings")],
     ])

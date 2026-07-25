@@ -6,6 +6,7 @@ from services.entry_filter import entry_quality_label, validate_entry
 from services.scanner import MemeCoin
 
 from handlers.presets import PRESETS
+from services.risk import format_risk_summary
 
 
 def greeting(name: str | None) -> str:
@@ -266,11 +267,13 @@ def format_autotrade_status(status: dict, autotrade_on: bool) -> str:
 
     labels = {
         "bought": "Last action: bought",
-        "scanning": "Scanning market",
-        "waiting": "Waiting for a good entry",
+        "holding": "Holding 1 coin — no new buys until exit",
+        "scanning": "Scanning for the single best coin",
+        "waiting": "Waiting for an elite setup",
         "swap_failed": "Swap failed — retrying",
         "low_balance": "Low balance — paused",
-        "max_positions": "Max positions reached",
+        "capital_cap": "Capital cap reached — protecting balance",
+        "max_positions": "Already in a trade",
         "no_wallet_key": "Wallet key missing",
         "error": "Error",
     }
@@ -282,6 +285,8 @@ def format_autotrade_status(status: dict, autotrade_on: bool) -> str:
         lines.append(f"Ready to buy: {status['candidates']} coin(s)")
     if status.get("top_pick"):
         lines.append(f"Top pick: {status['top_pick']}")
+    if status.get("focus_coin"):
+        lines.append(f"Holding: {status['focus_coin']}")
     if status.get("last_buy"):
         lines.append(f"Last buy: ${status['last_buy']}")
     if status.get("last_error"):
@@ -323,6 +328,7 @@ def format_dashboard(
 
     if user.get("wallet_pubkey"):
         lines.append(f"Wallet: <code>{short_address(user['wallet_pubkey'])}</code>")
+        lines.append(format_risk_summary(bal, float(user.get("trade_sol", 0.02)), invested))
 
     lines.extend([
         "",
@@ -339,7 +345,7 @@ def format_dashboard(
         "<b>Trading Stats</b>",
         f"Closed trades: {stats['total_trades']} ({stats['wins']}W / {stats['losses']}L)",
         f"Win rate: {stats['win_rate']}% | Avg PnL: {format_pct(stats['avg_pnl'])}",
-        f"Open positions: {stats['open_positions']} / {int(user.get('max_positions', 3))}",
+        f"Open positions: {stats['open_positions']} / 1 (one coin focus)",
     ])
 
     if position_details:

@@ -23,8 +23,9 @@ from db.database import (
 )
 from services.ai_scorer import rank_coins
 from services.crypto_store import decrypt_private_key
-from services.entry_filter import validate_entry
+from services.entry_filter import validate_entry, validate_entry_auto
 from services.jupiter import swap_sol_for_token, swap_token_for_sol
+from services.risk import compute_trade_sol
 from services.scanner import MemeCoin, get_token_price_cached, scan_meme_coins
 from services.wallet import get_balance_sol, get_token_balance_raw, keypair_from_private_key
 
@@ -119,15 +120,26 @@ class AutoTrader:
             return
 
         open_positions = await get_open_positions(user_id)
-        max_pos = int(user.get("max_positions") or 3)
-        if len(open_positions) >= max_pos:
+        max_pos = min(int(user.get("max_positions") or 1), 1)
+        if open_positions:
             self._set_status(
-                user_id, state="max_positions", open_positions=len(open_positions), max_positions=max_pos,
+                user_id,
+                state="holding",
+                open_positions=len(open_positions),
+                focus_coin=f"${open_positions[0]['token_symbol']}",
+                message="One coin at a time — waiting for exit before next buy",
             )
             return
 
         balance = await get_balance_sol(user["wallet_pubkey"])
-        trade_sol = float(user.get("trade_sol") or 0.05)
+        invested = sum(float(p.get("entry_amount_sol") or 0) for p in open_positions)
+        user_trade = float(user.get("trade_sol") or 0.02)
+        trade_sol, size_reason = compute_trade_sol(balance, user_trade, invested)
+
+        if trade_sol is None:
+            self._set_status(user_id, state="capital_cap", balance=balance, last_error=size_reason)
+            return
+
         needed = trade_sol + MIN_RESERVE_SOL
 
         if balance < needed:
@@ -158,9 +170,10 @@ class AutoTrader:
         for coin in ranked:
             if coin.mint in held or coin.mint in cooldown:
                 continue
-            ok, reason = validate_entry(coin, min_score)
+            ok, reason = validate_entry_auto(coin, min_score)
             if ok:
                 candidates.append(coin)
+                break
             elif len(blocked_samples) < 3:
                 blocked_samples.append(f"${coin.symbol}: {reason}")
 
@@ -172,6 +185,7 @@ class AutoTrader:
             balance=balance,
             top_pick=f"${candidates[0].symbol}" if candidates else None,
             blocked=blocked_samples,
+            trade_size=trade_sol,
         )
 
         if not candidates:
@@ -182,41 +196,32 @@ class AutoTrader:
                 top = ranked[0] if ranked else None
                 detail = ""
                 if top:
-                    _, reason = validate_entry(top, min_score)
+                    _, reason = validate_entry_auto(top, min_score)
                     detail = f"\nTop coin ${top.symbol} ({top.ai_score}/100) blocked: {reason}"
                 await self._notify_user(
                     user_id,
                     f"<b>Auto Trade — Waiting</b>\n\n"
-                    f"Scanned {len(ranked)} coins. None pass entry filters right now.{detail}\n\n"
-                    f"Try Balanced/Degen mode or run Best Buys to buy manually.",
+                    f"Scanned {len(ranked)} coins. No elite setup right now.{detail}\n\n"
+                    f"The bot only buys the single best coin with strict filters. "
+                    f"Trade size capped at {trade_sol:.4f} SOL per buy.",
                     user,
                 )
             return
 
-        bought = 0
-        last_fail = ""
-        for coin in candidates[:6]:
-            current = await get_open_positions(user_id)
-            if len(current) >= max_pos:
-                break
-            success, err = await self._buy(user, coin, trade_sol)
-            if success:
-                bought += 1
-                self._set_status(user_id, state="bought", last_buy=coin.symbol, last_buy_at=time.time())
-                break
-            last_fail = err
-            await asyncio.sleep(2)
-
-        if bought == 0 and last_fail:
-            self._set_status(user_id, state="swap_failed", last_error=last_fail, candidates=len(candidates))
+        best = candidates[0]
+        success, err = await self._buy(user, best, trade_sol)
+        if success:
+            self._set_status(user_id, state="bought", last_buy=best.symbol, last_buy_at=time.time())
+        elif err:
+            self._set_status(user_id, state="swap_failed", last_error=err, candidates=1)
             last = _fail_warned.get(user_id, 0)
             if time.time() - last > WARN_COOLDOWN_SEC:
                 _fail_warned[user_id] = time.time()
                 await self._notify_user(
                     user_id,
                     f"<b>Auto Trade — Buy Failed</b>\n\n"
-                    f"Found {len(candidates)} coin(s) but swap failed:\n{last_fail}\n\n"
-                    f"Retrying automatically. Check /dashboard for status.",
+                    f"Best pick ${best.symbol} — swap failed:\n{err}\n\n"
+                    f"Retrying on next scan. Only 1 coin, small size ({trade_sol:.4f} SOL).",
                     user,
                 )
 
@@ -264,32 +269,44 @@ class AutoTrader:
         coin = _last_scan.get(mint) or await get_token_price_cached(mint)
         if not coin:
             return False, "Coin not found"
-        min_score = float(user.get("min_ai_score") or 75)
+        min_score = float(user.get("min_ai_score") or 80)
         ok, reason = validate_entry(coin, min_score)
         if not ok:
             return False, f"Entry rejected: {reason}"
-        trade_sol = float(user.get("trade_sol") or 0.05)
+        balance = await get_balance_sol(user["wallet_pubkey"])
+        positions = await get_open_positions(user["user_id"])
+        if positions:
+            return False, f"Already holding ${positions[0]['token_symbol']} — one coin at a time"
+        invested = sum(float(p.get("entry_amount_sol") or 0) for p in positions)
+        trade_sol, size_reason = compute_trade_sol(balance, float(user.get("trade_sol") or 0.02), invested)
+        if trade_sol is None:
+            return False, size_reason
         success, err = await self._buy(user, coin, trade_sol)
         if success:
             return True, f"Bought ${coin.symbol}"
         return False, err or "Swap failed — try again"
 
     async def buy_top_coin(self, user: dict) -> tuple[bool, str]:
+        positions = await get_open_positions(user["user_id"])
+        if positions:
+            return False, f"Already holding ${positions[0]['token_symbol']} — sell first (one coin at a time)"
+
         coins = await scan_meme_coins()
         ranked = rank_coins(coins)
-        min_score = float(user.get("min_ai_score") or 75)
-        last_err = ""
+        min_score = float(user.get("min_ai_score") or 80)
+        balance = await get_balance_sol(user["wallet_pubkey"])
+        trade_sol, size_reason = compute_trade_sol(balance, float(user.get("trade_sol") or 0.02), 0)
+        if trade_sol is None:
+            return False, size_reason
+
         for coin in ranked:
-            ok, reason = validate_entry(coin, min_score)
+            ok, reason = validate_entry_auto(coin, min_score)
             if ok:
-                trade_sol = float(user.get("trade_sol") or 0.05)
                 success, err = await self._buy(user, coin, trade_sol)
                 if success:
-                    return True, f"Bought ${coin.symbol} ({coin.ai_score}/100)"
-                last_err = err
-        if last_err:
-            return False, last_err
-        return False, "No coins pass entry filters right now"
+                    return True, f"Bought ${coin.symbol} ({coin.ai_score}/100) with {trade_sol:.4f} SOL"
+                return False, err
+        return False, "No elite coin passes strict filters right now"
 
     async def sell_all(self, user: dict) -> tuple[int, int]:
         positions = await get_open_positions(user["user_id"])
@@ -333,7 +350,7 @@ class AutoTrader:
                 should_sell, reason = True, f"Stop Loss ({pnl_pct:.1f}%)"
             elif pnl_pct >= take_profit:
                 should_sell, reason = True, f"Take Profit ({pnl_pct:+.1f}%)"
-            elif pnl_pct > 8 and drop_from_peak <= -trailing:
+            elif pnl_pct > 5 and drop_from_peak <= -trailing:
                 should_sell, reason = True, f"Trailing Stop ({pnl_pct:+.1f}%)"
             elif coin.price_change_m5 <= -15 and pnl_pct < -2:
                 should_sell, reason = True, f"Flash Crash ({coin.price_change_m5:.0f}% in 5m)"

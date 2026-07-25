@@ -1,35 +1,35 @@
-"""One-tap trading presets."""
+"""One-tap trading presets — single coin focus, small size."""
 
 PRESETS = {
     "safe": {
         "label": "Safe",
-        "desc": "Small trades, tight stops, elite coins only",
-        "trade_sol": 0.02,
-        "stop_loss_pct": 10,
-        "take_profit_pct": 30,
-        "trailing_stop_pct": 8,
-        "max_positions": 2,
+        "desc": "Smallest size, 1 coin only, elite picks",
+        "trade_sol": 0.01,
+        "stop_loss_pct": 8,
+        "take_profit_pct": 25,
+        "trailing_stop_pct": 6,
+        "max_positions": 1,
         "min_ai_score": 85,
     },
     "balanced": {
         "label": "Balanced",
-        "desc": "Recommended for most users",
-        "trade_sol": 0.05,
-        "stop_loss_pct": 15,
-        "take_profit_pct": 50,
-        "trailing_stop_pct": 10,
-        "max_positions": 3,
-        "min_ai_score": 75,
+        "desc": "Recommended — 1 coin, small trades, tight exits",
+        "trade_sol": 0.02,
+        "stop_loss_pct": 12,
+        "take_profit_pct": 35,
+        "trailing_stop_pct": 8,
+        "max_positions": 1,
+        "min_ai_score": 80,
     },
     "degen": {
         "label": "Degen",
-        "desc": "Bigger trades, wider stops, more positions",
-        "trade_sol": 0.1,
-        "stop_loss_pct": 20,
-        "take_profit_pct": 100,
-        "trailing_stop_pct": 15,
-        "max_positions": 5,
-        "min_ai_score": 70,
+        "desc": "Still 1 coin only, slightly larger size",
+        "trade_sol": 0.03,
+        "stop_loss_pct": 15,
+        "take_profit_pct": 50,
+        "trailing_stop_pct": 10,
+        "max_positions": 1,
+        "min_ai_score": 78,
     },
 }
 
@@ -38,5 +38,5 @@ def preset_summary(key: str) -> str:
     p = PRESETS[key]
     return (
         f"{p['trade_sol']} SOL/trade | Stop -{p['stop_loss_pct']}% | Target +{p['take_profit_pct']}%\n"
-        f"Max {p['max_positions']} positions | Min score {p['min_ai_score']}/100"
+        f"1 coin at a time | Min score {p['min_ai_score']}/100"
     )

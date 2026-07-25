@@ -1,11 +1,11 @@
 WELCOME = """
 <b>Solana AI Trader</b>
 
-Automatic meme coin trading on Solana. The AI scans the market, finds the best coins, and trades for you.
+Focuses on <b>one coin at a time</b> with small, capped trades. Never deploys your full balance.
 
 <b>Setup:</b>
 1. Import wallet key
-2. Pick a trading mode
+2. Pick Safe or Balanced mode
 3. Start auto trade
 
 Or ask the AI anything — just type your question.
@@ -14,33 +14,31 @@ Or ask the AI anything — just type your question.
 WELCOME_BACK = """
 Welcome back. Your bot is ready.
 
-Run Best Buys for ranked picks with full breakdowns, check the dashboard for your portfolio, or ask the AI anything.
+One coin at a time, small trades only. Check the dashboard or run Best Buys.
 """
 
 HELP = """
 <b>Commands</b>
 
 /start — Main menu
-/scan — Best coins with full market breakdown
+/scan — Best coin to buy with full breakdown
 /ask — Ask the AI a question
 /analyze SYMBOL — Deep analysis on any coin
-/dashboard — Full portfolio, stats, and open positions
-/modes — Safe, Balanced, or Degen
+/dashboard — Portfolio and auto trade status
+/modes — Safe, Balanced, or Degen (all 1-coin focus)
 /wallet — Import trading wallet
 /balance — SOL balance
-/positions — Open trades with live PnL
+/positions — Your open trade (1 max)
 /history — Past trades with exit reasons
 /autotrade — Start or stop bot
 /settings — Adjust settings
 /stop — Emergency stop
 
-<b>Ask the AI</b>
-Type any question directly, or use /ask.
-Examples:
-- What should I buy right now?
-- Should I buy $BONK?
-- How does trailing stop work?
-- Which mode should I use?
+<b>How it trades</b>
+- Only 1 coin at a time
+- Max 8% of balance per trade
+- Keeps 0.08 SOL reserve always
+- Tight stop loss to cut losses fast
 """
 
 PROFIT_INFO = """
@@ -48,9 +46,9 @@ PROFIT_INFO = """
 
 Maybe — but there are no guarantees.
 
-The bot finds coins faster, filters scams, and exits with discipline. Meme coins are still high risk.
+The bot uses small trades and strict filters to protect your balance. Meme coins are still high risk.
 
-Start with Safe mode and small amounts. Only trade what you can afford to lose.
+Use Safe mode. Only trade what you can afford to lose.
 """
 
 SETUP_GUIDE = """
@@ -60,7 +58,7 @@ SETUP_GUIDE = """
 
 <b>Step 2</b> — Tap Import Wallet Key and paste your private key. It is encrypted and the message is deleted.
 
-<b>Step 3</b> — Pick a mode: Safe (beginners), Balanced (recommended), or Degen (aggressive).
+<b>Step 3</b> — Pick Safe or Balanced mode (both use 1 coin, small size).
 
 <b>Step 4</b> — Tap Start Auto Trade.
 """
@@ -68,11 +66,12 @@ SETUP_GUIDE = """
 AUTOTRADE_ON = """
 <b>Auto Trade Started</b>
 
-The bot is now:
-- Scanning every 25 seconds
-- Buying top AI-rated coins
-- Monitoring exits every 10 seconds
-- Selling on your stop loss and take profit rules
+Focus mode active:
+- 1 coin at a time only
+- Small trade size (capped % of your balance)
+- 0.08 SOL always kept in reserve
+- Tight stop loss and take profit
+- Only buys the single best AI-rated coin
 
 You will be notified on every trade.
 """
@@ -80,5 +79,5 @@ You will be notified on every trade.
 AUTOTRADE_OFF = """
 <b>Auto Trade Stopped</b>
 
-No new buys will be made. Open positions are still held. Use Positions to sell manually.
+No new buys will be made. Open position is still held. Use Positions to sell manually.
 """
