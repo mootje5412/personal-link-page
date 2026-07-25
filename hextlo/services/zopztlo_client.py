@@ -36,6 +36,7 @@ FIELD_ALIASES = {
     "weight": "Weight",
     "sex": "Sex",
     "status": "Status",
+    "id": "Id",
 }
 
 
@@ -99,6 +100,12 @@ def _extract_records(payload: Any) -> tuple[list[Any], int, str]:
 
     data = payload.get("data")
     if isinstance(data, dict):
+        if str(data.get("status", "")).lower() == "error":
+            nested = data.get("results")
+            if isinstance(nested, dict):
+                return [], 0, str(nested.get("message") or nested.get("error") or "Search failed.")
+            return [], 0, str(data.get("message") or "Search failed.")
+
         nested = data.get("results")
         if isinstance(nested, dict):
             if nested.get("error"):
@@ -213,6 +220,16 @@ class ZopzTloClient:
         except httpx.TimeoutException:
             return self._response(detected, message="Search timed out. Try again.")
         except httpx.HTTPStatusError as error:
+            body = ""
+            try:
+                body = error.response.text[:200]
+            except Exception:
+                pass
+            if error.response.status_code == 403 and "whitelist" in body.lower():
+                return self._response(
+                    detected,
+                    message="API IP not whitelisted. Contact support.",
+                )
             return self._response(detected, message=f"API error {error.response.status_code}.")
         except ValueError:
             return self._response(detected, message="API returned invalid JSON.")

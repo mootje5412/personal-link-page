@@ -2,6 +2,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from config.settings import settings
+from services.api_health import check_all_apis
 from services.access import (
     access_required_message,
     get_access_info,
@@ -118,6 +119,27 @@ async def cmd_revoke(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
 
     await message.reply_text(revoke_access(user_id))
+
+
+async def cmd_apistatus(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    if not message or not update.effective_user:
+        return
+
+    if not is_owner(update.effective_user.id, settings.owner_id):
+        await message.reply_text("Unauthorized. Owner only.")
+        return
+
+    await message.reply_chat_action("typing")
+    rows = await check_all_apis()
+    lines = ["API Status", "────────────────────────────"]
+    for label, ok, msg, count in rows:
+        status = "online" if ok else "offline"
+        extra = f" ({count} hits)" if ok and count else ""
+        if not ok:
+            extra = f" — {msg}"
+        lines.append(f"{label}: {status}{extra}")
+    await message.reply_text("\n".join(lines))
 
 
 async def cmd_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

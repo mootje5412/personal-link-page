@@ -5,13 +5,14 @@ _client = ZopzTloClient()
 
 
 def _dedupe_key(result: SearchResult) -> str:
+    if isinstance(result.raw, dict):
+        raw_id = result.raw.get("id") or result.raw.get("_id")
+        if raw_id is not None and str(raw_id).strip():
+            return f"id:{raw_id}"
+
     ssn = result.fields.get("SSN", "").strip()
     if ssn:
-        return f"ssn:{ssn}|{result.fields.get('Address', '')}|{result.fields.get('Phone', '')}"
-
-    raw_id = result.raw.get("id") if isinstance(result.raw, dict) else None
-    if raw_id:
-        return f"id:{raw_id}"
+        return f"ssn:{ssn}|{result.fields.get('Id', '')}|{result.fields.get('Address', '')}"
 
     parts = [result.title.lower()]
     for key in (
@@ -40,43 +41,17 @@ def _sort_results(results: list[SearchResult]) -> list[SearchResult]:
     )
 
 
-def _name_pair(api_query: str) -> tuple[str, str] | None:
-    parts = [part.strip() for part in api_query.split(",") if part.strip()]
-    if len(parts) >= 2 and parts[2].upper() not in {"XX", "*"} and len(parts[2]) == 2:
-        return parts[0], parts[1]
-    if len(parts) >= 2:
-        return parts[0], parts[1]
-    return None
-
-
 def _build_plans(detected: DetectedSearch) -> list[DetectedSearch]:
-    label = detected.label or "Search"
-
     if detected.search_type == SearchType.MOBILE:
         phone = detected.api_query.split(",")[0]
         formatted = f"({phone[:3]}) {phone[3:6]}-{phone[6:]}" if len(phone) == 10 else phone
+        label = detected.label or "Phone Search"
         return [
             DetectedSearch(SearchType.SSN, phone, detected.display_query, label=label),
             DetectedSearch(SearchType.SSN, formatted, detected.display_query, label=label),
             DetectedSearch(SearchType.MOBILE, f"{phone},*", detected.display_query, label=label),
             DetectedSearch(SearchType.MOBILE, f"{phone},{phone}", detected.display_query, label=label),
         ]
-
-    if detected.search_type == SearchType.CRIMINAL:
-        pair = _name_pair(detected.api_query)
-        plans = [detected]
-        if pair:
-            first, last = pair
-            plans.insert(
-                0,
-                DetectedSearch(
-                    SearchType.SSN,
-                    f"{first},{last}",
-                    detected.display_query,
-                    label=label,
-                ),
-            )
-        return plans
 
     return [detected]
 
@@ -103,12 +78,17 @@ async def run_detected_search(detected: DetectedSearch, user_id: int) -> SearchR
     api_connected = True
     search_type = detected.search_type
     label = detected.label
+    api_total = 0
 
     for plan in plans:
         response = await _client.search(plan)
         api_connected = api_connected and response.api_connected
+
         if response.message and not response.results:
             message = message or response.message
+
+        if response.count > api_total:
+            api_total = response.count
 
         for result in response.results:
             key = _dedupe_key(result)
@@ -117,10 +97,15 @@ async def run_detected_search(detected: DetectedSearch, user_id: int) -> SearchR
             seen.add(key)
             merged.append(result)
 
-        if plan.search_type == SearchType.SSN and response.results:
+        if response.results and plan.search_type == SearchType.SSN:
             search_type = SearchType.SSN
 
+        if merged and plan.search_type == detected.search_type:
+            break
+
     merged = _sort_results(merged)
+    total = len(merged) if merged else api_total
+
     if not merged and not message:
         message = _empty_message(detected)
 
@@ -128,7 +113,7 @@ async def run_detected_search(detected: DetectedSearch, user_id: int) -> SearchR
         search_type=search_type,
         query=detected.display_query,
         results=merged,
-        total=len(merged),
+        total=total,
         api_connected=api_connected,
         message=message,
         label=label,
