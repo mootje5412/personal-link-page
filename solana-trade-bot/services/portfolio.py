@@ -29,7 +29,7 @@ async def get_unrealized_pnl(
         from_peak = ((current - peak) / peak * 100) if peak > 0 else 0
         to_stop = (-stop_loss) - pnl_pct
         to_target = take_profit - pnl_pct
-        trail_buffer = (-trailing) - from_peak if pnl_pct > 8 else 999.0
+        trail_buffer = (-trailing) - from_peak if pnl_pct > 5 else 999.0
 
         live_note = ""
         if coin:
