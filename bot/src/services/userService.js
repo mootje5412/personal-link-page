@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const PLANS = require('../../config/plans');
 const { escapeHtml } = require('../utils/messages');
 
 const DATA_DIR = path.join(__dirname, '../../data');
@@ -11,6 +12,7 @@ class UserService {
     this.ensureDataDir();
     this.users = this.loadJson(USERS_FILE);
     this.directory = this.loadJson(DIRECTORY_FILE);
+    this.migrateLegacyUsers();
   }
 
   ensureDataDir() {
@@ -38,6 +40,27 @@ class UserService {
     fs.writeFileSync(DIRECTORY_FILE, JSON.stringify(this.directory, null, 2));
   }
 
+  migrateLegacyUsers() {
+    let changed = false;
+
+    Object.values(this.users).forEach((user) => {
+      if (!user.plan) {
+        user.plan = 'basic';
+        changed = true;
+      }
+      if (user.searches_per_day !== undefined) {
+        delete user.searches_per_day;
+        delete user.searches_used_today;
+        delete user.last_reset;
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      this.saveUsers();
+    }
+  }
+
   registerUser(userId, username, firstName, lastName) {
     this.directory[String(userId)] = {
       username: username || null,
@@ -58,16 +81,27 @@ class UserService {
     return null;
   }
 
-  grantAccess(userId, username, searchesPerDay, days) {
-    const searches = parseInt(searchesPerDay, 10);
+  getPlan(planId) {
+    return PLANS[planId] || null;
+  }
+
+  getPlans() {
+    return PLANS;
+  }
+
+  grantAccess(userId, username, planId, days) {
+    const plan = this.getPlan(planId.toLowerCase());
     const duration = parseInt(days, 10);
 
-    if (!Number.isFinite(searches) || searches < 1) {
-      return { success: false, message: 'Searches per day must be a positive number.' };
+    if (!plan) {
+      return {
+        success: false,
+        message: `Invalid plan. Available: ${Object.keys(PLANS).join(', ')}`
+      };
     }
 
     if (!Number.isFinite(duration) || duration < 1) {
-      return { success: false, message: 'Access days must be a positive number.' };
+      return { success: false, message: 'Days must be a positive number.' };
     }
 
     const expiresAt = new Date();
@@ -75,11 +109,9 @@ class UserService {
 
     this.users[String(userId)] = {
       username: username || `user_${userId}`,
-      searches_per_day: searches,
+      plan: plan.id,
       granted_at: new Date().toISOString(),
-      expires_at: expiresAt.toISOString(),
-      searches_used_today: 0,
-      last_reset: new Date().toISOString().split('T')[0]
+      expires_at: expiresAt.toISOString()
     };
 
     this.saveUsers();
@@ -87,10 +119,12 @@ class UserService {
     return {
       success: true,
       message: [
-        '✅ <b>Access Granted</b>',
+        '<b>Access Granted</b>',
         '',
         `User: <code>${escapeHtml(username || userId)}</code>`,
-        `Searches: <b>${searches}/day</b>`,
+        `Plan: <b>${plan.name}</b>`,
+        `Searches: <b>unlimited</b>`,
+        `Machine Viewer: <b>${plan.machineViewer ? 'yes' : 'no'}</b>`,
         `Duration: <b>${duration} days</b>`,
         `Expires: <b>${escapeHtml(expiresAt.toLocaleDateString())}</b>`
       ].join('\n')
@@ -106,67 +140,43 @@ class UserService {
     const name = this.users[key].username;
     delete this.users[key];
     this.saveUsers();
-    return { success: true, message: `🚫 Access revoked for <code>${escapeHtml(name)}</code>.` };
-  }
-
-  resetDailyIfNeeded(user) {
-    const today = new Date().toISOString().split('T')[0];
-    if (user.last_reset !== today) {
-      user.searches_used_today = 0;
-      user.last_reset = today;
-      this.saveUsers();
-    }
+    return { success: true, message: `Access revoked for <code>${escapeHtml(name)}</code>.` };
   }
 
   checkAccess(userId) {
     const user = this.users[String(userId)];
     if (!user) {
-      return { hasAccess: false, message: 'You do not have an active subscription.' };
+      return { hasAccess: false, message: 'No active subscription.' };
     }
 
     if (new Date() > new Date(user.expires_at)) {
-      return { hasAccess: false, message: 'Your subscription has expired.' };
-    }
-
-    this.resetDailyIfNeeded(user);
-
-    if (user.searches_used_today >= user.searches_per_day) {
-      return {
-        hasAccess: false,
-        message: `Daily limit reached (${user.searches_per_day} searches/day). Resets at midnight UTC.`
-      };
+      return { hasAccess: false, message: 'Subscription expired.' };
     }
 
     return { hasAccess: true, user };
   }
 
-  useSearch(userId) {
-    const user = this.users[String(userId)];
-    if (!user) return null;
+  hasMachineAccess(userId) {
+    const access = this.checkAccess(userId);
+    if (!access.hasAccess) return false;
 
-    this.resetDailyIfNeeded(user);
-    user.searches_used_today += 1;
-    this.saveUsers();
-
-    return {
-      used: user.searches_used_today,
-      remaining: user.searches_per_day - user.searches_used_today,
-      limit: user.searches_per_day
-    };
+    const plan = this.getPlan(access.user.plan);
+    return plan ? plan.machineViewer : false;
   }
 
   getAccountInfo(userId) {
     const user = this.users[String(userId)];
     if (!user) return null;
 
-    this.resetDailyIfNeeded(user);
-
+    const plan = this.getPlan(user.plan);
     const expiresAt = new Date(user.expires_at);
     const daysLeft = Math.max(0, Math.ceil((expiresAt - Date.now()) / 86400000));
 
     return {
       username: user.username,
-      searches_today: `${user.searches_used_today}/${user.searches_per_day}`,
+      plan: plan ? plan.name : user.plan,
+      searches: 'unlimited',
+      machine_viewer: plan ? plan.machineViewer : false,
       days_left: daysLeft,
       expires_at: expiresAt.toLocaleDateString()
     };
@@ -174,12 +184,15 @@ class UserService {
 
   listUsers() {
     return Object.entries(this.users).map(([userId, user]) => {
+      const plan = this.getPlan(user.plan);
       const expiresAt = new Date(user.expires_at);
       const daysLeft = Math.ceil((expiresAt - Date.now()) / 86400000);
+
       return {
         userId,
         username: user.username,
-        searches: `${user.searches_used_today}/${user.searches_per_day}`,
+        plan: plan ? plan.name : user.plan,
+        machine: plan && plan.machineViewer ? 'yes' : 'no',
         expires_in: `${Math.max(0, daysLeft)} days`,
         expired: daysLeft <= 0
       };

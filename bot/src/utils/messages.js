@@ -1,4 +1,5 @@
 const config = require('../../config/config');
+const PLANS = require('../../config/plans');
 
 function escapeHtml(text) {
   return String(text)
@@ -7,118 +8,198 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;');
 }
 
+function header(title) {
+  return `<b>${escapeHtml(config.botName.toUpperCase())}</b>\n<code>${'─'.repeat(20)}</code>\n<b>${escapeHtml(title)}</b>`;
+}
+
 function welcomeMessage(firstName) {
   return [
-    `✨ <b>Welcome to ${escapeHtml(config.botName)}</b>`,
+    header('Home'),
     '',
-    `Hey <b>${escapeHtml(firstName)}</b> 👋`,
+    `Welcome, <b>${escapeHtml(firstName)}</b>.`,
     '',
-    'We are an <b>intelligent OSINT search bot</b> — send any query and we scan multiple data sources in real time.',
+    'ApexSearch is an OSINT intelligence platform.',
+    'Send any query to search breach, stealer, and public data sources.',
     '',
-    '🔎 <b>What you can search:</b>',
-    '• Usernames &amp; emails',
-    '• Phone numbers &amp; IPs',
-    '• Discord, Roblox &amp; more',
+    '<b>Commands</b>',
+    '<code>/start</code> — Main menu',
+    '<code>/prices</code> — View plans',
+    '<code>/account</code> — Your subscription',
+    '<code>/machine &lt;name&gt;</code> — Machine lookup (Premium)',
     '',
-    '📝 <b>Just type your query</b> — no command needed.',
-    '',
-    '<i>Tap a button below to learn more.</i>'
+    'Type a query below to begin.'
   ].join('\n');
 }
 
 function howItWorksMessage() {
   return [
-    '🔍 <b>How It Works</b>',
+    header('How It Works'),
     '',
-    '1️⃣ Send any search term as a plain message',
-    '2️⃣ We query breach, stealer &amp; OSINT databases',
-    '3️⃣ Results appear in clean pages of 10',
-    '4️⃣ Use ◀ ▶ buttons to browse pages',
+    '1. Send any search term as a plain message',
+    '2. ApexSearch queries multiple OSINT sources in parallel',
+    '3. Results are returned in pages of 10',
+    '4. Navigate with Prev / Next buttons',
     '',
-    '⚡ Fast parallel searching',
-    '🔒 Access controlled by subscription',
-    '📊 Daily search limits per plan',
+    '<b>Supported queries</b>',
+    'Usernames, emails, phone numbers, IP addresses, Discord IDs, and general terms.',
     '',
-    '<i>Example: send</i> <code>john@gmail.com</code> <i>or</i> <code>cooluser123</code>'
+    '<b>Example</b>',
+    '<code>john@gmail.com</code>',
+    '<code>192.168.1.1</code>',
+    '<code>username123</code>'
   ].join('\n');
 }
 
 function aiSearchMessage() {
   return [
-    '🤖 <b>AI-Powered Search</b>',
+    header('AI Search'),
     '',
-    'Our engine uses smart query detection:',
+    'ApexSearch uses intelligent query detection to route your search to the right sources automatically.',
     '',
-    '📧 Emails → breach &amp; credential checks',
-    '📱 Phones → carrier &amp; leak lookup',
-    '🌐 IPs → geolocation &amp; WHOIS',
-    '👤 Usernames → cross-platform matching',
-    '🎮 Discord IDs → profile enrichment',
+    '<b>Detection</b>',
+    'Email — breach and credential databases',
+    'Phone — carrier and leak lookup',
+    'IP — geolocation and WHOIS',
+    'Username — cross-platform matching',
+    'Discord ID — profile enrichment',
     '',
-    'More sources are added continuously.',
-    '',
-    '<i>API integrations are being wired up — search UI is live now.</i>'
+    'Results are ranked and deduplicated before delivery.'
   ].join('\n');
 }
 
 function pricingMessage() {
+  const basic = PLANS.basic;
+  const premium = PLANS.premium;
+
   return [
-    '💎 <b>Pricing Plans</b>',
+    header('Pricing'),
     '',
-    'Choose a plan and contact the owner to activate:',
+    `<b>${basic.name}</b> — €${basic.price}/${basic.period}`,
+    'Unlimited searches',
+    'Full OSINT database access',
     '',
-    '• <b>Basic</b> — 50 searches/day — €5/mo',
-    '• <b>Standard</b> — 150 searches/day — €10/mo',
-    '• <b>Premium</b> — 500 searches/day — €25/mo',
+    `<b>${premium.name}</b> — €${premium.price}/${premium.period}`,
+    'Unlimited searches',
+    'Machine Viewer included',
+    '<code>/machine</code> command access',
     '',
-    'Tap a plan below for details.'
+    '<b>Payment methods</b>',
+    ...config.paymentMethods.map((m) => `· ${m}`),
+    '',
+    'Contact the owner with your User ID to purchase.'
+  ].join('\n');
+}
+
+function planDetailMessage(planId) {
+  const plan = PLANS[planId];
+  if (!plan) return pricingMessage();
+
+  return [
+    header(`${plan.name} Plan`),
+    '',
+    `Price: <b>€${plan.price}/${plan.period}</b>`,
+    `Searches: <b>${plan.searches}</b>`,
+    plan.machineViewer ? 'Machine Viewer: <b>included</b>' : 'Machine Viewer: <b>not included</b>',
+    '',
+    '<b>Includes</b>',
+    ...plan.features.map((f) => `· ${f}`),
+    '',
+    '<b>Payment methods</b>',
+    ...config.paymentMethods.map((m) => `· ${m}`),
+    '',
+    'Send your User ID to the owner to activate.'
   ].join('\n');
 }
 
 function noAccessMessage(reason) {
   return [
-    '🔒 <b>Access Required</b>',
+    header('Access Denied'),
     '',
     escapeHtml(reason),
     '',
-    'Contact the owner or use /prices to view plans.'
+    'Use /prices to view plans or contact the owner.'
+  ].join('\n');
+}
+
+function premiumRequiredMessage() {
+  return [
+    header('Premium Required'),
+    '',
+    'Machine Viewer requires a Premium subscription.',
+    '',
+    'Upgrade to Premium for €25,00/month.',
+    'Use /prices to view details.'
   ].join('\n');
 }
 
 function searchProgressMessage(query, count) {
+  const lines = [
+    header('Searching'),
+    '',
+    `Query: <code>${escapeHtml(query)}</code>`
+  ];
+
   if (count > 0) {
-    return [
-      '🔎 <b>Searching...</b>',
-      '',
-      `Query: <code>${escapeHtml(query)}</code>`,
-      `Found <b>${count}</b> result${count === 1 ? '' : 's'} so far...`
-    ].join('\n');
+    lines.push(`Status: ${count} result${count === 1 ? '' : 's'} found...`);
+  } else {
+    lines.push('Status: scanning sources...');
   }
 
+  return lines.join('\n');
+}
+
+function machineProgressMessage(query) {
   return [
-    '🔎 <b>Searching...</b>',
+    header('Machine Viewer'),
     '',
     `Query: <code>${escapeHtml(query)}</code>`,
-    'Scanning breach, stealer &amp; OSINT sources...'
+    'Status: searching machines...'
   ].join('\n');
 }
 
 function resultsHeader(query, page, totalPages, total) {
   return [
-    '━━ <b>Search Results</b> ━━',
+    header('Results'),
+    '',
     `Query: <code>${escapeHtml(query)}</code>`,
-    `Page <b>${page + 1}/${totalPages}</b> · <b>${total}</b> total`,
-    '────────────────────'
+    `Page ${page + 1} of ${totalPages} — ${total} total`,
+    `<code>${'─'.repeat(20)}</code>`
+  ].join('\n');
+}
+
+function machineResultsHeader(query, page, totalPages, total) {
+  return [
+    header('Machine Viewer'),
+    '',
+    `Query: <code>${escapeHtml(query)}</code>`,
+    `Page ${page + 1} of ${totalPages} — ${total} machines`,
+    `<code>${'─'.repeat(20)}</code>`
   ].join('\n');
 }
 
 function formatResultBlock(index, result) {
   const label = result.source || 'RESULT';
-  const lines = [`<b>[${index}]</b> <i>${escapeHtml(label)}</i>`];
+  const lines = [`<b>[${index}]</b> ${escapeHtml(label)}`];
 
   Object.entries(result.fields).forEach(([key, value]) => {
     lines.push(`${escapeHtml(key)}: <code>${escapeHtml(String(value))}</code>`);
   });
+
+  return lines.join('\n');
+}
+
+function formatMachineBlock(index, machine) {
+  const lines = [
+    `<b>[${index}]</b> ${escapeHtml(machine.name)}`,
+    `Files: <code>${machine.file_count}</code>`,
+    `Size: <code>${machine.size}</code>`,
+    `OS: <code>${escapeHtml(machine.os)}</code>`,
+    `ID: <code>${escapeHtml(machine.id)}</code>`
+  ];
+
+  if (machine.imported_at) {
+    lines.push(`Imported: <code>${escapeHtml(machine.imported_at)}</code>`);
+  }
 
   return lines.join('\n');
 }
@@ -128,9 +209,15 @@ module.exports = {
   howItWorksMessage,
   aiSearchMessage,
   pricingMessage,
+  planDetailMessage,
   noAccessMessage,
+  premiumRequiredMessage,
   searchProgressMessage,
+  machineProgressMessage,
   resultsHeader,
+  machineResultsHeader,
   formatResultBlock,
-  escapeHtml
+  formatMachineBlock,
+  escapeHtml,
+  header
 };

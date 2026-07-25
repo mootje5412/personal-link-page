@@ -65,37 +65,24 @@ class MessageHandler {
       if (results.length === 0) {
         bot.sendMessage(
           chatId,
-          `🔍 <b>No results</b>\n\nQuery: <code>${escapeHtml(query)}</code>\n\nTry a different search term.`,
+          `<b>No Results</b>\n\nQuery: <code>${escapeHtml(query)}</code>\n\nTry a different term.`,
           { parse_mode: 'HTML' }
         );
         return;
-      }
-
-      if (!this.isOwner(userId)) {
-        const usage = userService.useSearch(userId);
-        if (usage) {
-          await paginationHandler.sendPage(bot, chatId, query, results, 0);
-          bot.sendMessage(
-            chatId,
-            `📊 Searches today: <b>${usage.used}/${usage.limit}</b> (${usage.remaining} remaining)`,
-            { parse_mode: 'HTML' }
-          );
-          return;
-        }
       }
 
       await paginationHandler.sendPage(bot, chatId, query, results, 0);
     } catch (error) {
       console.error('Search error:', error);
       bot.editMessageText(
-        `❌ Search failed for <code>${escapeHtml(query)}</code>\n\nPlease try again.`,
+        `<b>Search Failed</b>\n\nQuery: <code>${escapeHtml(query)}</code>`,
         {
           chat_id: chatId,
           message_id: statusMsg.message_id,
           parse_mode: 'HTML'
         }
       ).catch(() => {
-        bot.sendMessage(chatId, '❌ Search failed. Please try again.');
+        bot.sendMessage(chatId, 'Search failed. Try again.');
       });
     }
   }

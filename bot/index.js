@@ -1,7 +1,7 @@
-const FindNowBot = require('./src/bot');
+const ApexSearchBot = require('./src/bot');
 
-console.log('Starting FindNow Telegram Bot...');
-new FindNowBot();
+console.log('Starting ApexSearch Bot...');
+new ApexSearchBot();
 
 process.on('SIGINT', () => {
   console.log('\nShutting down...');

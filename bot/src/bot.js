@@ -3,8 +3,9 @@ const config = require('../config/config');
 const commandHandler = require('./handlers/commandHandler');
 const messageHandler = require('./handlers/messageHandler');
 const paginationHandler = require('./handlers/paginationHandler');
+const machinePaginationHandler = require('./handlers/machinePaginationHandler');
 
-class FindNowBot {
+class ApexSearchBot {
   constructor() {
     if (!config.botToken) {
       throw new Error('TELEGRAM_BOT_TOKEN is missing. Copy bot/.env.example to bot/.env');
@@ -19,11 +20,13 @@ class FindNowBot {
     console.log(`Owner ID: ${config.ownerId}`);
 
     paginationHandler.clearAllSessions();
+    machinePaginationHandler.clearAllSessions();
 
     this.bot.onText(/\/start/, (msg) => commandHandler.handleStart(this.bot, msg));
     this.bot.onText(/\/account/, (msg) => commandHandler.handleAccount(this.bot, msg));
     this.bot.onText(/\/myid/, (msg) => commandHandler.handleMyId(this.bot, msg));
     this.bot.onText(/\/prices/, (msg) => commandHandler.handlePrices(this.bot, msg));
+    this.bot.onText(/\/machine (.+)/, (msg, match) => commandHandler.handleMachine(this.bot, msg, match));
     this.bot.onText(/\/grant (.+)/, (msg, match) => commandHandler.handleGrant(this.bot, msg, match));
     this.bot.onText(/\/revoke (.+)/, (msg, match) => commandHandler.handleRevoke(this.bot, msg, match));
     this.bot.onText(/\/users/, (msg) => commandHandler.handleUsers(this.bot, msg));
@@ -33,6 +36,11 @@ class FindNowBot {
 
       if (data.startsWith('page_')) {
         paginationHandler.handleCallback(this.bot, query);
+        return;
+      }
+
+      if (data.startsWith('mpage_')) {
+        machinePaginationHandler.handleCallback(this.bot, query);
         return;
       }
 
@@ -65,4 +73,4 @@ class FindNowBot {
   }
 }
 
-module.exports = FindNowBot;
+module.exports = ApexSearchBot;

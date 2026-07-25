@@ -1,10 +1,15 @@
 const config = require('../../config/config');
 const userService = require('../services/userService');
+const machineSearchService = require('../services/machineSearchService');
+const machinePaginationHandler = require('./machinePaginationHandler');
 const {
   welcomeMessage,
   howItWorksMessage,
   aiSearchMessage,
   pricingMessage,
+  planDetailMessage,
+  premiumRequiredMessage,
+  machineProgressMessage,
   escapeHtml
 } = require('../utils/messages');
 const {
@@ -27,10 +32,9 @@ class CommandHandler {
 
   handleStart(bot, msg) {
     const chatId = msg.chat.id;
-    const userId = msg.from.id;
-    const firstName = msg.from.first_name || 'there';
+    const firstName = msg.from.first_name || 'User';
 
-    userService.registerUser(userId, msg.from.username, msg.from.first_name, msg.from.last_name);
+    userService.registerUser(msg.from.id, msg.from.username, msg.from.first_name, msg.from.last_name);
     this.sendStart(bot, chatId, firstName);
   }
 
@@ -43,13 +47,13 @@ class CommandHandler {
       bot.sendMessage(
         chatId,
         [
-          '👤 <b>Your Account</b>',
+          '<b>Account</b>',
           '',
           `User ID: <code>${userId}</code>`,
           '',
-          '❌ No active subscription.',
+          'No active subscription.',
           '',
-          'Use /prices or contact the owner to get access.'
+          'Use /prices to view plans.'
         ].join('\n'),
         { parse_mode: 'HTML', reply_markup: backToStartKeyboard() }
       );
@@ -59,13 +63,15 @@ class CommandHandler {
     bot.sendMessage(
       chatId,
       [
-        '👤 <b>Your Account</b>',
+        '<b>Account</b>',
         '',
         `User ID: <code>${userId}</code>`,
         `Username: @${escapeHtml(info.username || 'unknown')}`,
-        `Searches today: <b>${escapeHtml(info.searches_today)}</b>`,
+        `Plan: <b>${escapeHtml(info.plan)}</b>`,
+        `Searches: <b>${info.searches}</b>`,
+        `Machine Viewer: <b>${info.machine_viewer ? 'active' : 'not included'}</b>`,
         `Expires in: <b>${info.days_left} days</b>`,
-        `Expiry date: <b>${escapeHtml(info.expires_at)}</b>`
+        `Expiry: <b>${escapeHtml(info.expires_at)}</b>`
       ].join('\n'),
       { parse_mode: 'HTML', reply_markup: backToStartKeyboard() }
     );
@@ -81,13 +87,13 @@ class CommandHandler {
     bot.sendMessage(
       chatId,
       [
-        '🆔 <b>Your Information</b>',
+        '<b>Your ID</b>',
         '',
         `User ID: <code>${userId}</code>`,
         `Username: ${escapeHtml(username)}`,
         `Name: ${escapeHtml([msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || 'N/A')}`,
         '',
-        '<i>Share your User ID with the owner to get access.</i>'
+        'Send this ID to the owner to purchase access.'
       ].join('\n'),
       { parse_mode: 'HTML', reply_markup: backToStartKeyboard() }
     );
@@ -105,7 +111,7 @@ class CommandHandler {
     const chatId = msg.chat.id;
 
     if (!this.isOwner(msg.from.id)) {
-      bot.sendMessage(chatId, '🚫 Owner only command.');
+      bot.sendMessage(chatId, 'Owner only.');
       return;
     }
 
@@ -115,24 +121,28 @@ class CommandHandler {
       bot.sendMessage(
         chatId,
         [
-          '🔑 <b>Grant Access</b>',
+          '<b>Grant Access</b>',
           '',
-          '<b>Usage:</b>',
-          '<code>/grant @username &lt;searches_per_day&gt; &lt;days&gt;</code>',
-          '<code>/grant &lt;user_id&gt; &lt;searches_per_day&gt; &lt;days&gt;</code>',
+          '<b>Usage</b>',
+          '<code>/grant @username &lt;plan&gt; &lt;days&gt;</code>',
+          '<code>/grant &lt;user_id&gt; &lt;plan&gt; &lt;days&gt;</code>',
           '',
-          '<b>Examples:</b>',
-          '<code>/grant @john 50 30</code> → 50 searches/day for 30 days',
-          '<code>/grant 123456789 150 7</code> → 150 searches/day for 7 days',
+          '<b>Plans</b>',
+          '<code>basic</code> — unlimited searches (€12,50/month)',
+          '<code>premium</code> — unlimited searches + Machine Viewer (€25,00/month)',
           '',
-          'The user must have messaged the bot at least once.'
+          '<b>Examples</b>',
+          '<code>/grant @john basic 30</code>',
+          '<code>/grant 123456789 premium 30</code>',
+          '',
+          'User must have messaged the bot at least once.'
         ].join('\n'),
         { parse_mode: 'HTML' }
       );
       return;
     }
 
-    let [target, searchesPerDay, days] = args;
+    const [target, plan, days] = args;
     let userId;
     let username;
 
@@ -142,7 +152,7 @@ class CommandHandler {
       if (!userId) {
         bot.sendMessage(
           chatId,
-          `❌ User @${escapeHtml(username)} not found.\n\nThey must message the bot first, then try again.`,
+          `User @${escapeHtml(username)} not found. They must message the bot first.`,
           { parse_mode: 'HTML' }
         );
         return;
@@ -151,11 +161,11 @@ class CommandHandler {
       userId = target;
       username = userService.directory[target]?.username || `user_${target}`;
     } else {
-      bot.sendMessage(chatId, '❌ Invalid target. Use @username or numeric user ID.');
+      bot.sendMessage(chatId, 'Invalid target. Use @username or numeric user ID.');
       return;
     }
 
-    const result = userService.grantAccess(userId, username, searchesPerDay, days);
+    const result = userService.grantAccess(userId, username, plan, days);
     bot.sendMessage(chatId, result.message, { parse_mode: 'HTML' });
   }
 
@@ -163,7 +173,7 @@ class CommandHandler {
     const chatId = msg.chat.id;
 
     if (!this.isOwner(msg.from.id)) {
-      bot.sendMessage(chatId, '🚫 Owner only command.');
+      bot.sendMessage(chatId, 'Owner only.');
       return;
     }
 
@@ -173,7 +183,7 @@ class CommandHandler {
     if (target.startsWith('@')) {
       userId = userService.findUserIdByUsername(target.replace('@', ''));
       if (!userId) {
-        bot.sendMessage(chatId, '❌ User not found.');
+        bot.sendMessage(chatId, 'User not found.');
         return;
       }
     }
@@ -186,26 +196,27 @@ class CommandHandler {
     const chatId = msg.chat.id;
 
     if (!this.isOwner(msg.from.id)) {
-      bot.sendMessage(chatId, '🚫 Owner only command.');
+      bot.sendMessage(chatId, 'Owner only.');
       return;
     }
 
     const users = userService.listUsers();
 
     if (users.length === 0) {
-      bot.sendMessage(chatId, '📋 No users with active access.');
+      bot.sendMessage(chatId, 'No users with active access.');
       return;
     }
 
-    const lines = [`📋 <b>Active Users</b> (${users.length})\n`];
+    const lines = [`<b>Active Users</b> (${users.length})\n`];
 
     users.forEach((user, i) => {
-      const status = user.expired ? '❌ EXPIRED' : '✅ Active';
+      const status = user.expired ? 'EXPIRED' : 'Active';
       lines.push(
-        `<b>${i + 1}.</b> ID <code>${user.userId}</code>`,
+        `<b>${i + 1}.</b> <code>${user.userId}</code>`,
         `   @${escapeHtml(user.username)}`,
-        `   Searches: ${escapeHtml(user.searches)}`,
-        `   Expires: ${escapeHtml(user.expires_in)} ${status}`,
+        `   Plan: ${escapeHtml(user.plan)}`,
+        `   Machine: ${user.machine}`,
+        `   Expires: ${escapeHtml(user.expires_in)} [${status}]`,
         ''
       );
     });
@@ -213,10 +224,54 @@ class CommandHandler {
     bot.sendMessage(chatId, lines.join('\n'), { parse_mode: 'HTML' });
   }
 
+  async handleMachine(bot, msg, match) {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    const query = match[1].trim();
+
+    userService.registerUser(userId, msg.from.username, msg.from.first_name, msg.from.last_name);
+
+    if (!this.isOwner(userId) && !userService.hasMachineAccess(userId)) {
+      bot.sendMessage(chatId, premiumRequiredMessage(), { parse_mode: 'HTML', reply_markup: pricingKeyboard() });
+      return;
+    }
+
+    machinePaginationHandler.clearSession(chatId);
+
+    const statusMsg = await bot.sendMessage(chatId, machineProgressMessage(query), {
+      parse_mode: 'HTML'
+    });
+
+    try {
+      const machines = await machineSearchService.mockMachineSearch(query);
+
+      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+
+      if (machines.length === 0) {
+        bot.sendMessage(
+          chatId,
+          `<b>Machine Viewer</b>\n\nNo machines found for: <code>${escapeHtml(query)}</code>`,
+          { parse_mode: 'HTML' }
+        );
+        return;
+      }
+
+      await machinePaginationHandler.sendPage(bot, chatId, query, machines, 0);
+    } catch (error) {
+      console.error('Machine search error:', error);
+      bot.editMessageText(
+        `<b>Machine Viewer</b>\n\nSearch failed for: <code>${escapeHtml(query)}</code>`,
+        { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' }
+      ).catch(() => {
+        bot.sendMessage(chatId, 'Machine search failed.');
+      });
+    }
+  }
+
   handleMenuCallback(bot, query) {
     const chatId = query.message.chat.id;
     const data = query.data;
-    const firstName = query.from.first_name || 'there';
+    const firstName = query.from.first_name || 'User';
 
     const handlers = {
       menu_start: () => this.sendStart(bot, chatId, firstName),
@@ -264,32 +319,19 @@ class CommandHandler {
 
   handlePriceCallback(bot, query) {
     const chatId = query.message.chat.id;
-    const plans = {
-      price_50: { name: 'Basic', searches: 50, price: '€5/month' },
-      price_150: { name: 'Standard', searches: 150, price: '€10/month' },
-      price_500: { name: 'Premium', searches: 500, price: '€25/month' }
-    };
+    const planId = query.data.replace('price_', '');
 
-    const plan = plans[query.data];
-    if (!plan) {
+    if (!userService.getPlan(planId)) {
       bot.answerCallbackQuery(query.id);
       return;
     }
 
-    bot.sendMessage(
-      chatId,
-      [
-        `💎 <b>${plan.name} Plan</b>`,
-        '',
-        `Searches: <b>${plan.searches}/day</b>`,
-        `Price: <b>${escapeHtml(plan.price)}</b>`,
-        '',
-        'Contact the owner with your User ID to purchase.'
-      ].join('\n'),
-      { parse_mode: 'HTML', reply_markup: backToStartKeyboard() }
-    );
+    bot.sendMessage(chatId, planDetailMessage(planId), {
+      parse_mode: 'HTML',
+      reply_markup: backToStartKeyboard()
+    });
 
-    bot.answerCallbackQuery(query.id, { text: `${plan.name} selected` });
+    bot.answerCallbackQuery(query.id, { text: `${planId} plan` });
   }
 }
 
