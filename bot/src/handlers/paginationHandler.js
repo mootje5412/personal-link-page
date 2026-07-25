@@ -54,7 +54,7 @@ class PaginationHandler {
     });
 
     return bot.sendMessage(chatId, message, {
-      parse_mode: 'MarkdownV2',
+      parse_mode: 'HTML',
       reply_markup: totalPages > 1 ? paginationKeyboard(safePage, totalPages) : undefined,
       disable_web_page_preview: true
     });
@@ -98,7 +98,7 @@ class PaginationHandler {
     bot.editMessageText(message, {
       chat_id: chatId,
       message_id: messageId,
-      parse_mode: 'MarkdownV2',
+      parse_mode: 'HTML',
       reply_markup: totalPages > 1 ? paginationKeyboard(safePage, totalPages) : undefined,
       disable_web_page_preview: true
     }).catch(() => {});

@@ -5,7 +5,7 @@ const {
   howItWorksMessage,
   aiSearchMessage,
   pricingMessage,
-  escapeMarkdown
+  escapeHtml
 } = require('../utils/messages');
 const {
   mainMenuKeyboard,
@@ -20,7 +20,7 @@ class CommandHandler {
 
   sendStart(bot, chatId, firstName) {
     return bot.sendMessage(chatId, welcomeMessage(firstName), {
-      parse_mode: 'MarkdownV2',
+      parse_mode: 'HTML',
       reply_markup: mainMenuKeyboard()
     });
   }
@@ -43,15 +43,15 @@ class CommandHandler {
       bot.sendMessage(
         chatId,
         [
-          '👤 *Your Account*',
+          '👤 <b>Your Account</b>',
           '',
-          `User ID: \`${userId}\``,
+          `User ID: <code>${userId}</code>`,
           '',
-          '❌ No active subscription\\.',
+          '❌ No active subscription.',
           '',
-          'Use /prices or contact the owner to get access\\.'
+          'Use /prices or contact the owner to get access.'
         ].join('\n'),
-        { parse_mode: 'MarkdownV2', reply_markup: backToStartKeyboard() }
+        { parse_mode: 'HTML', reply_markup: backToStartKeyboard() }
       );
       return;
     }
@@ -59,15 +59,15 @@ class CommandHandler {
     bot.sendMessage(
       chatId,
       [
-        '👤 *Your Account*',
+        '👤 <b>Your Account</b>',
         '',
-        `User ID: \`${userId}\``,
-        `Username: @${escapeMarkdown(info.username || 'unknown')}`,
-        `Searches today: *${escapeMarkdown(info.searches_today)}*`,
-        `Expires in: *${info.days_left} days*`,
-        `Expiry date: *${escapeMarkdown(info.expires_at)}*`
+        `User ID: <code>${userId}</code>`,
+        `Username: @${escapeHtml(info.username || 'unknown')}`,
+        `Searches today: <b>${escapeHtml(info.searches_today)}</b>`,
+        `Expires in: <b>${info.days_left} days</b>`,
+        `Expiry date: <b>${escapeHtml(info.expires_at)}</b>`
       ].join('\n'),
-      { parse_mode: 'MarkdownV2', reply_markup: backToStartKeyboard() }
+      { parse_mode: 'HTML', reply_markup: backToStartKeyboard() }
     );
   }
 
@@ -81,22 +81,22 @@ class CommandHandler {
     bot.sendMessage(
       chatId,
       [
-        '🆔 *Your Information*',
+        '🆔 <b>Your Information</b>',
         '',
-        `User ID: \`${userId}\``,
-        `Username: ${escapeMarkdown(username)}`,
-        `Name: ${escapeMarkdown([msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || 'N/A')}`,
+        `User ID: <code>${userId}</code>`,
+        `Username: ${escapeHtml(username)}`,
+        `Name: ${escapeHtml([msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ') || 'N/A')}`,
         '',
-        '_Share your User ID with the owner to get access\\._'
+        '<i>Share your User ID with the owner to get access.</i>'
       ].join('\n'),
-      { parse_mode: 'MarkdownV2', reply_markup: backToStartKeyboard() }
+      { parse_mode: 'HTML', reply_markup: backToStartKeyboard() }
     );
   }
 
   handlePrices(bot, msg) {
     const chatId = msg.chat.id;
     bot.sendMessage(chatId, pricingMessage(), {
-      parse_mode: 'MarkdownV2',
+      parse_mode: 'HTML',
       reply_markup: pricingKeyboard()
     });
   }
@@ -115,19 +115,19 @@ class CommandHandler {
       bot.sendMessage(
         chatId,
         [
-          '🔑 *Grant Access*',
+          '🔑 <b>Grant Access</b>',
           '',
-          '*Usage:*',
-          '`/grant @username <searches_per_day> <days>`',
-          '`/grant <user_id> <searches_per_day> <days>`',
+          '<b>Usage:</b>',
+          '<code>/grant @username &lt;searches_per_day&gt; &lt;days&gt;</code>',
+          '<code>/grant &lt;user_id&gt; &lt;searches_per_day&gt; &lt;days&gt;</code>',
           '',
-          '*Examples:*',
-          '`/grant @john 50 30` → 50 searches/day for 30 days',
-          '`/grant 123456789 150 7` → 150 searches/day for 7 days',
+          '<b>Examples:</b>',
+          '<code>/grant @john 50 30</code> → 50 searches/day for 30 days',
+          '<code>/grant 123456789 150 7</code> → 150 searches/day for 7 days',
           '',
-          'The user must have messaged the bot at least once\\.'
+          'The user must have messaged the bot at least once.'
         ].join('\n'),
-        { parse_mode: 'MarkdownV2' }
+        { parse_mode: 'HTML' }
       );
       return;
     }
@@ -142,8 +142,8 @@ class CommandHandler {
       if (!userId) {
         bot.sendMessage(
           chatId,
-          `❌ User @${escapeMarkdown(username)} not found.\n\nThey must message the bot first, then try again.`,
-          { parse_mode: 'MarkdownV2' }
+          `❌ User @${escapeHtml(username)} not found.\n\nThey must message the bot first, then try again.`,
+          { parse_mode: 'HTML' }
         );
         return;
       }
@@ -156,7 +156,7 @@ class CommandHandler {
     }
 
     const result = userService.grantAccess(userId, username, searchesPerDay, days);
-    bot.sendMessage(chatId, result.message, { parse_mode: 'MarkdownV2' });
+    bot.sendMessage(chatId, result.message, { parse_mode: 'HTML' });
   }
 
   handleRevoke(bot, msg, match) {
@@ -179,7 +179,7 @@ class CommandHandler {
     }
 
     const result = userService.revokeAccess(userId);
-    bot.sendMessage(chatId, result.message, { parse_mode: 'MarkdownV2' });
+    bot.sendMessage(chatId, result.message, { parse_mode: 'HTML' });
   }
 
   handleUsers(bot, msg) {
@@ -197,20 +197,20 @@ class CommandHandler {
       return;
     }
 
-    const lines = [`📋 *Active Users* (${users.length})\n`];
+    const lines = [`📋 <b>Active Users</b> (${users.length})\n`];
 
     users.forEach((user, i) => {
       const status = user.expired ? '❌ EXPIRED' : '✅ Active';
       lines.push(
-        `*${i + 1}\\.* ID \`${user.userId}\``,
-        `   @${escapeMarkdown(user.username)}`,
-        `   Searches: ${escapeMarkdown(user.searches)}`,
-        `   Expires: ${escapeMarkdown(user.expires_in)} ${status}`,
+        `<b>${i + 1}.</b> ID <code>${user.userId}</code>`,
+        `   @${escapeHtml(user.username)}`,
+        `   Searches: ${escapeHtml(user.searches)}`,
+        `   Expires: ${escapeHtml(user.expires_in)} ${status}`,
         ''
       );
     });
 
-    bot.sendMessage(chatId, lines.join('\n'), { parse_mode: 'MarkdownV2' });
+    bot.sendMessage(chatId, lines.join('\n'), { parse_mode: 'HTML' });
   }
 
   handleMenuCallback(bot, query) {
@@ -223,19 +223,19 @@ class CommandHandler {
       menu_how: () => bot.editMessageText(howItWorksMessage(), {
         chat_id: chatId,
         message_id: query.message.message_id,
-        parse_mode: 'MarkdownV2',
+        parse_mode: 'HTML',
         reply_markup: backToStartKeyboard()
       }),
       menu_ai: () => bot.editMessageText(aiSearchMessage(), {
         chat_id: chatId,
         message_id: query.message.message_id,
-        parse_mode: 'MarkdownV2',
+        parse_mode: 'HTML',
         reply_markup: backToStartKeyboard()
       }),
       menu_pricing: () => bot.editMessageText(pricingMessage(), {
         chat_id: chatId,
         message_id: query.message.message_id,
-        parse_mode: 'MarkdownV2',
+        parse_mode: 'HTML',
         reply_markup: pricingKeyboard()
       }),
       menu_account: () => {
@@ -279,14 +279,14 @@ class CommandHandler {
     bot.sendMessage(
       chatId,
       [
-        `💎 *${plan.name} Plan*`,
+        `💎 <b>${plan.name} Plan</b>`,
         '',
-        `Searches: *${plan.searches}/day*`,
-        `Price: *${escapeMarkdown(plan.price)}*`,
+        `Searches: <b>${plan.searches}/day</b>`,
+        `Price: <b>${escapeHtml(plan.price)}</b>`,
         '',
-        'Contact the owner with your User ID to purchase\\.'
+        'Contact the owner with your User ID to purchase.'
       ].join('\n'),
-      { parse_mode: 'MarkdownV2', reply_markup: backToStartKeyboard() }
+      { parse_mode: 'HTML', reply_markup: backToStartKeyboard() }
     );
 
     bot.answerCallbackQuery(query.id, { text: `${plan.name} selected` });

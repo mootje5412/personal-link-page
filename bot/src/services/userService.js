@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { escapeMarkdown } = require('../utils/messages');
+const { escapeHtml } = require('../utils/messages');
 
 const DATA_DIR = path.join(__dirname, '../../data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
@@ -87,12 +87,12 @@ class UserService {
     return {
       success: true,
       message: [
-        '✅ *Access Granted*',
+        '✅ <b>Access Granted</b>',
         '',
-        `User: \`${escapeMarkdown(username || userId)}\``,
-        `Searches: *${searches}/day*`,
-        `Duration: *${duration} days*`,
-        `Expires: *${escapeMarkdown(expiresAt.toLocaleDateString())}*`
+        `User: <code>${escapeHtml(username || userId)}</code>`,
+        `Searches: <b>${searches}/day</b>`,
+        `Duration: <b>${duration} days</b>`,
+        `Expires: <b>${escapeHtml(expiresAt.toLocaleDateString())}</b>`
       ].join('\n')
     };
   }
@@ -106,7 +106,7 @@ class UserService {
     const name = this.users[key].username;
     delete this.users[key];
     this.saveUsers();
-    return { success: true, message: `🚫 Access revoked for \`${name}\`.` };
+    return { success: true, message: `🚫 Access revoked for <code>${escapeHtml(name)}</code>.` };
   }
 
   resetDailyIfNeeded(user) {

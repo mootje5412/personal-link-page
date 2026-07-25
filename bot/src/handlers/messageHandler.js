@@ -5,7 +5,7 @@ const paginationHandler = require('./paginationHandler');
 const {
   noAccessMessage,
   searchProgressMessage,
-  escapeMarkdown
+  escapeHtml
 } = require('../utils/messages');
 
 class MessageHandler {
@@ -25,7 +25,7 @@ class MessageHandler {
     if (!this.isOwner(userId)) {
       const access = userService.checkAccess(userId);
       if (!access.hasAccess) {
-        bot.sendMessage(chatId, noAccessMessage(access.message), { parse_mode: 'MarkdownV2' });
+        bot.sendMessage(chatId, noAccessMessage(access.message), { parse_mode: 'HTML' });
         return;
       }
     }
@@ -35,7 +35,7 @@ class MessageHandler {
     const statusMsg = await bot.sendMessage(
       chatId,
       searchProgressMessage(query, 0),
-      { parse_mode: 'MarkdownV2' }
+      { parse_mode: 'HTML' }
     );
 
     let lastCount = 0;
@@ -53,7 +53,7 @@ class MessageHandler {
       await bot.editMessageText(searchProgressMessage(query, count), {
         chat_id: chatId,
         message_id: statusMsg.message_id,
-        parse_mode: 'MarkdownV2'
+        parse_mode: 'HTML'
       }).catch(() => {});
     };
 
@@ -65,8 +65,8 @@ class MessageHandler {
       if (results.length === 0) {
         bot.sendMessage(
           chatId,
-          `🔍 *No results*\n\nQuery: \`${escapeMarkdown(query)}\`\n\nTry a different search term\\.`,
-          { parse_mode: 'MarkdownV2' }
+          `🔍 <b>No results</b>\n\nQuery: <code>${escapeHtml(query)}</code>\n\nTry a different search term.`,
+          { parse_mode: 'HTML' }
         );
         return;
       }
@@ -77,8 +77,8 @@ class MessageHandler {
           await paginationHandler.sendPage(bot, chatId, query, results, 0);
           bot.sendMessage(
             chatId,
-            `📊 Searches today: *${usage.used}/${usage.limit}* (${usage.remaining} remaining)`,
-            { parse_mode: 'MarkdownV2' }
+            `📊 Searches today: <b>${usage.used}/${usage.limit}</b> (${usage.remaining} remaining)`,
+            { parse_mode: 'HTML' }
           );
           return;
         }
@@ -88,11 +88,11 @@ class MessageHandler {
     } catch (error) {
       console.error('Search error:', error);
       bot.editMessageText(
-        `❌ Search failed for \`${escapeMarkdown(query)}\`\n\nPlease try again\\.`,
+        `❌ Search failed for <code>${escapeHtml(query)}</code>\n\nPlease try again.`,
         {
           chat_id: chatId,
           message_id: statusMsg.message_id,
-          parse_mode: 'MarkdownV2'
+          parse_mode: 'HTML'
         }
       ).catch(() => {
         bot.sendMessage(chatId, '❌ Search failed. Please try again.');
