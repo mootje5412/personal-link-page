@@ -27,6 +27,7 @@ class ApexSearchBot {
     this.bot.onText(/\/account/, (msg) => commandHandler.handleAccount(this.bot, msg));
     this.bot.onText(/\/myid/, (msg) => commandHandler.handleMyId(this.bot, msg));
     this.bot.onText(/\/prices/, (msg) => commandHandler.handlePrices(this.bot, msg));
+    this.bot.onText(/\/apis/, (msg) => commandHandler.handleApis(this.bot, msg));
     this.bot.onText(/\/machine (.+)/, (msg, match) => commandHandler.handleMachine(this.bot, msg, match));
     this.bot.onText(/\/grant (.+)/, (msg, match) => commandHandler.handleGrant(this.bot, msg, match));
     this.bot.onText(/\/revoke (.+)/, (msg, match) => commandHandler.handleRevoke(this.bot, msg, match));

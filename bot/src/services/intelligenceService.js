@@ -92,32 +92,30 @@ class IntelligenceService {
 
   addDatabaseSearchTasks(tasks, query, types, add) {
     const detectedType = apiClient.detectDatabaseSearchType(query);
+    const type = detectedType || (types.includes('email') ? 'email' : null);
 
-    if (detectedType === 'email') {
+    if (query.includes('@')) {
       add('database-search', () => apiClient.databaseSearch(query, 'email'));
-      const localPart = query.split('@')[0];
-      if (localPart && localPart.length >= 3) {
-        add('database-search-user', () => apiClient.databaseSearch(localPart));
-        add('username-osint', () => apiClient.usernameOsint(localPart));
-      }
       return;
     }
 
-    if (detectedType === 'domain') {
+    if (type === 'domain') {
       add('database-search', () => apiClient.databaseSearch(query, 'domain'));
       return;
     }
 
     add('database-search', () => apiClient.databaseSearch(query));
-
-    if (types.includes('username') || types.includes('general')) {
-      add('username-osint', () => apiClient.usernameOsint(query));
-    }
   }
 
   buildTasks(query, types) {
     const tasks = [];
     const add = (name, run) => tasks.push({ name, run });
+
+    if (types.includes('email')) {
+      add('breach', () => apiClient.breach(query));
+      add('database-search', () => apiClient.databaseSearch(query, 'email'));
+      return tasks;
+    }
 
     add('breach', () => apiClient.breach(query));
 
@@ -138,17 +136,6 @@ class IntelligenceService {
       add('ip', () => apiClient.ip(query));
       add('dns', () => apiClient.dns(query));
       this.addDatabaseSearchTasks(tasks, query, types, add);
-      return tasks;
-    }
-
-    if (types.includes('email')) {
-      this.addDatabaseSearchTasks(tasks, query, types, add);
-
-      const [localPart, domainPart] = query.split('@');
-      if (domainPart) {
-        add('domain', () => apiClient.domain(domainPart));
-      }
-      this.addUsernameSources(tasks, localPart, add, { skipFootprint: true, skipGta: true });
       return tasks;
     }
 
@@ -195,16 +182,27 @@ class IntelligenceService {
     return 'empty';
   }
 
-  buildMeta(sourceStatus) {
+  buildMeta(sourceStatus, sourceDetails = {}) {
     const entries = Object.entries(sourceStatus);
     const statuses = entries.map(([, status]) => status);
     const failures = entries
       .filter(([, status]) => ['failed', 'timeout', 'auth'].includes(status))
-      .map(([name, status]) => ({ name, status }));
+      .map(([name, status]) => ({ name, status, detail: sourceDetails[name] || '' }));
+
+    const apiReport = ['breach', 'database-search'].map((name) => {
+      const status = sourceStatus[name] || 'not run';
+      const detail = sourceDetails[name] || '';
+      const label = name === 'breach'
+        ? 'GET /api/breach'
+        : 'GET /api/database-search';
+
+      return { name, label, status, detail };
+    });
 
     return {
       sourcesChecked: entries.length,
       failures,
+      apiReport,
       allAuth: statuses.length > 0 && statuses.every((status) => status === 'auth'),
       anyTimeout: statuses.some((status) => status === 'timeout'),
       anyFailed: failures.length > 0
@@ -260,7 +258,11 @@ class IntelligenceService {
   }
 
   getTaskTimeout(name) {
-    if (name.startsWith('database-search') || name === 'username-osint') {
+    if (name === 'breach') {
+      return config.breachTimeoutMs || config.apiTimeoutMs;
+    }
+
+    if (name === 'database-search' || name.startsWith('database-search')) {
       return config.stealerTimeoutMs;
     }
 
@@ -276,10 +278,30 @@ class IntelligenceService {
   }
 
   isStealerTask(name) {
-    return name.startsWith('database-search') || name === 'username-osint';
+    return name === 'database-search' || name.startsWith('database-search');
   }
 
-  async runTask({ name, run }, results, seen, sourceStatus, notify) {
+  getSourceDetail(data, status) {
+    if (!data) {
+      return status;
+    }
+
+    if (data.error === true) {
+      return String(data.message || status);
+    }
+
+    if (typeof data.error === 'string') {
+      return data.error;
+    }
+
+    if (status === 'empty' && data.results_count != null) {
+      return `${data.results_count} records`;
+    }
+
+    return status;
+  }
+
+  async runTask({ name, run }, results, seen, sourceStatus, sourceDetails, notify) {
     const beforeCount = results.length;
     const timeoutMs = this.getTaskTimeout(name);
 
@@ -296,9 +318,10 @@ class IntelligenceService {
       sourceStatus[name] = this.classifySourceStatus(data);
     }
 
+    sourceDetails[name] = this.getSourceDetail(data, sourceStatus[name]);
+
     if (['failed', 'timeout', 'auth'].includes(sourceStatus[name])) {
-      const message = data?.message || data?.error || 'unknown error';
-      console.error(`Source ${name} issue (${sourceStatus[name]}): ${message}`);
+      console.error(`Source ${name} issue (${sourceStatus[name]}): ${sourceDetails[name]}`);
     }
 
     notify();
@@ -589,26 +612,26 @@ class IntelligenceService {
     const results = [];
     const seen = new Set();
     const sourceStatus = {};
+    const sourceDetails = {};
     const types = this.detectQueryTypes(normalizedQuery);
     const tasks = this.buildTasks(normalizedQuery, types);
 
     const notify = (status) => {
       if (typeof onProgress === 'function') {
-        onProgress(results.length, status);
+        onProgress(results.length, status, types);
       }
     };
 
-    await this.withTimeout(
-      Promise.all(tasks.map((task) => this.runTask(task, results, seen, sourceStatus, notify))),
-      config.searchMaxWaitMs,
-      'search'
+    await Promise.all(
+      tasks.map((task) => this.runTask(task, results, seen, sourceStatus, sourceDetails, notify))
     );
 
     return {
       results,
       meta: {
-        ...this.buildMeta(sourceStatus),
-        sourceCounts: this.countSources(results)
+        ...this.buildMeta(sourceStatus, sourceDetails),
+        sourceCounts: this.countSources(results),
+        queryTypes: types
       }
     };
   }

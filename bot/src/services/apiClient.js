@@ -19,23 +19,25 @@ function isAuthError(message) {
     || lower.includes('ip_unauthorized');
 }
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 class ApiClient {
-  get(endpoint, query, extraParams = {}, timeoutMs = config.apiTimeoutMs) {
+  buildUrl(endpoint, query, extraParams = {}) {
     const params = new URLSearchParams({ query, ...extraParams });
-    const url = `${config.intelBaseUrl}${endpoint}?${params.toString()}`;
+    return `${config.intelBaseUrl}${endpoint}?${params.toString()}`;
+  }
+
+  get(endpoint, query, extraParams = {}, timeoutMs = config.apiTimeoutMs) {
+    const url = this.buildUrl(endpoint, query, extraParams);
     return this.request(url, { method: 'GET' }, timeoutMs);
   }
 
   /**
-   * GET https://www.osintcat.net/api/breach?query=<term>
-   * Header: X-API-KEY: <api-key>
+   * curl "https://www.osintcat.net/api/breach?query=user@example.com" \
+   *      -H "X-API-KEY: YOUR_API_KEY"
    */
   breach(query) {
-    return this.get('/breach', query, {}, config.breachTimeoutMs || config.apiTimeoutMs);
+    const url = this.buildUrl('/breach', query);
+    console.log(`[API] Breach -> ${url}`);
+    return this.request(url, { method: 'GET' }, config.breachTimeoutMs || config.apiTimeoutMs);
   }
 
   detectDatabaseSearchType(query) {
@@ -51,34 +53,14 @@ class ApiClient {
   }
 
   /**
-   * GET https://www.osintcat.net/api/database-search?query=<term>&type=<email|domain>
-   * Header: X-API-KEY: <api-key>
-   *
-   * type is optional — API auto-detects when omitted.
+   * curl "https://www.osintcat.net/api/database-search?query=example@email.com&type=email" \
+   *      -H "X-API-KEY: YOUR_API_KEY"
    */
-  async databaseSearch(query, type = null) {
-    const timeout = config.stealerTimeoutMs;
-    const retries = config.stealerRetries;
+  databaseSearch(query, type = null) {
     const extraParams = type ? { type } : {};
-    let last = null;
-
-    for (let attempt = 0; attempt <= retries; attempt += 1) {
-      last = await this.get('/database-search', query, extraParams, timeout);
-
-      const message = last?.error === true
-        ? last.message
-        : (typeof last?.error === 'string' ? last.error : null);
-
-      if (message && isTimeoutError(message) && attempt < retries) {
-        console.warn(`Database search timed out, retry ${attempt + 1}/${retries}...`);
-        await delay(1500);
-        continue;
-      }
-
-      break;
-    }
-
-    return last;
+    const url = this.buildUrl('/database-search', query, extraParams);
+    console.log(`[API] Database search -> ${url}`);
+    return this.request(url, { method: 'GET' }, config.stealerTimeoutMs);
   }
 
   stealer(query, type) {
@@ -122,6 +104,7 @@ class ApiClient {
 
           if (res.statusCode < 200 || res.statusCode >= 300) {
             const message = (parsed && (parsed.message || parsed.error)) || `HTTP ${res.statusCode}`;
+            console.error(`[API] HTTP ${res.statusCode} ${urlObj.pathname}: ${message}`);
             resolve({
               error: true,
               statusCode: res.statusCode,
@@ -132,7 +115,7 @@ class ApiClient {
           }
 
           if (parsed && typeof parsed.error === 'string' && !isNoResultError(parsed.error)) {
-            console.error(`API string error (${urlObj.pathname}): ${parsed.error}`);
+            console.error(`[API] ${urlObj.pathname}: ${parsed.error}`);
           }
 
           resolve(parsed);
@@ -141,18 +124,18 @@ class ApiClient {
 
       req.on('timeout', () => {
         req.destroy();
+        console.error(`[API] Timeout ${urlObj.pathname} after ${timeoutMs}ms`);
         resolve({ error: true, message: 'Request timed out' });
       });
 
       req.on('error', (error) => {
+        console.error(`[API] Error ${urlObj.pathname}: ${error.message}`);
         resolve({ error: true, message: error.message });
       });
 
       req.end();
     });
   }
-
-  usernameOsint(query) { return this.get('/username-osint', query); }
 
   discord(query) { return this.get('/discord', query); }
   roblox(query) { return this.get('/roblox', query); }

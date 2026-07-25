@@ -21,7 +21,7 @@ function truncateValue(value, max = 110) {
 }
 
 const STEALER_FIELD_ORDER = [
-  'Site', 'Email', 'Username', 'Password', 'Hash',
+  'Site', 'Entry', 'Email', 'Username', 'Password', 'Hash',
   'App', 'Computer', 'OS', 'Browser', 'IP', 'Phone',
   'Database', 'Date', 'Country'
 ];
@@ -202,6 +202,26 @@ function errorMessage(title, detail) {
   ].join('\n');
 }
 
+function apisMessage() {
+  return [
+    header('OsintCat APIs'),
+    '',
+    'Email searches call these two endpoints:',
+    '',
+    '<b>1. Breach Lookup</b>',
+    '<code>GET /api/breach?query=EMAIL</code>',
+    'Header: <code>X-API-KEY</code>',
+    '',
+    '<b>2. Stealer / Database Search</b>',
+    '<code>GET /api/database-search?query=EMAIL&amp;type=email</code>',
+    'Header: <code>X-API-KEY</code>',
+    '',
+    'Base URL: <code>https://www.osintcat.net/api</code>',
+    '',
+    supportLine()
+  ].join('\n');
+}
+
 function noResultsMessage(query, meta = {}) {
   const lines = [
     header('No Results'),
@@ -210,26 +230,23 @@ function noResultsMessage(query, meta = {}) {
     ''
   ];
 
+  if (meta.apiReport?.length) {
+    lines.push('<b>API status</b>');
+    meta.apiReport.forEach((api) => {
+      const detail = api.detail ? ` — ${escapeHtml(api.detail)}` : '';
+      lines.push(`${escapeHtml(api.label)}: <b>${escapeHtml(api.status)}</b>${detail}`);
+    });
+    lines.push('');
+  }
+
   if (meta.allAuth) {
     lines.push('API connection blocked. The server IP may not be whitelisted.');
     lines.push('Contact support to restore database access.');
   } else if (meta.anyTimeout) {
-    lines.push('No records found. Some sources timed out during the scan.');
-    lines.push('Try again in a moment or contact support if this keeps happening.');
+    lines.push('Stealer logs timed out. Breach may still be empty for this email.');
+    lines.push('Try again or contact support if this keeps happening.');
   } else {
-    lines.push('Nothing found across active sources.');
-    lines.push('Try a different term or format.');
-  }
-
-  if (meta.failures?.length && !meta.allAuth) {
-    const issueNames = meta.failures
-      .map(({ name, status }) => `${name} (${status})`)
-      .slice(0, 6);
-
-    if (issueNames.length) {
-      lines.push('');
-      lines.push(`Source status: ${issueNames.join(', ')}`);
-    }
+    lines.push('Nothing found in breach or stealer databases for this query.');
   }
 
   lines.push('', supportLine());
@@ -259,14 +276,19 @@ function searchProgressMessage(query, count, options = {}) {
     lines.push(`Elapsed: <b>${options.elapsed}s</b>`);
   }
 
+  if (options.types?.includes('email')) {
+    lines.push('');
+    lines.push('<b>APIs</b>');
+    lines.push('<code>GET /api/breach</code>');
+    lines.push('<code>GET /api/database-search?type=email</code>');
+  }
+
   if (options.status === 'stealer') {
-    lines.push('Status: scanning stealer logs...');
-    lines.push('Fast sources finished — waiting on database search.');
+    lines.push('Status: querying stealer database...');
   } else if (count > 0) {
     lines.push(`Status: <b>${count}</b> result${count === 1 ? '' : 's'} found`);
-    lines.push('Checking remaining sources...');
   } else {
-    lines.push('Status: scanning breach and database sources...');
+    lines.push('Status: querying breach database...');
   }
 
   return lines.join('\n');
@@ -349,6 +371,7 @@ module.exports = {
   noAccessMessage,
   premiumRequiredMessage,
   errorMessage,
+  apisMessage,
   noResultsMessage,
   machineNoResultsMessage,
   searchProgressMessage,

@@ -43,7 +43,7 @@ class MessageHandler {
 
     const startTime = Date.now();
 
-    const pushProgress = async (count, status) => {
+    const pushProgress = async (count, status, types) => {
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       if (count === lastCount && status === lastStatus && elapsed === lastElapsed) return;
 
@@ -55,7 +55,7 @@ class MessageHandler {
       lastElapsed = elapsed;
       lastEdit = now;
 
-      await bot.editMessageText(searchProgressMessage(query, count, { status, elapsed }), {
+      await bot.editMessageText(searchProgressMessage(query, count, { status, elapsed, types }), {
         chat_id: chatId,
         message_id: statusMsg.message_id,
         parse_mode: 'HTML'
@@ -71,8 +71,8 @@ class MessageHandler {
       pushProgress(lastCount, lastStatus).catch(() => {});
     }, 4000);
 
-    const onProgress = async (count, status) => {
-      await pushProgress(count, status);
+    const onProgress = async (count, status, types) => {
+      await pushProgress(count, status, types);
     };
 
     try {

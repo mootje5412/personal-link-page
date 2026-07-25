@@ -8,6 +8,7 @@ const {
   aiSearchMessage,
   pricingMessage,
   planDetailMessage,
+  apisMessage,
   premiumRequiredMessage,
   machineProgressMessage,
   errorMessage,
@@ -114,6 +115,14 @@ class CommandHandler {
     bot.sendMessage(chatId, pricingMessage(), {
       parse_mode: 'HTML',
       reply_markup: pricingKeyboard()
+    });
+  }
+
+  handleApis(bot, msg) {
+    const chatId = msg.chat.id;
+    bot.sendMessage(chatId, apisMessage(), {
+      parse_mode: 'HTML',
+      reply_markup: backToStartKeyboard()
     });
   }
 
