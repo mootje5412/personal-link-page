@@ -48,7 +48,6 @@ def build_application(token: str) -> Application:
             CallbackQueryHandler(cancel_conversation, pattern=r"^search_cancel$"),
         ],
         allow_reentry=True,
-        per_message=True,
         name="search_flow",
         persistent=False,
     )
