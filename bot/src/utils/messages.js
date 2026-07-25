@@ -255,11 +255,16 @@ function searchProgressMessage(query, count, options = {}) {
     `Query: <code>${escapeHtml(query)}</code>`
   ];
 
+  if (options.elapsed != null) {
+    lines.push(`Elapsed: <b>${options.elapsed}s</b>`);
+  }
+
   if (options.status === 'stealer') {
     lines.push('Status: scanning stealer logs...');
+    lines.push('Fast sources finished — waiting on database search.');
   } else if (count > 0) {
     lines.push(`Status: <b>${count}</b> result${count === 1 ? '' : 's'} found`);
-    lines.push('Still checking remaining sources...');
+    lines.push('Checking remaining sources...');
   } else {
     lines.push('Status: scanning breach and database sources...');
   }

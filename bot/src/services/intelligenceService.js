@@ -69,7 +69,7 @@ class IntelligenceService {
     return types;
   }
 
-  addUsernameSources(tasks, username, add) {
+  addUsernameSources(tasks, username, add, options = {}) {
     if (!username || username.length < 3) return;
 
     add('roblox', () => apiClient.roblox(username));
@@ -79,29 +79,21 @@ class IntelligenceService {
     add('instagram', () => apiClient.instagram(username));
     add('gta', () => apiClient.gtaPlayers(username));
     add('gta-spotted', () => apiClient.gtaSpotted(username));
-    add('footprint', () => this.fetchFootprint(username));
+
+    if (!options.skipFootprint) {
+      add('footprint', () => this.fetchFootprint(username));
+    }
   }
 
-  addDatabaseSearchTasks(tasks, query, types, add) {
+  addDatabaseSearchTasks(tasks, query, add) {
     const detectedType = apiClient.detectDatabaseSearchType(query);
 
-    if (detectedType === 'email') {
-      add('database-search', () => apiClient.databaseSearch(query, 'email'));
-      add('database-search-auto', () => apiClient.databaseSearch(query));
-      return;
-    }
-
-    if (detectedType === 'domain') {
-      add('database-search', () => apiClient.databaseSearch(query, 'domain'));
-      add('database-search-auto', () => apiClient.databaseSearch(query));
+    if (detectedType) {
+      add('database-search', () => apiClient.databaseSearch(query, detectedType));
       return;
     }
 
     add('database-search', () => apiClient.databaseSearch(query));
-
-    if (types.includes('username') || types.includes('general')) {
-      add('database-search-domain', () => apiClient.databaseSearch(query, 'domain'));
-    }
   }
 
   buildTasks(query, types) {
@@ -113,35 +105,35 @@ class IntelligenceService {
     if (types.includes('discord')) {
       add('discord', () => apiClient.discord(query));
       add('discord-to-roblox', () => apiClient.discordToRoblox(query));
-      this.addDatabaseSearchTasks(tasks, query, types, add);
+      this.addDatabaseSearchTasks(tasks, query, add);
       return tasks;
     }
 
     if (types.includes('vin')) {
       add('vin', () => apiClient.vin(query));
-      this.addDatabaseSearchTasks(tasks, query, types, add);
+      this.addDatabaseSearchTasks(tasks, query, add);
       return tasks;
     }
 
     if (types.includes('ip')) {
       add('ip', () => apiClient.ip(query));
       add('dns', () => apiClient.dns(query));
-      this.addDatabaseSearchTasks(tasks, query, types, add);
+      this.addDatabaseSearchTasks(tasks, query, add);
       return tasks;
     }
 
     if (types.includes('email')) {
-      this.addDatabaseSearchTasks(tasks, query, types, add);
+      this.addDatabaseSearchTasks(tasks, query, add);
 
       const [localPart, domainPart] = query.split('@');
       if (domainPart) {
         add('domain', () => apiClient.domain(domainPart));
       }
-      this.addUsernameSources(tasks, localPart, add);
+      this.addUsernameSources(tasks, localPart, add, { skipFootprint: true });
       return tasks;
     }
 
-    this.addDatabaseSearchTasks(tasks, query, types, add);
+    this.addDatabaseSearchTasks(tasks, query, add);
 
     if (types.includes('phone')) {
       add('phone', () => apiClient.phone(query));
@@ -228,6 +220,71 @@ class IntelligenceService {
 
   delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  withTimeout(promise, timeoutMs, label) {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        resolve({ error: true, message: `${label} timed out after ${timeoutMs}ms` });
+      }, timeoutMs);
+
+      Promise.resolve(promise)
+        .then((result) => {
+          clearTimeout(timer);
+          resolve(result);
+        })
+        .catch((error) => {
+          clearTimeout(timer);
+          resolve({ error: true, message: error.message || `${label} failed` });
+        });
+    });
+  }
+
+  getTaskTimeout(name) {
+    if (name === 'database-search' || name.startsWith('database-search')) {
+      return config.stealerTimeoutMs;
+    }
+
+    if (name === 'footprint') {
+      return config.footprintMaxWaitMs + 5000;
+    }
+
+    if (name === 'breach') {
+      return config.breachTimeoutMs || config.apiTimeoutMs;
+    }
+
+    return config.fastSourceTimeoutMs;
+  }
+
+  isSlowTask(name) {
+    return name === 'database-search'
+      || name.startsWith('database-search')
+      || name === 'footprint';
+  }
+
+  async runTask({ name, run }, results, seen, sourceStatus, notify) {
+    const beforeCount = results.length;
+    const timeoutMs = this.getTaskTimeout(name);
+
+    if (this.isSlowTask(name)) {
+      notify('stealer');
+    }
+
+    const data = await this.withTimeout(run(), timeoutMs, name);
+    this.processResponse(name, data, results, seen);
+
+    if (results.length > beforeCount) {
+      sourceStatus[name] = 'ok';
+    } else {
+      sourceStatus[name] = this.classifySourceStatus(data);
+    }
+
+    if (['failed', 'timeout', 'auth'].includes(sourceStatus[name])) {
+      const message = data?.message || data?.error || 'unknown error';
+      console.error(`Source ${name} issue (${sourceStatus[name]}): ${message}`);
+    }
+
+    notify();
   }
 
   label(name) {
@@ -467,6 +524,9 @@ class IntelligenceService {
     const sourceStatus = {};
     const types = this.detectQueryTypes(normalizedQuery);
     const tasks = this.buildTasks(normalizedQuery, types);
+    const fastTasks = tasks.filter(({ name }) => !this.isSlowTask(name));
+    const slowTasks = tasks.filter(({ name }) => this.isSlowTask(name));
+    const deadline = Date.now() + config.searchMaxWaitMs;
 
     const notify = (status) => {
       if (typeof onProgress === 'function') {
@@ -474,36 +534,23 @@ class IntelligenceService {
       }
     };
 
-    await Promise.all(tasks.map(async ({ name, run }) => {
-      try {
-        const beforeCount = results.length;
-        const isDatabaseSearch = name.startsWith('database-search') || name === 'stealer' || name === 'stealer-db';
+    await Promise.all(fastTasks.map((task) => this.runTask(task, results, seen, sourceStatus, notify)));
 
-        if (isDatabaseSearch) {
-          notify('stealer');
-        }
-
-        const data = await run();
-        this.processResponse(name, data, results, seen);
-
-        if (results.length > beforeCount) {
-          sourceStatus[name] = 'ok';
-        } else {
-          sourceStatus[name] = this.classifySourceStatus(data);
-        }
-
-        if (sourceStatus[name] === 'failed' || sourceStatus[name] === 'timeout' || sourceStatus[name] === 'auth') {
-          const message = data?.message || data?.error || 'unknown error';
-          console.error(`Source ${name} issue (${sourceStatus[name]}): ${message}`);
-        }
-
-        notify();
-      } catch (error) {
-        sourceStatus[name] = 'failed';
-        console.error(`Source ${name} failed:`, error.message);
-        notify();
-      }
-    }));
+    const remainingMs = deadline - Date.now();
+    if (remainingMs > 0 && slowTasks.length > 0) {
+      notify('stealer');
+      await Promise.all(
+        slowTasks.map((task) => this.withTimeout(
+          this.runTask(task, results, seen, sourceStatus, notify),
+          remainingMs,
+          task.name
+        ))
+      );
+    } else if (slowTasks.length > 0) {
+      slowTasks.forEach(({ name }) => {
+        sourceStatus[name] = 'timeout';
+      });
+    }
 
     return {
       results,

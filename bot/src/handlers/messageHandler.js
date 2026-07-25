@@ -41,25 +41,38 @@ class MessageHandler {
       { parse_mode: 'HTML' }
     );
 
-    let lastCount = 0;
-    let lastStatus = null;
-    let lastEdit = 0;
+    const startTime = Date.now();
 
-    const onProgress = async (count, status) => {
-      if (count === lastCount && status === lastStatus) return;
+    const pushProgress = async (count, status) => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      if (count === lastCount && status === lastStatus && elapsed === lastElapsed) return;
 
       const now = Date.now();
-      if (now - lastEdit < 600) return;
+      if (now - lastEdit < 600 && status === lastStatus) return;
 
       lastCount = count;
       lastStatus = status;
+      lastElapsed = elapsed;
       lastEdit = now;
 
-      await bot.editMessageText(searchProgressMessage(query, count, { status }), {
+      await bot.editMessageText(searchProgressMessage(query, count, { status, elapsed }), {
         chat_id: chatId,
         message_id: statusMsg.message_id,
         parse_mode: 'HTML'
       }).catch(() => {});
+    };
+
+    let lastCount = 0;
+    let lastStatus = null;
+    let lastElapsed = -1;
+    let lastEdit = 0;
+
+    const heartbeat = setInterval(() => {
+      pushProgress(lastCount, lastStatus).catch(() => {});
+    }, 4000);
+
+    const onProgress = async (count, status) => {
+      await pushProgress(count, status);
     };
 
     try {
@@ -88,6 +101,8 @@ class MessageHandler {
       }).catch(() => {
         bot.sendMessage(chatId, text, { parse_mode: 'HTML', reply_markup: supportKeyboard() });
       });
+    } finally {
+      clearInterval(heartbeat);
     }
   }
 }
