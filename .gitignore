@@ -39,5 +39,6 @@ search-api/__pycache__/
 # HexTLO bot
 hextlo/.venv/
 hextlo/.env
+hextlo/data/
 hextlo/__pycache__/
 hextlo/**/__pycache__/

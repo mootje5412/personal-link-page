@@ -63,5 +63,6 @@ def format_welcome(first_name: str) -> str:
         "  (256) 521-1446 ........... phone lookup\n"
         "  1HGBH41JXMN109186 ........ VIN decode\n\n"
         "SSN searches return the most detail:\n"
-        "name, SSN, DOB, phone, and address."
+        "name, SSN, DOB, phone, and address.\n\n"
+        "Access: $5/month — use /myid to get your ID."
     )
