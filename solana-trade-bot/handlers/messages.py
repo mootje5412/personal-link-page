@@ -1,42 +1,58 @@
 WELCOME = """
-🤖 <b>Solana AI Meme Coin Trader</b>
+⚡ <b>Solana AI Meme Coin Trader</b> ⚡
 
-The bot that scans, scores, and trades the best Solana meme coins automatically.
+The smartest Telegram bot for Solana meme coin trading. Scans, scores, buys, and sells — fully automatic.
 
-<b>What it does:</b>
-• 🔍 Scans trending meme coins on DexScreener
-• 🧠 AI scores each coin (liquidity, volume, buy pressure, rug risk)
-• 🟢 Auto-buys top scored coins
-• 🔴 Auto-sells when price drops (stop loss) or hits take profit
+<b>🧠 AI Engine scans for:</b>
+• Liquidity depth & rug pull risk
+• Volume momentum & buy pressure
+• Price action & entry timing
+• Scam/honeypot detection
 
-<b>Setup:</b>
-1. Connect Phantom or import a trading wallet key
-2. Set your trade size & stop loss
-3. Hit <b>Start Auto Trade</b>
+<b>🔄 Auto Trading:</b>
+• Buys top AI-scored meme coins
+• Stop loss when price drops
+• Take profit at your target
+• Trailing stop locks in gains
+• Flash crash protection
 
-⚠️ <b>Auto trading requires a wallet private key</b> so the bot can sign swaps via Jupiter. Use a dedicated trading wallet — never your main wallet.
+<b>⚡ Quick Setup:</b>
+1️⃣ Import wallet key (dedicated trading wallet)
+2️⃣ Set trade size in Settings
+3️⃣ Tap <b>START Auto Trade</b>
 
-Made for degens who want the bot to do the work.
+⚠️ Use a <b>separate wallet</b> with only what you can afford to lose.
 """
 
 HELP = """
-<b>Commands</b>
+<b>📋 Commands</b>
 /start — Main menu
+/dashboard — Stats & overview
 /scan — Scan best meme coins now
-/wallet — Connect or import wallet
-/balance — Check SOL balance
-/positions — Open positions
+/wallet — Import trading wallet
+/balance — SOL balance
+/positions — Open trades + manual sell
+/history — Recent trade log
 /autotrade — Toggle auto trading
-/settings — Trade settings
-/stop — Emergency stop auto trade
+/settings — Configure bot
+/stop — Emergency stop
 
-<b>Auto Trade Logic</b>
-• Scans every ~45 seconds
-• Buys coins with AI score ≥ 72
-• Stop loss: sells when down X% (default 15%)
-• Take profit: sells when up X% (default 50%)
-• Flash dump protection: exits on sudden 5m crashes
+<b>🤖 Auto Trade Logic</b>
+• Scans every 30s for new opportunities
+• Monitors exits every 15s
+• Only buys coins scoring ≥ 75/100
+• Rejects scams & low liquidity rugs
+• Max price impact: 8%
 
-<b>AI Score Factors</b>
-Liquidity depth · Volume momentum · Buy/sell ratio · Price action · Rug pull detection · Market cap sweet spot
+<b>🔴 Auto Sell Triggers</b>
+• Stop loss hit (default -15%)
+• Take profit hit (default +50%)
+• Trailing stop from peak (default -10%)
+• Flash crash (-15% in 5 min)
+• Heavy sell pressure
+• Liquidity collapse emergency exit
+
+<b>🧠 AI Score Guide</b>
+🔥 85+ = Elite · ✅ 75+ = Strong buy
+🟡 65+ = Decent · 🔴 Below 65 = Skip
 """

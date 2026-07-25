@@ -4,7 +4,7 @@ from typing import Any
 
 import aiosqlite
 
-from config import DB_PATH, DEFAULT_MAX_POSITIONS, DEFAULT_STOP_LOSS_PCT, DEFAULT_TAKE_PROFIT_PCT, DEFAULT_TRADE_SOL
+from config import DB_PATH, DEFAULT_MAX_POSITIONS, DEFAULT_STOP_LOSS_PCT, DEFAULT_TAKE_PROFIT_PCT, DEFAULT_TRAILING_STOP_PCT, DEFAULT_TRADE_SOL
 
 
 async def init_db() -> None:
@@ -20,6 +20,7 @@ async def init_db() -> None:
                 trade_sol REAL DEFAULT 0.05,
                 stop_loss_pct REAL DEFAULT 15,
                 take_profit_pct REAL DEFAULT 50,
+                trailing_stop_pct REAL DEFAULT 10,
                 max_positions INTEGER DEFAULT 3,
                 created_at TEXT,
                 updated_at TEXT
@@ -36,6 +37,7 @@ async def init_db() -> None:
                 entry_amount_sol REAL NOT NULL,
                 token_amount REAL,
                 ai_score REAL,
+                peak_price REAL,
                 status TEXT DEFAULT 'open',
                 exit_price REAL,
                 exit_reason TEXT,
@@ -58,6 +60,15 @@ async def init_db() -> None:
             );
             """
         )
+        # Migrate existing DBs
+        for col, default in [("trailing_stop_pct", DEFAULT_TRAILING_STOP_PCT), ("peak_price", "NULL")]:
+            try:
+                if col == "peak_price":
+                    await db.execute(f"ALTER TABLE positions ADD COLUMN {col} REAL")
+                else:
+                    await db.execute(f"ALTER TABLE users ADD COLUMN {col} REAL DEFAULT {default}")
+            except Exception:
+                pass
         await db.commit()
 
 
@@ -80,10 +91,10 @@ async def upsert_user(user_id: int, **fields: Any) -> dict[str, Any]:
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
                 """
-                INSERT INTO users (user_id, trade_sol, stop_loss_pct, take_profit_pct, max_positions, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO users (user_id, trade_sol, stop_loss_pct, take_profit_pct, trailing_stop_pct, max_positions, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (user_id, DEFAULT_TRADE_SOL, DEFAULT_STOP_LOSS_PCT, DEFAULT_TAKE_PROFIT_PCT, DEFAULT_MAX_POSITIONS, now, now),
+                (user_id, DEFAULT_TRADE_SOL, DEFAULT_STOP_LOSS_PCT, DEFAULT_TAKE_PROFIT_PCT, DEFAULT_TRAILING_STOP_PCT, DEFAULT_MAX_POSITIONS, now, now),
             )
             await db.commit()
         existing = await get_user(user_id)
@@ -109,9 +120,10 @@ async def set_autotrade(user_id: int, enabled: bool) -> None:
 async def get_autotrade_users() -> list[dict[str, Any]]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT * FROM users WHERE autotrade = 1 AND wallet_pubkey IS NOT NULL") as cur:
-            rows = await cur.fetchall()
-            return [dict(r) for r in rows]
+        async with db.execute(
+            "SELECT * FROM users WHERE autotrade = 1 AND wallet_pubkey IS NOT NULL AND encrypted_key IS NOT NULL"
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
 
 
 async def add_position(
@@ -124,6 +136,7 @@ async def add_position(
     entry_amount_sol: float,
     token_amount: float,
     ai_score: float,
+    peak_price: float | None = None,
 ) -> int:
     now = _now()
     async with aiosqlite.connect(DB_PATH) as db:
@@ -131,13 +144,20 @@ async def add_position(
             """
             INSERT INTO positions (
                 user_id, token_mint, token_symbol, token_name, pair_address,
-                entry_price, entry_amount_sol, token_amount, ai_score, opened_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                entry_price, entry_amount_sol, token_amount, ai_score, peak_price, opened_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (user_id, token_mint, token_symbol, token_name, pair_address, entry_price, entry_amount_sol, token_amount, ai_score, now),
+            (user_id, token_mint, token_symbol, token_name, pair_address,
+             entry_price, entry_amount_sol, token_amount, ai_score, peak_price or entry_price, now),
         )
         await db.commit()
         return cur.lastrowid or 0
+
+
+async def update_position_peak(position_id: int, peak_price: float) -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE positions SET peak_price = ? WHERE id = ?", (peak_price, position_id))
+        await db.commit()
 
 
 async def get_open_positions(user_id: int) -> list[dict[str, Any]]:
@@ -148,6 +168,17 @@ async def get_open_positions(user_id: int) -> list[dict[str, Any]]:
             (user_id,),
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_position_by_id(position_id: int, user_id: int) -> dict[str, Any] | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM positions WHERE id = ? AND user_id = ? AND status = 'open'",
+            (position_id, user_id),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
 
 
 async def close_position(position_id: int, exit_price: float, exit_reason: str, pnl_pct: float) -> None:
@@ -173,3 +204,47 @@ async def log_trade(user_id: int, action: str, token_mint: str, token_symbol: st
             (user_id, action, token_mint, token_symbol, amount_sol, tx_sig, json.dumps(details), _now()),
         )
         await db.commit()
+
+
+async def get_trade_history(user_id: int, limit: int = 10) -> list[dict[str, Any]]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM trade_log WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            (user_id, limit),
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+
+async def get_stats(user_id: int) -> dict[str, Any]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT COUNT(*) as total, SUM(CASE WHEN pnl_pct >= 0 THEN 1 ELSE 0 END) as wins FROM positions WHERE user_id = ? AND status = 'closed'",
+            (user_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            total = row["total"] or 0
+            wins = row["wins"] or 0
+
+        async with db.execute(
+            "SELECT AVG(pnl_pct) as avg_pnl, SUM(pnl_pct) as total_pnl FROM positions WHERE user_id = ? AND status = 'closed'",
+            (user_id,),
+        ) as cur:
+            pnl_row = await cur.fetchone()
+
+        async with db.execute(
+            "SELECT COUNT(*) as open_count FROM positions WHERE user_id = ? AND status = 'open'",
+            (user_id,),
+        ) as cur:
+            open_row = await cur.fetchone()
+
+    return {
+        "total_trades": total,
+        "wins": wins,
+        "losses": total - wins,
+        "win_rate": round(wins / total * 100, 1) if total > 0 else 0,
+        "avg_pnl": round(pnl_row["avg_pnl"] or 0, 1),
+        "total_pnl": round(pnl_row["total_pnl"] or 0, 1),
+        "open_positions": open_row["open_count"] or 0,
+    }
