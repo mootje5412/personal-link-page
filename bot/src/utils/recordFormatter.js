@@ -171,6 +171,56 @@ function formatRecordFields(item) {
   return lines.join('\n');
 }
 
+function formatStealerFields(item) {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const normalized = normalizeRecord(item);
+  const fields = {};
+  const set = (label, value) => {
+    if (value !== null && value !== undefined && String(value).trim() !== '') {
+      fields[label] = String(value).trim();
+    }
+  };
+
+  set('Site', normalized.url || normalized.host || normalized.website);
+  set('Email', normalized.email);
+  set('Username', normalized.username);
+  set('Password', normalized.password);
+  set('Hash', normalized.hash);
+  set('App', normalized.application || normalized.app);
+  set('Computer', normalized.computer_name || normalized.hostname || normalized.machine);
+  set('OS', normalized.os || normalized.platform);
+  set('Browser', normalized.browser);
+  set('IP', normalized.ip || normalized.ip_address || normalized.last_ip);
+  set('Phone', normalized.phone);
+  set('Database', normalized.source || normalized.database || normalized.origin);
+  set('Date', normalized.date || normalized.breach_date || normalized.created || normalized.log_date);
+  set('Country', normalized.country);
+
+  const used = new Set([
+    'url', 'host', 'website', 'email', 'username', 'password', 'hash', 'application', 'app',
+    'computer_name', 'hostname', 'machine', 'os', 'platform', 'browser', 'ip', 'ip_address',
+    'last_ip', 'phone', 'source', 'database', 'origin', 'date', 'breach_date', 'created',
+    'log_date', 'country', 'mail', 'e_mail', 'login', 'user', 'user_name', 'pass', 'passwd',
+    'pwd', 'site', 'domain', 'password_hash', 'hashed_password', 'breach', 'mobile', 'phone_number'
+  ]);
+
+  Object.entries(normalized).forEach(([key, value]) => {
+    if (used.has(key) || METADATA_KEYS.has(key)) {
+      return;
+    }
+
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      const label = key.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+      set(label, value);
+    }
+  });
+
+  return Object.keys(fields).length ? fields : null;
+}
+
 module.exports = {
   CATEGORY_LABELS,
   formatBytes,
@@ -179,5 +229,6 @@ module.exports = {
   buildMachineHeader,
   formatCategoryBlock,
   formatMachineCard,
-  formatRecordFields
+  formatRecordFields,
+  formatStealerFields
 };

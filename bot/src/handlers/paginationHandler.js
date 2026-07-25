@@ -27,14 +27,14 @@ class PaginationHandler {
     this.sessions.clear();
   }
 
-  buildPageMessage(query, results, page) {
+  buildPageMessage(query, results, page, sourceCounts = {}) {
     const perPage = config.itemsPerPage;
     const totalPages = Math.max(1, Math.ceil(results.length / perPage));
     const safePage = Math.min(page, totalPages - 1);
     const start = safePage * perPage;
     const pageResults = results.slice(start, start + perPage);
 
-    let message = resultsHeader(query, safePage, totalPages, results.length);
+    let message = resultsHeader(query, safePage, totalPages, results.length, sourceCounts);
 
     pageResults.forEach((result, i) => {
       message += '\n\n' + formatResultBlock(start + i + 1, result);
@@ -43,13 +43,14 @@ class PaginationHandler {
     return { message, safePage, totalPages, pageResults, start };
   }
 
-  sendPage(bot, chatId, query, results, page = 0) {
-    const { message, safePage, totalPages } = this.buildPageMessage(query, results, page);
+  sendPage(bot, chatId, query, results, page = 0, sourceCounts = {}) {
+    const { message, safePage, totalPages } = this.buildPageMessage(query, results, page, sourceCounts);
 
     this.sessions.set(chatId, {
       query,
       results,
       page: safePage,
+      sourceCounts,
       timestamp: Date.now()
     });
 
@@ -89,7 +90,8 @@ class PaginationHandler {
     const { message, safePage, totalPages } = this.buildPageMessage(
       session.query,
       session.results,
-      page
+      page,
+      session.sourceCounts || {}
     );
 
     session.page = safePage;

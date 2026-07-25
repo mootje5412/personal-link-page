@@ -1,9 +1,10 @@
 const config = require('../../config/config');
 const apiClient = require('./apiClient');
 const { isAuthError, isTimeoutError, isNoResultError } = require('./apiClient');
-const { formatRecordFields, formatBytes } = require('../utils/recordFormatter');
+const { formatRecordFields, formatStealerFields, formatBytes } = require('../utils/recordFormatter');
 const {
   extractAllRecords,
+  extractStealerRecords,
   extractIpSections,
   hasOnlyMetadata,
   isUsefulRecord
@@ -12,7 +13,9 @@ const {
 const SOURCE_LABELS = {
   breach: 'BREACH',
   stealer: 'STEALER',
-  'stealer-db': 'STEALER',
+  'database-search': 'STEALER',
+  'database-search-auto': 'STEALER',
+  'database-search-domain': 'STEALER',
   discord: 'DISCORD',
   roblox: 'ROBLOX',
   'discord-to-roblox': 'DISCORD-ROBLOX',
@@ -79,6 +82,28 @@ class IntelligenceService {
     add('footprint', () => this.fetchFootprint(username));
   }
 
+  addDatabaseSearchTasks(tasks, query, types, add) {
+    const detectedType = apiClient.detectDatabaseSearchType(query);
+
+    if (detectedType === 'email') {
+      add('database-search', () => apiClient.databaseSearch(query, 'email'));
+      add('database-search-auto', () => apiClient.databaseSearch(query));
+      return;
+    }
+
+    if (detectedType === 'domain') {
+      add('database-search', () => apiClient.databaseSearch(query, 'domain'));
+      add('database-search-auto', () => apiClient.databaseSearch(query));
+      return;
+    }
+
+    add('database-search', () => apiClient.databaseSearch(query));
+
+    if (types.includes('username') || types.includes('general')) {
+      add('database-search-domain', () => apiClient.databaseSearch(query, 'domain'));
+    }
+  }
+
   buildTasks(query, types) {
     const tasks = [];
     const add = (name, run) => tasks.push({ name, run });
@@ -88,24 +113,25 @@ class IntelligenceService {
     if (types.includes('discord')) {
       add('discord', () => apiClient.discord(query));
       add('discord-to-roblox', () => apiClient.discordToRoblox(query));
-      add('stealer', () => apiClient.stealer(query));
+      this.addDatabaseSearchTasks(tasks, query, types, add);
       return tasks;
     }
 
     if (types.includes('vin')) {
       add('vin', () => apiClient.vin(query));
+      this.addDatabaseSearchTasks(tasks, query, types, add);
       return tasks;
     }
 
     if (types.includes('ip')) {
       add('ip', () => apiClient.ip(query));
       add('dns', () => apiClient.dns(query));
+      this.addDatabaseSearchTasks(tasks, query, types, add);
       return tasks;
     }
 
     if (types.includes('email')) {
-      add('stealer', () => apiClient.stealer(query, 'email'));
-      add('stealer-db', () => apiClient.stealer(query));
+      this.addDatabaseSearchTasks(tasks, query, types, add);
 
       const [localPart, domainPart] = query.split('@');
       if (domainPart) {
@@ -115,8 +141,7 @@ class IntelligenceService {
       return tasks;
     }
 
-    const stealerType = query.includes('@') ? 'email' : 'domain';
-    add('stealer', () => apiClient.stealer(query, stealerType));
+    this.addDatabaseSearchTasks(tasks, query, types, add);
 
     if (types.includes('phone')) {
       add('phone', () => apiClient.phone(query));
@@ -221,6 +246,13 @@ class IntelligenceService {
     return Object.keys(fields).length ? fields : { Result: text };
   }
 
+  pushResultFields(results, seen, source, fields) {
+    const key = `${source}:${JSON.stringify(fields)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    results.push({ source: this.label(source), fields });
+  }
+
   pushResult(results, seen, source, payload) {
     const key = `${source}:${JSON.stringify(payload)}`;
     if (seen.has(key)) return;
@@ -313,6 +345,21 @@ class IntelligenceService {
     return null;
   }
 
+  processDatabaseSearchResponse(data, results, seen) {
+    const records = extractStealerRecords(data);
+    let added = 0;
+
+    records.forEach((item) => {
+      const fields = formatStealerFields(item);
+      if (fields) {
+        this.pushResultFields(results, seen, 'stealer', fields);
+        added += 1;
+      }
+    });
+
+    return added;
+  }
+
   processResponse(name, data, results, seen) {
     if (!data || data.error === true) return;
     if (typeof data.error === 'string') {
@@ -329,6 +376,11 @@ class IntelligenceService {
         });
         return;
       }
+    }
+
+    if (name === 'database-search' || name === 'database-search-auto' || name === 'database-search-domain' || name === 'stealer' || name === 'stealer-db') {
+      this.processDatabaseSearchResponse(data, results, seen);
+      return;
     }
 
     if (name === 'discord') {
@@ -416,13 +468,21 @@ class IntelligenceService {
     const types = this.detectQueryTypes(normalizedQuery);
     const tasks = this.buildTasks(normalizedQuery, types);
 
-    const notify = () => {
-      if (typeof onProgress === 'function') onProgress(results.length);
+    const notify = (status) => {
+      if (typeof onProgress === 'function') {
+        onProgress(results.length, status);
+      }
     };
 
     await Promise.all(tasks.map(async ({ name, run }) => {
       try {
         const beforeCount = results.length;
+        const isDatabaseSearch = name.startsWith('database-search') || name === 'stealer' || name === 'stealer-db';
+
+        if (isDatabaseSearch) {
+          notify('stealer');
+        }
+
         const data = await run();
         this.processResponse(name, data, results, seen);
 
@@ -441,13 +501,26 @@ class IntelligenceService {
       } catch (error) {
         sourceStatus[name] = 'failed';
         console.error(`Source ${name} failed:`, error.message);
+        notify();
       }
     }));
 
     return {
       results,
-      meta: this.buildMeta(sourceStatus)
+      meta: {
+        ...this.buildMeta(sourceStatus),
+        sourceCounts: this.countSources(results)
+      }
     };
+  }
+
+  countSources(results) {
+    const counts = {};
+    results.forEach((result) => {
+      const label = result.source || 'RESULT';
+      counts[label] = (counts[label] || 0) + 1;
+    });
+    return counts;
   }
 
   normalizeMachine(machine) {

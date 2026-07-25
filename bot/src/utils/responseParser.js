@@ -281,11 +281,43 @@ function extractSnusbaseWhois(response, query) {
   return sections;
 }
 
+function extractStealerRecords(response) {
+  const records = [];
+
+  if (!response || typeof response !== 'object') {
+    return records;
+  }
+
+  extractAllRecords(response).forEach(({ item }) => {
+    if (isUsefulRecord(item)) {
+      records.push(item);
+    }
+  });
+
+  const nested = response.results || response.data;
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    Object.entries(nested).forEach(([bucket, items]) => {
+      if (!Array.isArray(items)) {
+        return;
+      }
+
+      items.forEach((item) => {
+        if (isUsefulRecord(item)) {
+          records.push({ ...item, source: item.source || bucket });
+        }
+      });
+    });
+  }
+
+  return records;
+}
+
 module.exports = {
   METADATA_KEYS,
   isUsefulRecord,
   formatIpInfo,
   extractAllRecords,
+  extractStealerRecords,
   hasOnlyMetadata,
   extractIpSections,
   extractSnusbaseRecords,

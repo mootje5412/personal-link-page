@@ -12,6 +12,48 @@ function header(title) {
   return `<b>${escapeHtml(config.botName.toUpperCase())}</b>\n<code>${'─'.repeat(22)}</code>\n<b>${escapeHtml(title)}</b>`;
 }
 
+function truncateValue(value, max = 110) {
+  const text = String(value);
+  if (text.length <= max) {
+    return text;
+  }
+  return `${text.slice(0, max)}...`;
+}
+
+const STEALER_FIELD_ORDER = [
+  'Site', 'Email', 'Username', 'Password', 'Hash',
+  'App', 'Computer', 'OS', 'Browser', 'IP', 'Phone',
+  'Database', 'Date', 'Country'
+];
+
+function orderFields(fields, preferredOrder) {
+  const ordered = [];
+  const seen = new Set();
+
+  preferredOrder.forEach((key) => {
+    if (fields[key] !== undefined) {
+      ordered.push([key, fields[key]]);
+      seen.add(key);
+    }
+  });
+
+  Object.entries(fields).forEach(([key, value]) => {
+    if (!seen.has(key)) {
+      ordered.push([key, value]);
+    }
+  });
+
+  return ordered;
+}
+
+function formatSourceSummary(sourceCounts = {}) {
+  const parts = Object.entries(sourceCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([source, count]) => `${source} ${count}`);
+
+  return parts.length ? parts.join('  ·  ') : null;
+}
+
 function supportLine() {
   return `Support: ${config.supportContact}`;
 }
@@ -206,17 +248,20 @@ function machineNoResultsMessage(query) {
   ].join('\n');
 }
 
-function searchProgressMessage(query, count) {
+function searchProgressMessage(query, count, options = {}) {
   const lines = [
     header('Searching'),
     '',
     `Query: <code>${escapeHtml(query)}</code>`
   ];
 
-  if (count > 0) {
-    lines.push(`Status: <b>${count}</b> result${count === 1 ? '' : 's'} found...`);
+  if (options.status === 'stealer') {
+    lines.push('Status: scanning stealer logs...');
+  } else if (count > 0) {
+    lines.push(`Status: <b>${count}</b> result${count === 1 ? '' : 's'} found`);
+    lines.push('Still checking remaining sources...');
   } else {
-    lines.push('Status: scanning databases...');
+    lines.push('Status: scanning breach and database sources...');
   }
 
   return lines.join('\n');
@@ -231,14 +276,21 @@ function machineProgressMessage(query) {
   ].join('\n');
 }
 
-function resultsHeader(query, page, totalPages, total) {
-  return [
+function resultsHeader(query, page, totalPages, total, sourceCounts = {}) {
+  const lines = [
     header('Results'),
     '',
     `Query: <code>${escapeHtml(query)}</code>`,
-    `Page ${page + 1} of ${totalPages}  |  ${total} total`,
-    `<code>${'─'.repeat(22)}</code>`
-  ].join('\n');
+    `Page ${page + 1} of ${totalPages}  |  ${total} total`
+  ];
+
+  const summary = formatSourceSummary(sourceCounts);
+  if (summary) {
+    lines.push(summary);
+  }
+
+  lines.push(`<code>${'─'.repeat(22)}</code>`);
+  return lines.join('\n');
 }
 
 function machineResultsHeader(query, page, totalPages, total) {
@@ -253,10 +305,15 @@ function machineResultsHeader(query, page, totalPages, total) {
 
 function formatResultBlock(index, result) {
   const label = result.source || 'RESULT';
+  const isStealer = label === 'STEALER';
   const lines = [`<b>[${index}]</b>  ${escapeHtml(label)}`];
 
-  Object.entries(result.fields).forEach(([key, value]) => {
-    lines.push(`${escapeHtml(key)}: <code>${escapeHtml(String(value))}</code>`);
+  const entries = isStealer
+    ? orderFields(result.fields || {}, STEALER_FIELD_ORDER)
+    : Object.entries(result.fields || {});
+
+  entries.forEach(([key, value]) => {
+    lines.push(`${escapeHtml(key)}: <code>${escapeHtml(truncateValue(value))}</code>`);
   });
 
   return lines.join('\n');
@@ -295,6 +352,8 @@ module.exports = {
   machineResultsHeader,
   formatResultBlock,
   formatMachineBlock,
+  formatSourceSummary,
+  truncateValue,
   escapeHtml,
   header,
   supportLine,

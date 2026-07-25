@@ -38,6 +38,53 @@ class ApiClient {
     return this.get('/breach', query, {}, config.breachTimeoutMs || config.apiTimeoutMs);
   }
 
+  detectDatabaseSearchType(query) {
+    if (query.includes('@')) {
+      return 'email';
+    }
+
+    if (/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(query)) {
+      return 'domain';
+    }
+
+    return null;
+  }
+
+  /**
+   * GET https://www.osintcat.net/api/database-search?query=<term>&type=<email|domain>
+   * Header: X-API-KEY: <api-key>
+   *
+   * type is optional — API auto-detects when omitted.
+   */
+  async databaseSearch(query, type = null) {
+    const timeout = config.stealerTimeoutMs;
+    const retries = config.stealerRetries;
+    const extraParams = type ? { type } : {};
+    let last = null;
+
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      last = await this.get('/database-search', query, extraParams, timeout);
+
+      const message = last?.error === true
+        ? last.message
+        : (typeof last?.error === 'string' ? last.error : null);
+
+      if (message && isTimeoutError(message) && attempt < retries) {
+        console.warn(`Database search timed out, retry ${attempt + 1}/${retries}...`);
+        await delay(1500);
+        continue;
+      }
+
+      break;
+    }
+
+    return last;
+  }
+
+  stealer(query, type) {
+    return this.databaseSearch(query, type);
+  }
+
   request(url, options = {}, timeoutMs = config.apiTimeoutMs) {
     return new Promise((resolve) => {
       const urlObj = new URL(url);
@@ -103,30 +150,6 @@ class ApiClient {
 
       req.end();
     });
-  }
-
-  async stealer(query, type) {
-    const timeout = config.stealerTimeoutMs;
-    const retries = config.stealerRetries;
-    let last = null;
-
-    for (let attempt = 0; attempt <= retries; attempt += 1) {
-      last = await this.get('/database-search', query, type ? { type } : {}, timeout);
-
-      const message = last?.error === true
-        ? last.message
-        : (typeof last?.error === 'string' ? last.error : null);
-
-      if (message && isTimeoutError(message) && attempt < retries) {
-        console.warn(`Stealer search timed out, retry ${attempt + 1}/${retries}...`);
-        await delay(1500);
-        continue;
-      }
-
-      break;
-    }
-
-    return last;
   }
 
   discord(query) { return this.get('/discord', query); }

@@ -4,7 +4,7 @@ module.exports = {
   botToken: process.env.TELEGRAM_BOT_TOKEN,
   ownerId: Number(process.env.OWNER_ID || 8073205490),
   botName: 'ApexSearch',
-  version: '1.2.2',
+  version: '1.3.0',
   supportContact: '@strafbaar',
   supportUrl: 'https://t.me/strafbaar',
   itemsPerPage: 10,

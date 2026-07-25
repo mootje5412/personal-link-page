@@ -42,18 +42,20 @@ class MessageHandler {
     );
 
     let lastCount = 0;
+    let lastStatus = null;
     let lastEdit = 0;
 
-    const onProgress = async (count) => {
-      if (count === lastCount) return;
+    const onProgress = async (count, status) => {
+      if (count === lastCount && status === lastStatus) return;
 
       const now = Date.now();
       if (now - lastEdit < 600) return;
 
       lastCount = count;
+      lastStatus = status;
       lastEdit = now;
 
-      await bot.editMessageText(searchProgressMessage(query, count), {
+      await bot.editMessageText(searchProgressMessage(query, count, { status }), {
         chat_id: chatId,
         message_id: statusMsg.message_id,
         parse_mode: 'HTML'
@@ -73,7 +75,7 @@ class MessageHandler {
         return;
       }
 
-      await paginationHandler.sendPage(bot, chatId, query, results, 0);
+      await paginationHandler.sendPage(bot, chatId, query, results, 0, meta.sourceCounts || {});
     } catch (error) {
       console.error('Search error:', error);
       const text = errorMessage('Search Failed', `Could not complete search for your query.`);
