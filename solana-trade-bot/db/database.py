@@ -4,7 +4,7 @@ from typing import Any
 
 import aiosqlite
 
-from config import DB_PATH, DEFAULT_MAX_POSITIONS, DEFAULT_STOP_LOSS_PCT, DEFAULT_TAKE_PROFIT_PCT, DEFAULT_TRAILING_STOP_PCT, DEFAULT_TRADE_SOL
+from config import DB_PATH, DEFAULT_MAX_POSITIONS, DEFAULT_STOP_LOSS_PCT, DEFAULT_TAKE_PROFIT_PCT, DEFAULT_TRAILING_STOP_PCT, DEFAULT_TRADE_SOL, MIN_AI_SCORE
 
 
 async def init_db() -> None:
@@ -22,6 +22,9 @@ async def init_db() -> None:
                 take_profit_pct REAL DEFAULT 50,
                 trailing_stop_pct REAL DEFAULT 10,
                 max_positions INTEGER DEFAULT 3,
+                min_ai_score REAL DEFAULT 75,
+                risk_mode TEXT DEFAULT 'balanced',
+                notify_trades INTEGER DEFAULT 1,
                 created_at TEXT,
                 updated_at TEXT
             );
@@ -61,12 +64,16 @@ async def init_db() -> None:
             """
         )
         # Migrate existing DBs
-        for col, default in [("trailing_stop_pct", DEFAULT_TRAILING_STOP_PCT), ("peak_price", "NULL")]:
+        migrations = [
+            ("users", "trailing_stop_pct", f"REAL DEFAULT {DEFAULT_TRAILING_STOP_PCT}"),
+            ("users", "min_ai_score", f"REAL DEFAULT {MIN_AI_SCORE}"),
+            ("users", "risk_mode", "TEXT DEFAULT 'balanced'"),
+            ("users", "notify_trades", "INTEGER DEFAULT 1"),
+            ("positions", "peak_price", "REAL"),
+        ]
+        for table, col, typedef in migrations:
             try:
-                if col == "peak_price":
-                    await db.execute(f"ALTER TABLE positions ADD COLUMN {col} REAL")
-                else:
-                    await db.execute(f"ALTER TABLE users ADD COLUMN {col} REAL DEFAULT {default}")
+                await db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typedef}")
             except Exception:
                 pass
         await db.commit()
@@ -111,6 +118,23 @@ async def upsert_user(user_id: int, **fields: Any) -> dict[str, Any]:
 
 async def set_wallet(user_id: int, pubkey: str, encrypted_key: str | None = None) -> None:
     await upsert_user(user_id, wallet_pubkey=pubkey, encrypted_key=encrypted_key)
+
+
+async def disconnect_wallet(user_id: int) -> None:
+    await upsert_user(user_id, wallet_pubkey=None, encrypted_key=None, autotrade=0)
+
+
+async def apply_preset(user_id: int, preset: dict, mode_key: str) -> None:
+    await upsert_user(
+        user_id,
+        trade_sol=preset["trade_sol"],
+        stop_loss_pct=preset["stop_loss_pct"],
+        take_profit_pct=preset["take_profit_pct"],
+        trailing_stop_pct=preset["trailing_stop_pct"],
+        max_positions=preset["max_positions"],
+        min_ai_score=preset["min_ai_score"],
+        risk_mode=mode_key,
+    )
 
 
 async def set_autotrade(user_id: int, enabled: bool) -> None:

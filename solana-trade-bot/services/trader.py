@@ -6,7 +6,6 @@ from typing import Awaitable, Callable
 from config import (
     EXIT_CHECK_SEC,
     LAMPORTS_PER_SOL,
-    MIN_AI_SCORE,
     MIN_RESERVE_SOL,
     SCAN_INTERVAL_SEC,
     SELL_SLIPPAGE_BPS,
@@ -59,7 +58,9 @@ class AutoTrader:
                     pass
         logger.info("AutoTrader stopped")
 
-    async def _notify_user(self, user_id: int, msg: str) -> None:
+    async def _notify_user(self, user_id: int, msg: str, user: dict | None = None) -> None:
+        if user and not user.get("notify_trades", 1):
+            return
         if self._notify:
             try:
                 await self._notify(user_id, msg)
@@ -116,12 +117,14 @@ class AutoTrader:
                     f"Have: {balance:.4f} SOL\n"
                     f"Need: {needed:.4f} SOL per trade\n\n"
                     f"Send SOL to your trading wallet to continue.",
+                    user,
                 )
             return
 
         coins = await scan_meme_coins()
         ranked = rank_coins(coins)
-        top = [c for c in ranked if c.ai_score >= MIN_AI_SCORE and not c.is_scam]
+        min_score = float(user.get("min_ai_score") or 75)
+        top = [c for c in ranked if c.ai_score >= min_score and not c.is_scam]
 
         held_mints = {p["token_mint"] for p in open_positions}
         bought = 0
@@ -177,9 +180,39 @@ class AutoTrader:
                 f"🔗 <a href='https://solscan.io/tx/{sig}'>View TX</a> · "
                 f"<a href='{coin.url}'>Chart</a>"
             )
-            await self._notify_user(user_id, msg)
+            await self._notify_user(user_id, msg, user)
         except Exception as exc:
             logger.warning("Buy failed %s for user %s: %s", coin.symbol, user_id, exc)
+
+    async def buy_top_coin(self, user: dict) -> tuple[bool, str]:
+        """Manual buy of the #1 ranked coin."""
+        coins = await scan_meme_coins()
+        ranked = rank_coins(coins)
+        min_score = float(user.get("min_ai_score") or 75)
+        top = [c for c in ranked if c.ai_score >= min_score and not c.is_scam]
+        if not top:
+            return False, "No coins meet your AI score threshold right now."
+        trade_sol = float(user.get("trade_sol") or 0.05)
+        await self._buy(user, top[0], trade_sol)
+        return True, f"Buying ${top[0].symbol} (score {top[0].ai_score}/100)..."
+
+    async def sell_all(self, user: dict) -> tuple[int, int]:
+        """Sell all open positions. Returns (success_count, total)."""
+        positions = await get_open_positions(user["user_id"])
+        ok = 0
+        for pos in positions:
+            coin = await get_token_price_cached(pos["token_mint"])
+            if not coin:
+                continue
+            entry = float(pos["entry_price"])
+            pnl = ((coin.price_usd - entry) / entry * 100) if entry > 0 else 0
+            try:
+                await self._sell(user, pos, coin, "👤 Sell All", pnl)
+                ok += 1
+            except Exception:
+                pass
+            await asyncio.sleep(2)
+        return ok, len(positions)
 
     async def _check_exits(self, user: dict, positions: list[dict]) -> None:
         user_id = user["user_id"]
@@ -265,10 +298,10 @@ class AutoTrader:
                 f"💵 Exit: ${coin.price_usd:.8f}\n"
                 f"🔗 <a href='https://solscan.io/tx/{sig}'>View TX</a>"
             )
-            await self._notify_user(user_id, msg)
+            await self._notify_user(user_id, msg, user)
         except Exception as exc:
             logger.error("Sell failed %s: %s", pos["token_symbol"], exc)
-            await self._notify_user(user_id, f"❌ Sell failed for ${pos['token_symbol']}: {exc}")
+            await self._notify_user(user_id, f"❌ Sell failed for ${pos['token_symbol']}: {exc}", user)
 
     async def sell_position_manual(self, user: dict, pos: dict) -> tuple[bool, str]:
         coin = await get_token_price_cached(pos["token_mint"])

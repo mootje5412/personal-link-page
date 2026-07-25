@@ -5,6 +5,8 @@ from telegram.ext import Application, CallbackQueryHandler, CommandHandler, Cont
 
 from config import TELEGRAM_BOT_TOKEN
 from db.database import (
+    apply_preset,
+    disconnect_wallet,
     get_open_positions,
     get_position_by_id,
     get_stats,
@@ -15,8 +17,18 @@ from db.database import (
     set_wallet,
     upsert_user,
 )
-from handlers.keyboards import back_button, main_menu, positions_menu, settings_menu
-from handlers.messages import HELP, WELCOME
+from handlers.keyboards import (
+    back_button,
+    main_menu,
+    modes_menu,
+    positions_menu,
+    settings_menu,
+    setup_guide_menu,
+    stop_loss_quick,
+    trade_size_quick,
+)
+from handlers.messages import HELP, PROFIT_INFO, SETUP_GUIDE, WELCOME
+from handlers.presets import PRESETS, preset_summary
 from services.ai_scorer import format_score_emoji, rank_coins
 from services.crypto_store import encrypt_private_key
 from services.scanner import get_token_price_cached, scan_meme_coins
@@ -32,8 +44,9 @@ PENDING_SETTING: dict[int, str] = {}
 async def _get_menu_kb(user_id: int):
     user = await get_user(user_id)
     has_wallet = bool(user and user.get("wallet_pubkey"))
+    has_key = bool(user and user.get("encrypted_key"))
     autotrade = bool(user and user.get("autotrade"))
-    return main_menu(has_wallet, autotrade)
+    return main_menu(has_wallet, autotrade, has_key)
 
 
 def _score_bar(score: float) -> str:
@@ -69,22 +82,27 @@ async def _format_dashboard(user_id: int) -> str:
     if user.get("wallet_pubkey"):
         bal = await get_balance_sol(user["wallet_pubkey"])
     autotrade = "🟢 RUNNING" if user.get("autotrade") else "🔴 STOPPED"
+    mode = user.get("risk_mode") or "balanced"
+    mode_label = PRESETS.get(mode, PRESETS["balanced"])["label"]
 
     return (
         f"📊 <b>Trading Dashboard</b>\n\n"
         f"🤖 Auto Trade: <b>{autotrade}</b>\n"
+        f"🎛 Mode: <b>{mode_label}</b>\n"
         f"💰 Balance: <b>{bal:.4f} SOL</b>\n"
         f"📦 Open Positions: {stats['open_positions']}\n\n"
         f"<b>Performance</b>\n"
         f"├ Total Trades: {stats['total_trades']}\n"
+        f"├ Wins: {stats['wins']} │ Losses: {stats['losses']}\n"
         f"├ Win Rate: {stats['win_rate']}%\n"
         f"├ Avg PnL: {stats['avg_pnl']:+.1f}%\n"
         f"└ Total PnL: {stats['total_pnl']:+.1f}%\n\n"
-        f"<b>Settings</b>\n"
-        f"├ Trade Size: {float(user.get('trade_sol', 0.05))} SOL\n"
-        f"├ Stop Loss: {float(user.get('stop_loss_pct', 15))}%\n"
-        f"├ Take Profit: {float(user.get('take_profit_pct', 50))}%\n"
-        f"└ Trailing Stop: {float(user.get('trailing_stop_pct', 10))}%"
+        f"<b>Active Settings</b>\n"
+        f"├ Trade: {float(user.get('trade_sol', 0.05))} SOL\n"
+        f"├ Stop Loss: -{float(user.get('stop_loss_pct', 15))}%\n"
+        f"├ Take Profit: +{float(user.get('take_profit_pct', 50))}%\n"
+        f"├ Trailing: -{float(user.get('trailing_stop_pct', 10))}%\n"
+        f"└ Min AI Score: {float(user.get('min_ai_score', 75))}/100"
     )
 
 
@@ -240,18 +258,43 @@ async def cmd_autotrade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await update.message.reply_text(msg, parse_mode="HTML", reply_markup=await _get_menu_kb(update.effective_user.id))
 
 
+async def cmd_modes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message or not update.effective_user:
+        return
+    user = await get_user(update.effective_user.id) or {}
+    current = user.get("risk_mode") or "balanced"
+    lines = ["🎛 <b>Pick a Trading Mode</b>\n\nOne tap sets everything — trade size, stops, and AI threshold.\n"]
+    for key, p in PRESETS.items():
+        lines.append(f"{p['label']}\n<i>{p['desc']}</i>\n{preset_summary(key)}\n")
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="HTML",
+        reply_markup=modes_menu(current),
+    )
+
+
+async def _format_settings(user: dict) -> str:
+    notify = "🔔 ON" if user.get("notify_trades", 1) else "🔕 OFF"
+    mode = PRESETS.get(user.get("risk_mode") or "balanced", PRESETS["balanced"])["label"]
+    return (
+        f"⚙️ <b>Settings</b> — Mode: {mode}\n\n"
+        f"💵 Trade size: <b>{float(user.get('trade_sol', 0.05))} SOL</b>\n"
+        f"🛑 Stop loss: <b>{float(user.get('stop_loss_pct', 15))}%</b>\n"
+        f"🎯 Take profit: <b>{float(user.get('take_profit_pct', 50))}%</b>\n"
+        f"📐 Trailing stop: <b>{float(user.get('trailing_stop_pct', 10))}%</b>\n"
+        f"📦 Max positions: <b>{int(user.get('max_positions', 3))}</b>\n"
+        f"🤖 Min AI score: <b>{float(user.get('min_ai_score', 75))}/100</b>\n"
+        f"Notifications: {notify}\n\n"
+        f"Tap a button to change:"
+    )
+
+
 async def cmd_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.effective_user:
         return
     user = await get_user(update.effective_user.id) or {}
     await update.message.reply_text(
-        f"⚙️ <b>Settings</b>\n\n"
-        f"💵 Trade size: <b>{float(user.get('trade_sol', 0.05))} SOL</b>\n"
-        f"🛑 Stop loss: <b>{float(user.get('stop_loss_pct', 15))}%</b>\n"
-        f"🎯 Take profit: <b>{float(user.get('take_profit_pct', 50))}%</b>\n"
-        f"📐 Trailing stop: <b>{float(user.get('trailing_stop_pct', 10))}%</b>\n"
-        f"📦 Max positions: <b>{int(user.get('max_positions', 3))}</b>\n\n"
-        f"Tap a button to change:",
+        await _format_settings(user),
         parse_mode="HTML",
         reply_markup=settings_menu(),
     )
@@ -278,6 +321,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     if data == "menu":
         await query.edit_message_text(WELCOME, parse_mode="HTML", reply_markup=await _get_menu_kb(user_id))
+    elif data == "setup_guide":
+        await query.edit_message_text(SETUP_GUIDE, parse_mode="HTML", reply_markup=setup_guide_menu())
+    elif data == "profit_info":
+        await query.edit_message_text(PROFIT_INFO, parse_mode="HTML", reply_markup=back_button())
     elif data == "help":
         await query.edit_message_text(HELP, parse_mode="HTML", reply_markup=back_button())
     elif data == "dashboard":
@@ -305,18 +352,54 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     elif data == "history":
         text = await _format_history(user_id)
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=back_button())
+    elif data == "modes":
+        user = await get_user(user_id) or {}
+        current = user.get("risk_mode") or "balanced"
+        lines = ["🎛 <b>Pick a Trading Mode</b>\n"]
+        for key, p in PRESETS.items():
+            lines.append(f"{p['label']} — <i>{p['desc']}</i>\n{preset_summary(key)}\n")
+        await query.edit_message_text("\n".join(lines), parse_mode="HTML", reply_markup=modes_menu(current))
+    elif data.startswith("preset_"):
+        mode_key = data.replace("preset_", "")
+        if mode_key in PRESETS:
+            await apply_preset(user_id, PRESETS[mode_key], mode_key)
+            p = PRESETS[mode_key]
+            await query.edit_message_text(
+                f"✅ <b>{p['label']} activated!</b>\n\n{preset_summary(mode_key)}\n\n"
+                f"Ready to trade. Tap START Auto Trade when you're set.",
+                parse_mode="HTML",
+                reply_markup=await _get_menu_kb(user_id),
+            )
+    elif data == "buy_top":
+        user = await get_user(user_id)
+        if not user or not user.get("encrypted_key"):
+            await query.edit_message_text("❌ Import wallet key first.", reply_markup=back_button())
+            return
+        await query.edit_message_text("⏳ Buying top AI pick...", parse_mode="HTML")
+        ok, msg = await auto_trader.buy_top_coin(user)
+        await query.edit_message_text(f"{'✅' if ok else '❌'} {msg}", reply_markup=back_button())
+    elif data == "sell_all":
+        user = await get_user(user_id)
+        if not user or not user.get("encrypted_key"):
+            await query.edit_message_text("❌ No wallet.", reply_markup=back_button())
+            return
+        await query.edit_message_text("⏳ Selling all positions...", parse_mode="HTML")
+        ok, total = await auto_trader.sell_all(user)
+        await query.edit_message_text(f"✅ Sold {ok}/{total} positions.", reply_markup=back_button())
+    elif data == "toggle_notify":
+        user = await get_user(user_id) or {}
+        new_val = 0 if user.get("notify_trades", 1) else 1
+        await upsert_user(user_id, notify_trades=new_val)
+        status = "🔔 ON" if new_val else "🔕 OFF"
+        await query.answer(f"Notifications {status}")
+        user = await get_user(user_id) or {}
+        await query.edit_message_text(await _format_settings(user), parse_mode="HTML", reply_markup=settings_menu())
+    elif data == "disconnect":
+        await disconnect_wallet(user_id)
+        await query.edit_message_text("🔓 Wallet disconnected. Auto trade stopped.", reply_markup=await _get_menu_kb(user_id))
     elif data == "settings":
         user = await get_user(user_id) or {}
-        await query.edit_message_text(
-            f"⚙️ <b>Settings</b>\n\n"
-            f"💵 Trade: {float(user.get('trade_sol', 0.05))} SOL\n"
-            f"🛑 Stop loss: {float(user.get('stop_loss_pct', 15))}%\n"
-            f"🎯 Take profit: {float(user.get('take_profit_pct', 50))}%\n"
-            f"📐 Trailing: {float(user.get('trailing_stop_pct', 10))}%\n"
-            f"📦 Max positions: {int(user.get('max_positions', 3))}",
-            parse_mode="HTML",
-            reply_markup=settings_menu(),
-        )
+        await query.edit_message_text(await _format_settings(user), parse_mode="HTML", reply_markup=settings_menu())
     elif data == "autotrade_on":
         user = await get_user(user_id)
         if not user or not user.get("encrypted_key"):
@@ -342,12 +425,21 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         ok, msg = await auto_trader.sell_position_manual(user, pos)
         result = f"✅ {msg}" if ok else f"❌ {msg}"
         await query.edit_message_text(result, reply_markup=back_button())
+    elif data.startswith("quick_trade_"):
+        val = float(data.replace("quick_trade_", ""))
+        await upsert_user(user_id, trade_sol=val)
+        await query.edit_message_text(f"✅ Trade size → <b>{val} SOL</b>", parse_mode="HTML", reply_markup=settings_menu())
+    elif data.startswith("quick_sl_"):
+        val = float(data.replace("quick_sl_", ""))
+        await upsert_user(user_id, stop_loss_pct=val)
+        await query.edit_message_text(f"✅ Stop loss → <b>{val}%</b>", parse_mode="HTML", reply_markup=settings_menu())
     elif data == "set_trade":
-        PENDING_SETTING[user_id] = "trade_sol"
-        await query.edit_message_text("💵 Send trade size in SOL (e.g. <code>0.05</code>):", parse_mode="HTML", reply_markup=back_button())
+        await query.edit_message_text("💵 Pick trade size:", parse_mode="HTML", reply_markup=trade_size_quick())
     elif data == "set_stoploss":
-        PENDING_SETTING[user_id] = "stop_loss_pct"
-        await query.edit_message_text("🛑 Send stop loss % (e.g. <code>15</code>):", parse_mode="HTML", reply_markup=back_button())
+        await query.edit_message_text("🛑 Pick stop loss %:", parse_mode="HTML", reply_markup=stop_loss_quick())
+    elif data == "set_minscore":
+        PENDING_SETTING[user_id] = "min_ai_score"
+        await query.edit_message_text("🤖 Min AI score (70-95, e.g. <code>80</code>):", parse_mode="HTML", reply_markup=back_button())
     elif data == "set_takeprofit":
         PENDING_SETTING[user_id] = "take_profit_pct"
         await query.edit_message_text("🎯 Send take profit % (e.g. <code>50</code>):", parse_mode="HTML", reply_markup=back_button())
@@ -372,6 +464,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 val = max(1, min(10, int(text)))
             elif field == "trade_sol":
                 val = max(0.01, min(5.0, float(text)))
+            elif field == "min_ai_score":
+                val = max(65, min(95, float(text)))
             elif field in ("stop_loss_pct", "take_profit_pct", "trailing_stop_pct"):
                 val = max(1, min(100, float(text)))
             else:
@@ -398,7 +492,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 f"✅ <b>Wallet Connected!</b>\n\n"
                 f"<code>{pubkey[:12]}...{pubkey[-8:]}</code>\n"
                 f"Balance: <b>{bal:.4f} SOL</b>\n\n"
-                f"🚀 Tap <b>START Auto Trade</b> to begin!",
+                f"Next: tap <b>🎛 Trading Modes</b> → pick Safe/Balanced/Degen\n"
+                f"Then tap <b>START Auto Trade</b>!",
                 parse_mode="HTML",
                 reply_markup=await _get_menu_kb(user_id),
             )
@@ -467,8 +562,8 @@ def build_application() -> Application:
 
     for cmd, handler in [
         ("start", cmd_start), ("help", cmd_help), ("dashboard", cmd_dashboard),
-        ("scan", cmd_scan), ("wallet", cmd_wallet), ("balance", cmd_balance),
-        ("positions", cmd_positions), ("history", cmd_history),
+        ("scan", cmd_scan), ("modes", cmd_modes), ("wallet", cmd_wallet),
+        ("balance", cmd_balance), ("positions", cmd_positions), ("history", cmd_history),
         ("autotrade", cmd_autotrade), ("settings", cmd_settings), ("stop", cmd_stop),
     ]:
         app.add_handler(CommandHandler(cmd, handler))
