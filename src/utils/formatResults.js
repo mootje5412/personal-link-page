@@ -69,20 +69,37 @@ function getFieldValue(record, fieldConfig) {
   return '';
 }
 
+function getDisplayTitle(record, index) {
+  const name = getCombinedName(record);
+  if (name) {
+    return `👤 #${index} ${name}`;
+  }
+
+  const phone = cleanValue(record.Phone) || cleanValue(record.MobilePhone) || cleanValue(record.HomePhone);
+  if (phone) {
+    return `📱 #${index} ${phone}`;
+  }
+
+  const email = cleanValue(record.Email);
+  if (email) {
+    return `📧 #${index} ${email}`;
+  }
+
+  return `👤 #${index} Onbekend`;
+}
+
 function formatRecordCard(record, index) {
-  const lines = [`👤 #${index}`];
-  const usedLabels = new Set();
+  const lines = [getDisplayTitle(record, index)];
+  const usedLabels = new Set(['Naam']);
 
   for (const field of DISPLAY_FIELDS) {
-    const value = getFieldValue(record, field);
-
-    if (!value || usedLabels.has(field.label)) {
+    if (field.combineName) {
       continue;
     }
 
-    if (field.label === 'Naam') {
-      lines[0] = `${field.icon} #${index} ${value}`;
-      usedLabels.add(field.label);
+    const value = getFieldValue(record, field);
+
+    if (!value || usedLabels.has(field.label)) {
       continue;
     }
 
@@ -91,7 +108,7 @@ function formatRecordCard(record, index) {
   }
 
   if (lines.length === 1) {
-    lines.push('ℹ️ Geen leesbare gegevens gevonden');
+    lines.push('ℹ️ Geen extra gegevens');
   }
 
   return lines.join('\n');
