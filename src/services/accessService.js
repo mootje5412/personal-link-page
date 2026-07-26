@@ -200,15 +200,17 @@ function grantAccess(adminUser, rawTarget) {
       username: data.users[target.value]?.username || '',
     };
   } else {
-    const existingUser = Object.values(data.users).find(
-      (user) => normalizeUsername(user.username) === target.value,
+    const existingUser = Object.entries(data.users).find(
+      ([, user]) => normalizeUsername(user.username) === target.value,
     );
 
     if (existingUser) {
-      data.users[existingUser.userId] = {
-        ...existingUser,
+      const [userId, user] = existingUser;
+      data.users[userId] = {
+        ...user,
         ...entry,
         username: target.value,
+        userId,
       };
     } else {
       data.pendingUsernames[target.value] = {
@@ -221,10 +223,27 @@ function grantAccess(adminUser, rawTarget) {
   saveData(data);
 
   const label = target.type === 'id' ? `ID ${target.value}` : `@${target.value}`;
+  let details = `✅ Toegang gegeven aan ${label}\n\n`;
+  details += `Geldig tot: ${formatDate(expiresAt)}\n`;
+  details += `Duur: ${config.accessDays} dagen\n`;
+
+  if (target.type === 'id') {
+    details += `Telegram ID: ${target.value}`;
+  } else {
+    const linked = Object.entries(data.users).find(
+      ([, user]) => normalizeUsername(user.username) === target.value,
+    );
+
+    if (linked) {
+      details += `Telegram ID: ${linked[0]}\nGebruiker: @${target.value}`;
+    } else {
+      details += `Gebruiker: @${target.value}\nTelegram ID: volgt zodra de gebruiker /start stuurt`;
+    }
+  }
 
   return {
     ok: true,
-    message: `✅ Toegang gegeven aan ${label}\n\nGeldig tot: ${formatDate(expiresAt)}\nDuur: ${config.accessDays} dagen`,
+    message: details,
   };
 }
 

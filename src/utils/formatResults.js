@@ -1,29 +1,7 @@
 const MESSAGE_LIMIT = 3900;
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
-const DISPLAY_FIELDS = [
-  { keys: ['Name', 'FirstName', 'LastName'], label: 'Naam', icon: '👤', combineName: true },
-  { keys: ['Phone'], label: 'Telefoon', icon: '📱' },
-  { keys: ['MobilePhone'], label: 'Mobiel', icon: '📱' },
-  { keys: ['HomePhone'], label: 'Thuis', icon: '☎️' },
-  { keys: ['OtherPhone'], label: 'Overig nummer', icon: '📞' },
-  { keys: ['Email'], label: 'E-mail', icon: '📧' },
-  { keys: ['Birthdate', 'BirthDate__c'], label: 'Geboortedatum', icon: '🎂' },
-  { keys: ['Gender__c'], label: 'Geslacht', icon: '⚧️' },
-  { keys: ['ID_number__c'], label: 'ID-nummer', icon: '🪪' },
-  { keys: ['Initials__c'], label: 'Initialen', icon: '🔤' },
-  { keys: ['Brand__c'], label: 'Merk', icon: '🏷️' },
-  { keys: ['vlocity_cmt__Status__c'], label: 'Status', icon: '✅' },
-  { keys: ['Account_Segment_Indicator__c'], label: 'Segment', icon: '📊' },
-  { keys: ['COPS_Language__c'], label: 'Taal', icon: '🌐' },
-  { keys: ['Nationality__c'], label: 'Nationaliteit', icon: '🌍' },
-  { keys: ['Commercial_offering__c'], label: 'Commercieel aanbod', icon: '📣' },
-  { keys: ['Newsletter__c'], label: 'Nieuwsbrief', icon: '📰' },
-  { keys: ['Role__c'], label: 'Rol', icon: '💼' },
-  { keys: ['Person_ID__c'], label: 'Persoon-ID', icon: '🆔' },
-];
-
-const SKIP_VALUES = new Set(['', 'false', 'true', 'no', 'unknown', 'null', 'none', 'n/a']);
+const SKIP_VALUES = new Set(['', 'false', 'true', 'no', 'unknown', 'null', 'none', 'n/a', '0']);
 
 function cleanValue(value) {
   if (value === null || value === undefined) {
@@ -35,80 +13,140 @@ function cleanValue(value) {
     return '';
   }
 
-  if (text.startsWith('<a href')) {
+  if (text.startsWith('<a href') || text.includes('target="_blank"')) {
     return '';
   }
 
   return text;
 }
 
-function getCombinedName(record) {
-  const first = cleanValue(record.FirstName);
-  const last = cleanValue(record.LastName);
-  const full = [first, last].filter(Boolean).join(' ').trim();
+function formatDate(value) {
+  const text = cleanValue(value);
+  if (!text) {
+    return '';
+  }
 
-  if (full) {
-    return full;
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) {
+    return text;
+  }
+
+  return date.toLocaleDateString('nl-NL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+function getFullName(record) {
+  const salutation = cleanValue(record.Salutation);
+  const first = cleanValue(record.FirstName);
+  const middle = cleanValue(record.MiddleName);
+  const last = cleanValue(record.LastName);
+  const parts = [salutation, first, middle, last].filter(Boolean);
+
+  if (parts.length) {
+    return parts.join(' ');
   }
 
   return cleanValue(record.Name);
 }
 
-function getFieldValue(record, fieldConfig) {
-  if (fieldConfig.combineName) {
-    return getCombinedName(record);
-  }
+function getPhones(record) {
+  const phones = [
+    ['Telefoon', record.Phone],
+    ['Mobiel', record.MobilePhone],
+    ['Thuis', record.HomePhone],
+    ['Overig', record.OtherPhone],
+  ]
+    .map(([label, value]) => [label, cleanValue(value)])
+    .filter(([, value]) => value);
 
-  for (const key of fieldConfig.keys) {
-    const value = cleanValue(record[key]);
-    if (value) {
-      return value;
+  const seen = new Set();
+  return phones.filter(([, value]) => {
+    if (seen.has(value)) {
+      return false;
     }
-  }
-
-  return '';
+    seen.add(value);
+    return true;
+  });
 }
 
-function getDisplayTitle(record, index) {
-  const name = getCombinedName(record);
-  if (name) {
-    return `👤 #${index} ${name}`;
+function addSection(lines, title, items) {
+  const validItems = items.filter(([, value]) => value);
+  if (!validItems.length) {
+    return;
   }
 
-  const phone = cleanValue(record.Phone) || cleanValue(record.MobilePhone) || cleanValue(record.HomePhone);
-  if (phone) {
-    return `📱 #${index} ${phone}`;
-  }
-
-  const email = cleanValue(record.Email);
-  if (email) {
-    return `📧 #${index} ${email}`;
-  }
-
-  return `👤 #${index} Onbekend`;
+  lines.push(title);
+  validItems.forEach(([label, value]) => {
+    lines.push(`   ${label}: ${value}`);
+  });
 }
 
 function formatRecordCard(record, index) {
-  const lines = [getDisplayTitle(record, index)];
-  const usedLabels = new Set(['Naam']);
+  const lines = [];
+  const name = getFullName(record);
 
-  for (const field of DISPLAY_FIELDS) {
-    if (field.combineName) {
-      continue;
-    }
+  lines.push(`👤 RESULTAAT #${index}`);
+  lines.push('');
 
-    const value = getFieldValue(record, field);
-
-    if (!value || usedLabels.has(field.label)) {
-      continue;
-    }
-
-    lines.push(`${field.icon} ${field.label}: ${value}`);
-    usedLabels.add(field.label);
+  if (name) {
+    lines.push(`Naam: ${name}`);
   }
 
-  if (lines.length === 1) {
-    lines.push('ℹ️ Geen extra gegevens');
+  const topIds = [
+    ['Contact ID', cleanValue(record.Id)],
+    ['Account ID', cleanValue(record.AccountId)],
+    ['Persoon ID', cleanValue(record.Person_ID__c)],
+  ].filter(([, value]) => value);
+
+  topIds.forEach(([label, value]) => {
+    lines.push(`🆔 ${label}: ${value}`);
+  });
+
+  lines.push('');
+
+  addSection(lines, '📋 Persoon', [
+    ['Initialen', cleanValue(record.Initials__c)],
+    ['Geboortedatum', formatDate(record.Birthdate || record.BirthDate__c)],
+    ['Geslacht', cleanValue(record.Gender__c)],
+    ['Nationaliteit', cleanValue(record.Nationality__c)],
+    ['Gebruikersnaam', cleanValue(record.Receiving_Username__c)],
+    ['Rol', cleanValue(record.Role__c)],
+  ]);
+
+  const phones = getPhones(record);
+  if (phones.length || cleanValue(record.Email)) {
+    lines.push('');
+    lines.push('📞 Contact');
+    phones.forEach(([label, value]) => {
+      lines.push(`   ${label}: ${value}`);
+    });
+    if (cleanValue(record.Email)) {
+      lines.push(`   E-mail: ${cleanValue(record.Email)}`);
+    }
+  }
+
+  addSection(lines, '🪪 Identiteitsbewijs', [
+    ['ID-nummer', cleanValue(record.ID_number__c)],
+    ['ID-type', cleanValue(record.ID_type__c)],
+    ['Geldig tot', formatDate(record.ID_valid__c)],
+  ]);
+
+  addSection(lines, '🏢 Odido', [
+    ['Merk', cleanValue(record.Brand__c)],
+    ['Status', cleanValue(record.vlocity_cmt__Status__c)],
+    ['Segment', cleanValue(record.Account_Segment_Indicator__c)],
+    ['Taal', cleanValue(record.COPS_Language__c)],
+    ['Commercieel aanbod', cleanValue(record.Commercial_offering__c)],
+    ['Nieuwsbrief', cleanValue(record.Newsletter__c)],
+    ['Persoonsgegevens', cleanValue(record.Use_Personal_Data__c)],
+  ]);
+
+  if (lines.length <= 3) {
+    lines.push('');
+    lines.push('ℹ️ Geen extra gegevens beschikbaar');
   }
 
   return lines.join('\n');
@@ -170,21 +208,6 @@ function extractResults(data) {
   return [];
 }
 
-function getNoResultsMessage(data) {
-  const payload = data?.data && typeof data.data === 'object' ? data.data : data;
-  const resultsBlock = payload?.results;
-
-  if (resultsBlock?.message) {
-    return resultsBlock.message;
-  }
-
-  if (data?.error || data?.message) {
-    return data.error || data.message;
-  }
-
-  return 'Probeer een andere naam, telefoonnummer of zoekterm.';
-}
-
 function getTotalPages(total, pageSize = PAGE_SIZE) {
   return Math.max(1, Math.ceil(total / pageSize));
 }
@@ -212,10 +235,11 @@ function formatPageMessage(query, results, page = 0, options = {}) {
     '🔍 Odido Zoeker',
     `${typeLabels[queryType] || 'Zoekterm'}: ${query}`,
     `📄 Pagina ${safePage + 1}/${totalPages} • ${total} ${total === 1 ? 'resultaat' : 'resultaten'}`,
+    `📦 ${PAGE_SIZE} resultaten per pagina`,
   ];
 
   if (options.broad) {
-    headerLines.push('ℹ️ Geen exacte match — vergelijkbare resultaten getoond');
+    headerLines.push('ℹ️ Geen exacte match — vergelijkbare resultaten');
   }
 
   headerLines.push('');
@@ -224,7 +248,7 @@ function formatPageMessage(query, results, page = 0, options = {}) {
   const cards = pageResults
     .map((record, index) => {
       const card = formatRecordCard(record, start + index + 1);
-      return `━━━━━━━━━━━━━━━━\n${card}`;
+      return `━━━━━━━━━━━━━━━━━━━━\n${card}`;
     })
     .join('\n\n');
 
@@ -246,7 +270,7 @@ function formatEmptyMessage(query) {
   return `❌ Geen resultaten voor: ${query}
 
 Probeer bijvoorbeeld:
-• Naam: Ferry Hoenson
+• Naam: Hoenson
 • E-mail: test@gmail.com
 • Domein: odido.nl
 • Telefoon: 0612345678`;
