@@ -1,116 +1,100 @@
 const MESSAGE_LIMIT = 3900;
-const MAX_RESULTS = 15;
+const PAGE_SIZE = 10;
 
-const FIELD_LABELS = {
-  full_name: 'Naam',
-  name: 'Naam',
-  first_name: 'Voornaam',
-  last_name: 'Achternaam',
-  phone: 'Telefoon',
-  mobile: 'Mobiel',
-  email: 'E-mail',
-  address: 'Adres',
-  street: 'Straat',
-  city: 'Plaats',
-  postcode: 'Postcode',
-  postal_code: 'Postcode',
-  zip: 'Postcode',
-  country: 'Land',
-  dob: 'Geboortedatum',
-  date_of_birth: 'Geboortedatum',
-  birthdate: 'Geboortedatum',
-  iban: 'IBAN',
-  bsn: 'BSN',
-  id: 'ID',
-  customer_id: 'Klant-ID',
-  subscription: 'Abonnement',
-  provider: 'Provider',
-  notes: 'Notities',
-};
+const DISPLAY_FIELDS = [
+  { keys: ['Name', 'FirstName', 'LastName'], label: 'Naam', icon: '👤', combineName: true },
+  { keys: ['Phone'], label: 'Telefoon', icon: '📱' },
+  { keys: ['MobilePhone'], label: 'Mobiel', icon: '📱' },
+  { keys: ['HomePhone'], label: 'Thuis', icon: '☎️' },
+  { keys: ['OtherPhone'], label: 'Overig nummer', icon: '📞' },
+  { keys: ['Email'], label: 'E-mail', icon: '📧' },
+  { keys: ['Birthdate', 'BirthDate__c'], label: 'Geboortedatum', icon: '🎂' },
+  { keys: ['Gender__c'], label: 'Geslacht', icon: '⚧️' },
+  { keys: ['ID_number__c'], label: 'ID-nummer', icon: '🪪' },
+  { keys: ['Initials__c'], label: 'Initialen', icon: '🔤' },
+  { keys: ['Brand__c'], label: 'Merk', icon: '🏷️' },
+  { keys: ['vlocity_cmt__Status__c'], label: 'Status', icon: '✅' },
+  { keys: ['Account_Segment_Indicator__c'], label: 'Segment', icon: '📊' },
+  { keys: ['COPS_Language__c'], label: 'Taal', icon: '🌐' },
+  { keys: ['Nationality__c'], label: 'Nationaliteit', icon: '🌍' },
+  { keys: ['Commercial_offering__c'], label: 'Commercieel aanbod', icon: '📣' },
+  { keys: ['Newsletter__c'], label: 'Nieuwsbrief', icon: '📰' },
+  { keys: ['Role__c'], label: 'Rol', icon: '💼' },
+  { keys: ['Person_ID__c'], label: 'Persoon-ID', icon: '🆔' },
+];
 
-function humanizeKey(key) {
-  if (FIELD_LABELS[key]) {
-    return FIELD_LABELS[key];
+const SKIP_VALUES = new Set(['', 'false', 'true', 'no', 'unknown', 'null', 'none', 'n/a']);
+
+function cleanValue(value) {
+  if (value === null || value === undefined) {
+    return '';
   }
 
-  return String(key)
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+  const text = String(value).trim();
+  if (!text || SKIP_VALUES.has(text.toLowerCase())) {
+    return '';
+  }
+
+  if (text.startsWith('<a href')) {
+    return '';
+  }
+
+  return text;
 }
 
-function formatValue(value) {
-  if (value === null || value === undefined || value === '') {
-    return null;
+function getCombinedName(record) {
+  const first = cleanValue(record.FirstName);
+  const last = cleanValue(record.LastName);
+  const full = [first, last].filter(Boolean).join(' ').trim();
+
+  if (full) {
+    return full;
   }
 
-  if (typeof value === 'object') {
-    return JSON.stringify(value);
-  }
-
-  return String(value).trim();
+  return cleanValue(record.Name);
 }
 
-function flattenRecord(record, prefix = '') {
-  const lines = [];
-
-  if (record === null || record === undefined) {
-    return lines;
+function getFieldValue(record, fieldConfig) {
+  if (fieldConfig.combineName) {
+    return getCombinedName(record);
   }
 
-  if (Array.isArray(record)) {
-    record.forEach((item, index) => {
-      lines.push(...flattenRecord(item, prefix ? `${prefix} ${index + 1}` : `#${index + 1}`));
-    });
-    return lines;
+  for (const key of fieldConfig.keys) {
+    const value = cleanValue(record[key]);
+    if (value) {
+      return value;
+    }
   }
 
-  if (typeof record !== 'object') {
-    const text = formatValue(record);
-    if (text) {
-      lines.push(prefix ? `${prefix}: ${text}` : text);
+  return '';
+}
+
+function formatRecordCard(record, index) {
+  const lines = [`👤 #${index}`];
+  const usedLabels = new Set();
+
+  for (const field of DISPLAY_FIELDS) {
+    const value = getFieldValue(record, field);
+
+    if (!value || usedLabels.has(field.label)) {
+      continue;
     }
-    return lines;
+
+    if (field.label === 'Naam') {
+      lines[0] = `${field.icon} #${index} ${value}`;
+      usedLabels.add(field.label);
+      continue;
+    }
+
+    lines.push(`${field.icon} ${field.label}: ${value}`);
+    usedLabels.add(field.label);
   }
 
-  Object.entries(record).forEach(([key, value]) => {
-    if (value === null || value === undefined || value === '') {
-      return;
-    }
+  if (lines.length === 1) {
+    lines.push('ℹ️ Geen leesbare gegevens gevonden');
+  }
 
-    const label = humanizeKey(key);
-
-    if (typeof value === 'object') {
-      if (Array.isArray(value)) {
-        if (value.every((item) => typeof item !== 'object')) {
-          lines.push(`${label}: ${value.map(formatValue).filter(Boolean).join(', ')}`);
-        } else {
-          value.forEach((item, index) => {
-            const nested = flattenRecord(item);
-            if (nested.length) {
-              lines.push(`${label} ${index + 1}:`);
-              nested.forEach((line) => lines.push(`   ${line}`));
-            }
-          });
-        }
-      } else {
-        const nested = flattenRecord(value);
-        if (nested.length === 1 && !prefix) {
-          lines.push(`${label}: ${nested[0]}`);
-        } else if (nested.length) {
-          lines.push(`${label}:`);
-          nested.forEach((line) => lines.push(`   ${line}`));
-        }
-      }
-      return;
-    }
-
-    const text = formatValue(value);
-    if (text) {
-      lines.push(`${label}: ${text}`);
-    }
-  });
-
-  return lines;
+  return lines.join('\n');
 }
 
 function extractResults(data) {
@@ -145,12 +129,7 @@ function extractResults(data) {
     payload.data,
     payload.records,
     payload.items,
-    payload.hits,
-    payload.matches,
-    payload.people,
-    payload.persons,
     data.results,
-    data.result,
     data.records,
     data.items,
   ];
@@ -168,17 +147,13 @@ function extractResults(data) {
       if (Array.isArray(candidate.results)) {
         return candidate.results;
       }
-
-      if (Array.isArray(candidate.items)) {
-        return candidate.items;
-      }
     }
   }
 
   return [];
 }
 
-function getNoResultsMessage(query, data) {
+function getNoResultsMessage(data) {
   const payload = data?.data && typeof data.data === 'object' ? data.data : data;
   const resultsBlock = payload?.results;
 
@@ -193,46 +168,56 @@ function getNoResultsMessage(query, data) {
   return 'Probeer een andere naam, telefoonnummer of zoekterm.';
 }
 
-function formatSingleResult(index, record) {
-  const lines = flattenRecord(record);
-  if (!lines.length) {
-    return `${index}. Geen leesbare gegevens`;
-  }
-
-  return `${index}. ${lines.join('\n   ')}`;
+function getTotalPages(total, pageSize = PAGE_SIZE) {
+  return Math.max(1, Math.ceil(total / pageSize));
 }
 
-function formatResultsMessage(query, data) {
-  if (data && data.success === false) {
-    return `Geen resultaten voor: ${query}\n\n${data.error || data.message || 'De zoekopdracht gaf geen resultaat.'}`;
-  }
-
-  const results = extractResults(data);
-
-  if (!results.length) {
-    return `Geen resultaten gevonden voor: ${query}\n\n${getNoResultsMessage(query, data)}`;
-  }
-
+function formatPageMessage(query, results, page = 0) {
   const total = results.length;
-  const header = `Gevonden: ${total} ${total === 1 ? 'resultaat' : 'resultaten'} voor "${query}"\n\n`;
-  const body = results
-    .slice(0, MAX_RESULTS)
-    .map((record, index) => formatSingleResult(index + 1, record))
+  const totalPages = getTotalPages(total);
+  const safePage = Math.min(Math.max(page, 0), totalPages - 1);
+  const start = safePage * PAGE_SIZE;
+  const pageResults = results.slice(start, start + PAGE_SIZE);
+
+  const header = [
+    '🔍 Odido Zoeker',
+    `Zoekopdracht: ${query}`,
+    `📄 Pagina ${safePage + 1}/${totalPages} • ${total} ${total === 1 ? 'resultaat' : 'resultaten'}`,
+    '',
+  ].join('\n');
+
+  const cards = pageResults
+    .map((record, index) => {
+      const card = formatRecordCard(record, start + index + 1);
+      return `━━━━━━━━━━━━━━━━\n${card}`;
+    })
     .join('\n\n');
 
-  let message = header + body;
-
-  if (total > MAX_RESULTS) {
-    message += `\n\n... en nog ${total - MAX_RESULTS} resultaat${total - MAX_RESULTS === 1 ? '' : 'en'}`;
-  }
+  let message = `${header}${cards}`;
 
   if (message.length > MESSAGE_LIMIT) {
     message = `${message.slice(0, MESSAGE_LIMIT - 3)}...`;
   }
 
-  return message;
+  return {
+    text: message,
+    page: safePage,
+    totalPages,
+    total,
+  };
+}
+
+function formatEmptyMessage(query, data) {
+  if (data && data.success === false) {
+    return `❌ Geen resultaten voor: ${query}\n\n${data.error || data.message || 'De zoekopdracht gaf geen resultaat.'}`;
+  }
+
+  return `❌ Geen resultaten voor: ${query}\n\n${getNoResultsMessage(data)}`;
 }
 
 module.exports = {
-  formatResultsMessage,
+  PAGE_SIZE,
+  extractResults,
+  formatPageMessage,
+  formatEmptyMessage,
 };

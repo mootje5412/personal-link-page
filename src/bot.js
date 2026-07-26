@@ -2,6 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const config = require('../config/config');
 const commandHandler = require('./handlers/commandHandler');
 const messageHandler = require('./handlers/messageHandler');
+const paginationHandler = require('./handlers/paginationHandler');
 
 class OdidoZoekerBot {
   constructor() {
@@ -16,6 +17,12 @@ class OdidoZoekerBot {
 
     this.bot.onText(/^\/start(?:@\w+)?(?:\s|$)/i, (msg) => {
       commandHandler.handleStart(this.bot, msg);
+    });
+
+    this.bot.on('callback_query', (query) => {
+      if (query.data.startsWith('page_')) {
+        paginationHandler.handleCallback(this.bot, query);
+      }
     });
 
     this.bot.on('message', (msg) => {

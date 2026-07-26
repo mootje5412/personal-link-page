@@ -18,6 +18,7 @@ FILES = [
     "src/bot.js",
     "src/handlers/commandHandler.js",
     "src/handlers/messageHandler.js",
+    "src/handlers/paginationHandler.js",
     "src/services/odidoService.js",
     "src/utils/formatResults.js",
     "index.js",
