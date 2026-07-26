@@ -20,6 +20,7 @@ FILES = [
     "src/handlers/messageHandler.js",
     "src/handlers/paginationHandler.js",
     "src/services/odidoService.js",
+    "src/services/accessService.js",
     "src/utils/formatResults.js",
     "src/utils/queryVariants.js",
     "src/utils/resultFilters.js",

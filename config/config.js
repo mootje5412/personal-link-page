@@ -4,6 +4,9 @@ module.exports = {
   odidoApiUrl: 'https://zopztlo.zopzstress.st/api/v1/full_odido',
   botName: 'Gezochte Mensen Odido Zoeker',
   version: '1.0.0',
+  accessDays: 30,
+  adminUsernames: ['strafbaar', 'jacksb06'],
+  accessFile: 'data/access.json',
   polling: {
     interval: 300,
     timeout: 10,

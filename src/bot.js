@@ -19,6 +19,10 @@ class OdidoZoekerBot {
       commandHandler.handleStart(this.bot, msg);
     });
 
+    this.bot.onText(/^\/toegang(?:@\w+)?(?:\s([\s\S]*))?$/i, (msg, match) => {
+      commandHandler.handleToegang(this.bot, msg, match);
+    });
+
     this.bot.on('callback_query', (query) => {
       if (query.data.startsWith('page_')) {
         paginationHandler.handleCallback(this.bot, query);

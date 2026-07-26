@@ -1,4 +1,5 @@
 const odidoService = require('../services/odidoService');
+const accessService = require('../services/accessService');
 const paginationHandler = require('./paginationHandler');
 const { formatEmptyMessage } = require('../utils/formatResults');
 
@@ -6,8 +7,14 @@ class MessageHandler {
   async handleMessage(bot, msg) {
     const chatId = msg.chat.id;
     const query = msg.text.trim();
+    const access = accessService.hasAccess(msg.from);
 
     if (!query) {
+      return;
+    }
+
+    if (!access.allowed) {
+      await bot.sendMessage(chatId, accessService.getAccessDeniedMessage());
       return;
     }
 
