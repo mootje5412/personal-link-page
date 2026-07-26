@@ -2,8 +2,13 @@
 
 SERVER="109.71.252.128"
 USER="root"
-PASS="zWE2CTnItIWftvmTdxF4"
+PASS="${DEPLOY_PASSWORD:-}"
 REMOTE_DIR="/root/odido-zoeker"
+
+if [ -z "$PASS" ]; then
+  echo "Stel DEPLOY_PASSWORD in voor SSH-toegang."
+  exit 1
+fi
 
 echo "Deployment-pakket maken..."
 cd /workspace
@@ -12,8 +17,7 @@ tar -czf bot-deploy.tar.gz \
   src/ \
   index.js \
   bot-package.json \
-  restart.sh \
-  .env.example
+  restart.sh
 
 echo "Verbinden met server..."
 
@@ -42,17 +46,19 @@ echo "Dependencies installeren..."
 npm install
 
 echo "Oude bot instanties stoppen..."
-pkill -9 -f "node index.js" 2>/dev/null || true
+pkill -9 -f "/root/odido-zoeker" 2>/dev/null || true
 pkill -9 -f "node /root/findnow-bot/index.js" 2>/dev/null || true
 sleep 1
 
-echo "Bot starten..."
+echo "Bot starten via pm2..."
 chmod +x restart.sh
-nohup npm start > bot.log 2>&1 &
+pm2 delete odido-zoeker 2>/dev/null || true
+pm2 start index.js --name odido-zoeker
+pm2 save
 
 sleep 3
 echo "Bot gestart!"
-tail -n 20 bot.log
+pm2 logs odido-zoeker --lines 20 --nostream
 ENDSSH
 
 echo "Deployment voltooid!"
