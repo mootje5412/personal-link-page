@@ -1,6 +1,11 @@
+const dns = require('dns');
+const https = require('https');
 const config = require('../../config/config');
 
+dns.setDefaultResultOrder('ipv4first');
+
 const REQUEST_TIMEOUT_MS = 30000;
+const ipv4Agent = new https.Agent({ family: 4, keepAlive: true });
 
 async function searchOdido(query) {
   const url = new URL(config.odidoApiUrl);
@@ -18,6 +23,7 @@ async function searchOdido(query) {
         'User-Agent': `${config.botName}/${config.version}`,
       },
       signal: controller.signal,
+      agent: ipv4Agent,
     });
 
     const raw = await response.text();
@@ -27,6 +33,10 @@ async function searchOdido(query) {
       data = raw ? JSON.parse(raw) : {};
     } catch {
       throw new Error('Ongeldig antwoord van de zoek-API.');
+    }
+
+    if (data.success === false && data.error) {
+      throw new Error(data.error);
     }
 
     if (!response.ok) {
@@ -39,7 +49,7 @@ async function searchOdido(query) {
       throw new Error('Zoeken duurde te lang. Probeer het opnieuw.');
     }
 
-    if (error.message.startsWith('Ongeldig') || error.message.startsWith('API-fout') || error.message.startsWith('Zoeken')) {
+    if (error.message) {
       throw error;
     }
 

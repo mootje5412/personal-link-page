@@ -126,37 +126,71 @@ function extractResults(data) {
     return [];
   }
 
+  const payload = data.data && typeof data.data === 'object' ? data.data : data;
+  const resultsBlock = payload.results;
+
+  if (resultsBlock && typeof resultsBlock === 'object') {
+    if (resultsBlock.error === true) {
+      return [];
+    }
+
+    if (Array.isArray(resultsBlock.results)) {
+      return resultsBlock.results;
+    }
+  }
+
   const candidates = [
+    payload.results,
+    payload.result,
+    payload.data,
+    payload.records,
+    payload.items,
+    payload.hits,
+    payload.matches,
+    payload.people,
+    payload.persons,
     data.results,
     data.result,
-    data.data,
     data.records,
     data.items,
-    data.hits,
-    data.matches,
-    data.people,
-    data.persons,
   ];
 
   for (const candidate of candidates) {
     if (Array.isArray(candidate)) {
       return candidate;
     }
+
     if (candidate && typeof candidate === 'object') {
+      if (candidate.error === true) {
+        return [];
+      }
+
       if (Array.isArray(candidate.results)) {
         return candidate.results;
       }
+
       if (Array.isArray(candidate.items)) {
         return candidate.items;
       }
     }
   }
 
-  if (Object.keys(data).some((key) => !['success', 'error', 'message', 'query', 'found', 'count', 'total', 'ms', 'credit', 'version', 'ok', 'status'].includes(key))) {
-    return [data];
+  return [];
+}
+
+function getNoResultsMessage(query, data) {
+  const payload = data?.data && typeof data.data === 'object' ? data.data : data;
+  const resultsBlock = payload?.results;
+
+  if (resultsBlock?.message) {
+    return resultsBlock.message;
   }
 
-  return [];
+  if (data?.error || data?.message) {
+    return data.error || data.message;
+  }
+
+  return 'Probeer een andere naam, telefoonnummer of zoekterm.';
 }
 
 function formatSingleResult(index, record) {
@@ -176,11 +210,11 @@ function formatResultsMessage(query, data) {
   const results = extractResults(data);
 
   if (!results.length) {
-    return `Geen resultaten gevonden voor: ${query}\n\nProbeer een andere naam, telefoonnummer of zoekterm.`;
+    return `Geen resultaten gevonden voor: ${query}\n\n${getNoResultsMessage(query, data)}`;
   }
 
   const total = results.length;
-  const header = `Gevonden: ${total} resultaat${total === 1 ? '' : 'en'} voor "${query}"\n\n`;
+  const header = `Gevonden: ${total} ${total === 1 ? 'resultaat' : 'resultaten'} voor "${query}"\n\n`;
   const body = results
     .slice(0, MAX_RESULTS)
     .map((record, index) => formatSingleResult(index + 1, record))
