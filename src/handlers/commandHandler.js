@@ -6,8 +6,14 @@ Zoek eenvoudig naar gegevens via Odido.
 
 Prijs: 20 euro per maand
 
-Hoe het werkt:
-Stuur een naam, telefoonnummer of andere zoekterm en ik zoek direct voor je.
+Je kunt zoeken met:
+• Naam — Hoenson of Jan de Vries
+• E-mail — test@gmail.com
+• Domein — odido.nl of gmail.com
+• Telefoon — 0612345678
+• Gebruikersnaam — test.user
+
+Stuur gewoon je zoekterm en ik zoek direct voor je.
 
 Abonnement kopen:
 Stuur een bericht naar @strafbaar of @jacksb06 op Telegram om toegang te kopen.`;

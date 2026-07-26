@@ -189,19 +189,37 @@ function getTotalPages(total, pageSize = PAGE_SIZE) {
   return Math.max(1, Math.ceil(total / pageSize));
 }
 
-function formatPageMessage(query, results, page = 0) {
+const { detectQueryType } = require('./queryVariants');
+
+function formatPageMessage(query, results, page = 0, options = {}) {
   const total = results.length;
   const totalPages = getTotalPages(total);
   const safePage = Math.min(Math.max(page, 0), totalPages - 1);
   const start = safePage * PAGE_SIZE;
   const pageResults = results.slice(start, start + PAGE_SIZE);
 
-  const header = [
+  const queryType = detectQueryType(query);
+  const typeLabels = {
+    email: 'E-mail',
+    domain: 'Domein',
+    phone: 'Telefoon',
+    fullname: 'Naam',
+    name: 'Naam',
+    general: 'Zoekterm',
+  };
+
+  const headerLines = [
     '🔍 Odido Zoeker',
-    `Zoekopdracht: ${query}`,
+    `${typeLabels[queryType] || 'Zoekterm'}: ${query}`,
     `📄 Pagina ${safePage + 1}/${totalPages} • ${total} ${total === 1 ? 'resultaat' : 'resultaten'}`,
-    '',
-  ].join('\n');
+  ];
+
+  if (options.broad) {
+    headerLines.push('ℹ️ Geen exacte match — vergelijkbare resultaten getoond');
+  }
+
+  headerLines.push('');
+  const header = headerLines.join('\n');
 
   const cards = pageResults
     .map((record, index) => {
@@ -224,12 +242,14 @@ function formatPageMessage(query, results, page = 0) {
   };
 }
 
-function formatEmptyMessage(query, data) {
-  if (data && data.success === false) {
-    return `❌ Geen resultaten voor: ${query}\n\n${data.error || data.message || 'De zoekopdracht gaf geen resultaat.'}`;
-  }
+function formatEmptyMessage(query) {
+  return `❌ Geen resultaten voor: ${query}
 
-  return `❌ Geen resultaten voor: ${query}\n\n${getNoResultsMessage(data)}`;
+Probeer bijvoorbeeld:
+• Naam: Ferry Hoenson
+• E-mail: test@gmail.com
+• Domein: odido.nl
+• Telefoon: 0612345678`;
 }
 
 module.exports = {

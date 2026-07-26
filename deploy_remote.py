@@ -21,6 +21,8 @@ FILES = [
     "src/handlers/paginationHandler.js",
     "src/services/odidoService.js",
     "src/utils/formatResults.js",
+    "src/utils/queryVariants.js",
+    "src/utils/resultFilters.js",
     "index.js",
     "bot-package.json",
     "restart.sh",

@@ -33,8 +33,8 @@ class PaginationHandler {
     return { inline_keyboard: [buttons] };
   }
 
-  async sendResults(bot, chatId, query, results, page = 0, messageId = null) {
-    const formatted = formatPageMessage(query, results, page);
+  async sendResults(bot, chatId, query, results, page = 0, messageId = null, searchOptions = {}) {
+    const formatted = formatPageMessage(query, results, page, searchOptions);
     const keyboard = this.createKeyboard(formatted.page, formatted.totalPages);
 
     this.saveSession(chatId, {
@@ -42,9 +42,10 @@ class PaginationHandler {
       results,
       page: formatted.page,
       messageId,
+      broad: searchOptions.broad || false,
     });
 
-    const options = {
+    const messageOptions = {
       reply_markup: keyboard,
       disable_web_page_preview: true,
     };
@@ -53,17 +54,18 @@ class PaginationHandler {
       await bot.editMessageText(formatted.text, {
         chat_id: chatId,
         message_id: messageId,
-        ...options,
+        ...messageOptions,
       });
       return messageId;
     }
 
-    const sent = await bot.sendMessage(chatId, formatted.text, options);
+    const sent = await bot.sendMessage(chatId, formatted.text, messageOptions);
     this.saveSession(chatId, {
       query,
       results,
       page: formatted.page,
       messageId: sent.message_id,
+      broad: searchOptions.broad || false,
     });
     return sent.message_id;
   }
@@ -98,6 +100,7 @@ class PaginationHandler {
         session.results,
         page,
         messageId,
+        { broad: session.broad },
       );
       await bot.answerCallbackQuery(callbackQuery.id);
     } catch (error) {

@@ -1,6 +1,6 @@
 const odidoService = require('../services/odidoService');
 const paginationHandler = require('./paginationHandler');
-const { extractResults, formatEmptyMessage } = require('../utils/formatResults');
+const { formatEmptyMessage } = require('../utils/formatResults');
 
 class MessageHandler {
   async handleMessage(bot, msg) {
@@ -13,15 +13,17 @@ class MessageHandler {
 
     paginationHandler.clearSession(chatId);
 
-    const loadingMsg = await bot.sendMessage(chatId, `🔍 Zoeken naar: ${query}\n\nEven geduld...`);
+    const loadingMsg = await bot.sendMessage(
+      chatId,
+      `🔍 Zoeken naar: ${query}\n\nNaam, e-mail, domein, telefoon...\nEven geduld...`,
+    );
 
     try {
       await bot.sendChatAction(chatId, 'typing');
-      const data = await odidoService.searchOdido(query);
-      const results = extractResults(data);
+      const search = await odidoService.searchOdido(query);
 
-      if (!results.length) {
-        await bot.editMessageText(formatEmptyMessage(query, data), {
+      if (!search.results.length) {
+        await bot.editMessageText(formatEmptyMessage(query), {
           chat_id: chatId,
           message_id: loadingMsg.message_id,
         });
@@ -32,9 +34,10 @@ class MessageHandler {
         bot,
         chatId,
         query,
-        results,
+        search.results,
         0,
         loadingMsg.message_id,
+        { broad: search.broad },
       );
     } catch (error) {
       const errorText = error.message || 'Er ging iets mis bij het zoeken.';
