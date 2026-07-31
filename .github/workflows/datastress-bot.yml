@@ -1,0 +1,33 @@
+name: DataStress Bot
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'datastress/**'
+      - '.github/workflows/datastress-bot.yml'
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: datastress
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: datastress/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start DataStress bot
+        run: npm start
