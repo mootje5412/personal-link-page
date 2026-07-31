@@ -89,11 +89,15 @@ class CallbackHandler {
       }
 
       const paymentId = userService.createPayment(telegramId, planId, crypto, plan.price);
+      const wallet = paymentService.getWallet(crypto);
+      const keyboard = paymentConfirmKeyboard(paymentId, wallet);
 
       bot.answerCallbackQuery(query.id);
-      bot.sendMessage(chatId, paymentService.formatPaymentMessage(plan, crypto, paymentId), {
-        reply_markup: paymentConfirmKeyboard(paymentId)
-      });
+      bot.sendMessage(
+        chatId,
+        paymentService.formatPaymentMessage(plan, crypto, paymentId),
+        paymentService.getPaymentMessageOptions(plan, crypto, paymentId, keyboard)
+      );
       return;
     }
 

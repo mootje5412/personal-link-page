@@ -50,13 +50,19 @@ function cryptoKeyboard(planId) {
   };
 }
 
-function paymentConfirmKeyboard(paymentId) {
-  return {
-    inline_keyboard: [
-      [{ text: 'I Have Sent Payment', callback_data: `confirm_pay_${paymentId}` }],
-      [{ text: 'Back to Menu', callback_data: 'menu_main' }]
-    ]
-  };
+function paymentConfirmKeyboard(paymentId, wallet) {
+  const rows = [];
+
+  if (wallet) {
+    rows.push([{ text: 'Copy Address', copy_text: { text: wallet } }]);
+  }
+
+  rows.push(
+    [{ text: 'I Have Sent Payment', callback_data: `confirm_pay_${paymentId}` }],
+    [{ text: 'Back to Menu', callback_data: 'menu_main' }]
+  );
+
+  return { inline_keyboard: rows };
 }
 
 function ownerApprovalKeyboard(paymentId) {
