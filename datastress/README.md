@@ -23,14 +23,14 @@ All settings are in `config/config.js`:
 
 - `botToken` - Telegram bot token
 - `adminUserId` - Your Telegram user ID for `/approve`
-- `wallets` - BTC, ETH, LTC, USDT addresses
+- `wallets` - BTC and ETH addresses
 
 ## Features
 
 - `/start` - Main menu with bot overview (no emojis)
 - **Methods** - View available stress testing methods
 - **Plans** - 8 subscription tiers (60s to 3000s max duration), priced in EUR
-- **Pay** - Crypto payment flow (BTC, ETH, LTC, USDT) with wallet address, Payment ID, and auto-activation
+- **Pay** - Crypto payment flow (BTC, ETH) with wallet address and Payment ID
 - **Launch Attack** - Log attacks to CSV (requires active plan)
 - **My Account** - View subscription status
 

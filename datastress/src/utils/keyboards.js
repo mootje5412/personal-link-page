@@ -45,10 +45,6 @@ function cryptoKeyboard(planId) {
         { text: 'BTC', callback_data: `crypto_${planId}_btc` },
         { text: 'ETH', callback_data: `crypto_${planId}_eth` }
       ],
-      [
-        { text: 'LTC', callback_data: `crypto_${planId}_ltc` },
-        { text: 'USDT', callback_data: `crypto_${planId}_usdt` }
-      ],
       [{ text: 'Back', callback_data: `plan_${planId}` }]
     ]
   };

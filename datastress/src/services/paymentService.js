@@ -8,9 +8,7 @@ class PaymentService {
   getCryptoLabel(crypto) {
     const labels = {
       btc: 'BTC',
-      eth: 'ETH',
-      ltc: 'LTC',
-      usdt: 'USDT'
+      eth: 'ETH'
     };
     return labels[crypto.toLowerCase()] || crypto.toUpperCase();
   }

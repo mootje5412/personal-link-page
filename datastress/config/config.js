@@ -4,10 +4,8 @@ module.exports = {
   adminUserId: 8073205490,
 
   wallets: {
-    btc: 'bc1qexamplebtcaddress',
-    eth: '0xExampleEthAddress',
-    ltc: 'ltc1qexampleltcaddress',
-    usdt: '0xExampleUsdtAddress'
+    btc: 'bc1plp7yfcwkp7hfxu3jcvpnmy0qamp6t3g0tlzs0zfd0wn55z8xqjhq2msvdg',
+    eth: '0x1d6D74DbBE9fd6Ce87908De394633bc0Ecc64AC1'
   },
 
   ownerPlan: {
