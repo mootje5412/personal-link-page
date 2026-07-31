@@ -77,7 +77,7 @@ function ownerApprovalKeyboard(paymentId) {
 
 function methodsKeyboard() {
   const rows = config.methods.map((method) => [
-    { text: method.name, callback_data: `method_${method.id}` }
+    { text: `${method.name} L${method.layer}`, callback_data: `method_${method.id}` }
   ]);
 
   rows.push([{ text: 'Back to Menu', callback_data: 'menu_main' }]);

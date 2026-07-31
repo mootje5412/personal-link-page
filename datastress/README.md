@@ -39,13 +39,31 @@ All settings are in `config/config.js`:
 - **Users** - SQLite database at `database/users.db`
 - **Attacks** - CSV log at `data/attacks.csv`
 
-## Admin
+## Admin / Owner
 
-Set your Telegram ID in `config/config.js` as `adminUserId`. Payments auto-activate when the user confirms. If auto-activation fails, manually approve with:
+Set your Telegram ID in `config/config.js` as `adminUserId`. The owner gets unlimited duration and concurrent slots.
+
+When a user submits payment, you receive a notification with Approve/Reject buttons.
 
 ```
 /approve <payment_id>
+/reject <payment_id>
 ```
+
+## Attack Commands
+
+```
+/udp <ip> <port> <duration>
+/tcp <ip> <port> <duration>
+/http <ip> <port> <duration>
+/httppost <ip> <port> <duration>
+/dns <ip> <port> <duration>
+/icmp <ip> <port> <duration>
+/slowloris <ip> <port> <duration>
+/mixed <ip> <port> <duration>
+```
+
+Plans above 70 EUR include 2-4 concurrent slots.
 
 ## Disclaimer
 

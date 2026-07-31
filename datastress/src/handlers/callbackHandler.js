@@ -20,7 +20,7 @@ class CallbackHandler {
 
     if (data === 'menu_main') {
       bot.answerCallbackQuery(query.id);
-      bot.editMessageText('DATASTRESS MENU\n────────────────────\nSelect an option:', {
+      bot.editMessageText('Menu', {
         chat_id: chatId,
         message_id: query.message.message_id,
         reply_markup: mainMenuKeyboard()
@@ -53,39 +53,28 @@ class CallbackHandler {
     }
 
     if (data.startsWith('method_')) {
-      const methodId = data.replace('method_', '');
       bot.answerCallbackQuery(query.id);
-      commandHandler.sendMethodDetail(bot, chatId, methodId);
+      commandHandler.sendMethodDetail(bot, chatId, data.replace('method_', ''));
       return;
     }
 
     if (data.startsWith('plan_')) {
-      const planId = Number(data.replace('plan_', ''));
       bot.answerCallbackQuery(query.id);
-      commandHandler.sendPlanDetail(bot, chatId, planId);
+      commandHandler.sendPlanDetail(bot, chatId, Number(data.replace('plan_', '')));
       return;
     }
 
     if (data.startsWith('pay_')) {
-      const planId = Number(data.replace('pay_', ''));
-      const plan = config.plans.find((p) => p.id === planId);
-
+      const plan = config.plans.find((p) => p.id === Number(data.replace('pay_', '')));
       if (!plan) {
-        bot.answerCallbackQuery(query.id, { text: 'Plan not found' });
+        bot.answerCallbackQuery(query.id, { text: 'Not found' });
         return;
       }
 
       bot.answerCallbackQuery(query.id);
-      bot.sendMessage(
-        chatId,
-        `SELECT PAYMENT METHOD
-────────────────────
-Plan:  ${plan.name}
-Price: ${plan.price} EUR
-
-With what do you wanna pay?`,
-        { reply_markup: cryptoKeyboard(planId) }
-      );
+      bot.sendMessage(chatId, `${plan.name} - ${plan.price} EUR\n\nHow do you wanna pay?`, {
+        reply_markup: cryptoKeyboard(plan.id)
+      });
       return;
     }
 
@@ -96,15 +85,14 @@ With what do you wanna pay?`,
       const plan = config.plans.find((p) => p.id === planId);
 
       if (!plan) {
-        bot.answerCallbackQuery(query.id, { text: 'Plan not found' });
+        bot.answerCallbackQuery(query.id, { text: 'Not found' });
         return;
       }
 
       const paymentId = userService.createPayment(telegramId, planId, crypto, plan.price);
-      const message = paymentService.formatPaymentMessage(plan, crypto, paymentId);
 
       bot.answerCallbackQuery(query.id);
-      bot.sendMessage(chatId, message, {
+      bot.sendMessage(chatId, paymentService.formatPaymentMessage(plan, crypto, paymentId), {
         reply_markup: paymentConfirmKeyboard(paymentId)
       });
       return;
@@ -134,7 +122,7 @@ With what do you wanna pay?`,
     const payment = userService.getPayment(paymentId);
 
     if (!payment) {
-      bot.answerCallbackQuery(query.id, { text: 'Payment not found' });
+      bot.answerCallbackQuery(query.id, { text: 'Not found' });
       return;
     }
 
@@ -149,22 +137,15 @@ With what do you wanna pay?`,
     }
 
     if (payment.status === 'awaiting_approval') {
-      bot.answerCallbackQuery(query.id, { text: 'Already submitted' });
-      bot.sendMessage(
-        chatId,
-        `PAYMENT PENDING
-────────────────────
-Payment ID: #${paymentId}
-Status:     Awaiting owner approval
-
-The owner is reviewing your payment.`,
-        { reply_markup: backToMenuKeyboard() }
-      );
+      bot.answerCallbackQuery(query.id, { text: 'Already waiting' });
+      bot.sendMessage(chatId, `Payment #${paymentId} is waiting for owner approval.`, {
+        reply_markup: backToMenuKeyboard()
+      });
       return;
     }
 
     if (payment.status === 'rejected') {
-      bot.answerCallbackQuery(query.id, { text: 'Payment was rejected' });
+      bot.answerCallbackQuery(query.id, { text: 'Rejected' });
       return;
     }
 
@@ -173,35 +154,15 @@ The owner is reviewing your payment.`,
     const user = userService.getUser(telegramId);
 
     if (!submitted) {
-      bot.answerCallbackQuery(query.id, { text: 'Could not submit payment' });
+      bot.answerCallbackQuery(query.id, { text: 'Error' });
       return;
     }
 
-    bot.answerCallbackQuery(query.id, { text: 'Submitted for review' });
-
-    bot.editMessageText(
-      `${query.message.text}\n\n────────────────────\nStatus: Awaiting owner approval\nPayment ID: #${paymentId}`,
-      {
-        chat_id: chatId,
-        message_id: query.message.message_id,
-        reply_markup: { inline_keyboard: [[{ text: 'Back to Menu', callback_data: 'menu_main' }]] }
-      }
-    ).catch(() => {});
+    bot.answerCallbackQuery(query.id, { text: 'Sent to owner' });
 
     bot.sendMessage(
       chatId,
-      `PAYMENT SUBMITTED
-────────────────────
-Payment ID: #${paymentId}
-Plan:       ${plan?.name || payment.plan_id}
-Amount:     ${payment.amount_eur} EUR
-Crypto:     ${payment.crypto.toUpperCase()}
-Status:     Pending owner verification
-────────────────────
-Your plan will activate once the owner
-confirms your payment was received.
-
-Keep Payment ID: #${paymentId}`,
+      `Payment #${paymentId} sent for review.\nPlan: ${plan?.name}\nAmount: ${payment.amount_eur} EUR\n\nOwner must approve before access.`,
       { reply_markup: backToMenuKeyboard() }
     );
 
@@ -212,8 +173,6 @@ Keep Payment ID: #${paymentId}`,
         { reply_markup: ownerApprovalKeyboard(paymentId) }
       ).catch(() => {});
     }
-
-    return;
   }
 
   handleOwnerApprove(bot, query, paymentId) {
@@ -228,41 +187,17 @@ Keep Payment ID: #${paymentId}`,
     const plan = config.plans.find((p) => p.id === payment?.plan_id);
 
     if (!payment) {
-      bot.answerCallbackQuery(query.id, { text: 'Already processed or not found' });
+      bot.answerCallbackQuery(query.id, { text: 'Already done' });
       return;
     }
 
     bot.answerCallbackQuery(query.id, { text: 'Approved' });
 
-    bot.editMessageReplyMarkup(
-      { inline_keyboard: [[{ text: `Approved #${paymentId}`, callback_data: 'menu_main' }]] },
-      { chat_id: chatId, message_id: query.message.message_id }
-    ).catch(() => {});
-
-    bot.sendMessage(
-      chatId,
-      `PAYMENT APPROVED
-────────────────────
-Payment ID: #${paymentId}
-User:       ${payment.telegram_id}
-Plan:       ${plan?.name || payment.plan_id}
-Status:     Activated`
-    );
+    bot.sendMessage(chatId, `Approved #${paymentId}`);
 
     bot.sendMessage(
       payment.telegram_id,
-      `PLAN ACTIVATED
-────────────────────
-Payment ID: #${paymentId}
-Plan:       ${plan?.name || payment.plan_id}
-Duration:   ${plan?.maxDuration || 'N/A'}s max
-Concurrent: ${plan?.concurrent || 1} slot${plan?.concurrent > 1 ? 's' : ''}
-────────────────────
-Your payment was verified and approved.
-
-Launch attacks using slash commands:
-  /udp ip port duration
-  /help for full list`,
+      `Plan active: ${plan?.name}\nPayment ID: #${paymentId}\n\n/methods for commands`,
       { reply_markup: backToMenuKeyboard() }
     ).catch(() => {});
   }
@@ -278,40 +213,24 @@ Launch attacks using slash commands:
     const payment = userService.rejectPayment(paymentId);
 
     if (!payment) {
-      bot.answerCallbackQuery(query.id, { text: 'Already processed or not found' });
+      bot.answerCallbackQuery(query.id, { text: 'Already done' });
       return;
     }
 
     bot.answerCallbackQuery(query.id, { text: 'Rejected' });
 
-    bot.editMessageReplyMarkup(
-      { inline_keyboard: [[{ text: `Rejected #${paymentId}`, callback_data: 'menu_main' }]] },
-      { chat_id: chatId, message_id: query.message.message_id }
-    ).catch(() => {});
-
-    bot.sendMessage(
-      chatId,
-      `PAYMENT REJECTED
-────────────────────
-Payment ID: #${paymentId}
-User:       ${payment.telegram_id}`
-    );
+    bot.sendMessage(chatId, `Rejected #${paymentId}`);
 
     bot.sendMessage(
       payment.telegram_id,
-      `PAYMENT REJECTED
-────────────────────
-Payment ID: #${paymentId}
-
-Your payment could not be verified.
-Contact the owner if you believe this is an error.`,
+      `Payment #${paymentId} rejected.`,
       { reply_markup: backToMenuKeyboard() }
     ).catch(() => {});
   }
 
   editOrSendMethods(bot, chatId, messageId) {
-    const lines = config.methods.map((m) => `  /${m.command} - ${m.name}`);
-    const message = `AVAILABLE METHODS\n────────────────────\n\n${lines.join('\n')}\n\nTap a method for details:`;
+    const { formatMethodsList } = require('../utils/commands');
+    const message = `Methods\n\n${formatMethodsList()}`;
 
     bot.editMessageText(message, {
       chat_id: chatId,
@@ -323,9 +242,7 @@ Contact the owner if you believe this is an error.`,
   }
 
   editOrSendPlans(bot, chatId, messageId) {
-    const message = `SUBSCRIPTION PLANS\n────────────────────\nAll plans include every method.\nPlans above 70 EUR include extra concurrent slots.\n\nSelect a plan:`;
-
-    bot.editMessageText(message, {
+    bot.editMessageText('Plans', {
       chat_id: chatId,
       message_id: messageId,
       reply_markup: require('../utils/keyboards').plansKeyboard()

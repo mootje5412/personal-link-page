@@ -3,6 +3,7 @@ const userService = require('./services/userService');
 const commandHandler = require('./handlers/commandHandler');
 const callbackHandler = require('./handlers/callbackHandler');
 const attackHandler = require('./handlers/attackHandler');
+const { attackPattern, getBotCommands } = require('./utils/commands');
 
 class DataStressBot {
   constructor() {
@@ -13,25 +14,35 @@ class DataStressBot {
     this.init();
   }
 
+  async registerTelegramCommands() {
+    try {
+      await this.bot.setMyCommands(getBotCommands());
+      console.log('Telegram commands registered.');
+    } catch (error) {
+      console.error('Failed to register commands:', error.message);
+    }
+  }
+
   init() {
     console.log(`${config.botName} is starting...`);
 
-    this.bot.onText(/\/start/, (msg) => commandHandler.handleStart(this.bot, msg));
-    this.bot.onText(/\/help/, (msg) => commandHandler.handleHelp(this.bot, msg));
-    this.bot.onText(/\/account/, (msg) => commandHandler.handleAccount(this.bot, msg));
-    this.bot.onText(/\/methods/, (msg) => commandHandler.handleMethods(this.bot, msg));
+    this.registerTelegramCommands();
 
-    this.bot.onText(/\/approve (\d+)/, (msg, match) => {
+    this.bot.onText(/\/start(?:@\w+)?/i, (msg) => commandHandler.handleStart(this.bot, msg));
+    this.bot.onText(/\/help(?:@\w+)?/i, (msg) => commandHandler.handleHelp(this.bot, msg));
+    this.bot.onText(/\/account(?:@\w+)?/i, (msg) => commandHandler.handleAccount(this.bot, msg));
+    this.bot.onText(/\/methods(?:@\w+)?/i, (msg) => commandHandler.handleMethods(this.bot, msg));
+
+    this.bot.onText(/\/approve(?:@\w+)?\s+(\d+)/i, (msg, match) => {
       this.handleApprove(msg, Number(match[1]));
     });
 
-    this.bot.onText(/\/reject (\d+)/, (msg, match) => {
+    this.bot.onText(/\/reject(?:@\w+)?\s+(\d+)/i, (msg, match) => {
       this.handleReject(msg, Number(match[1]));
     });
 
     config.methods.forEach((method) => {
-      const pattern = new RegExp(`\\/${method.command}\\s+(\\S+)\\s+(\\d+)\\s+(\\d+)`, 'i');
-      this.bot.onText(pattern, (msg, match) => {
+      this.bot.onText(attackPattern(method.command), (msg, match) => {
         attackHandler.handleAttackCommand(this.bot, msg, match, method);
       });
     });
@@ -52,7 +63,7 @@ class DataStressBot {
 
     console.log('DataStress bot is running.');
     if (config.adminUserId) {
-      console.log(`Owner ID: ${config.adminUserId} (unlimited access)`);
+      console.log(`Owner ID: ${config.adminUserId}`);
     }
   }
 
@@ -60,7 +71,7 @@ class DataStressBot {
     const chatId = msg.chat.id;
 
     if (!userService.isOwner(msg.from.id)) {
-      this.bot.sendMessage(chatId, 'Unauthorized. Owner only.');
+      this.bot.sendMessage(chatId, 'Owner only.');
       return;
     }
 
@@ -68,31 +79,15 @@ class DataStressBot {
     const plan = config.plans.find((p) => p.id === payment?.plan_id);
 
     if (!payment) {
-      this.bot.sendMessage(chatId, `Payment #${paymentId} not found or already processed.`);
+      this.bot.sendMessage(chatId, `Payment #${paymentId} not found.`);
       return;
     }
 
-    this.bot.sendMessage(
-      chatId,
-      `PAYMENT APPROVED
-────────────────────
-Payment ID: #${paymentId}
-User:       ${payment.telegram_id}
-Plan:       ${plan?.name || payment.plan_id}`
-    );
+    this.bot.sendMessage(chatId, `Approved #${paymentId} for user ${payment.telegram_id}.`);
 
     this.bot.sendMessage(
       payment.telegram_id,
-      `PLAN ACTIVATED
-────────────────────
-Payment ID: #${paymentId}
-Plan:       ${plan?.name || payment.plan_id}
-Duration:   ${plan?.maxDuration || 'N/A'}s max
-Concurrent: ${plan?.concurrent || 1} slot${plan?.concurrent > 1 ? 's' : ''}
-────────────────────
-Your payment was verified.
-
-Use /help to see attack commands.`,
+      `Plan activated: ${plan?.name || payment.plan_id}\nPayment ID: #${paymentId}\n\nUse /methods to see commands.`,
       { reply_markup: require('./utils/keyboards').backToMenuKeyboard() }
     ).catch(() => {});
   }
@@ -101,26 +96,22 @@ Use /help to see attack commands.`,
     const chatId = msg.chat.id;
 
     if (!userService.isOwner(msg.from.id)) {
-      this.bot.sendMessage(chatId, 'Unauthorized. Owner only.');
+      this.bot.sendMessage(chatId, 'Owner only.');
       return;
     }
 
     const payment = userService.rejectPayment(paymentId);
 
     if (!payment) {
-      this.bot.sendMessage(chatId, `Payment #${paymentId} not found or already processed.`);
+      this.bot.sendMessage(chatId, `Payment #${paymentId} not found.`);
       return;
     }
 
-    this.bot.sendMessage(chatId, `Payment #${paymentId} rejected.`);
+    this.bot.sendMessage(chatId, `Rejected #${paymentId}.`);
 
     this.bot.sendMessage(
       payment.telegram_id,
-      `PAYMENT REJECTED
-────────────────────
-Payment ID: #${paymentId}
-
-Your payment could not be verified.`,
+      `Payment #${paymentId} rejected.\nContact owner if this is wrong.`,
       { reply_markup: require('./utils/keyboards').backToMenuKeyboard() }
     ).catch(() => {});
   }

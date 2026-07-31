@@ -29,14 +29,15 @@ module.exports = {
   ],
 
   methods: [
-    { id: 'udp', command: 'udp', name: 'UDP-FLOOD', description: 'UDP packet flood for bandwidth testing' },
-    { id: 'tcp', command: 'tcp', name: 'TCP-SYN', description: 'TCP SYN flood for connection limit testing' },
-    { id: 'http', command: 'http', name: 'HTTP-GET', description: 'HTTP GET request flood for web server testing' },
-    { id: 'http-post', command: 'httppost', name: 'HTTP-POST', description: 'HTTP POST request flood for API testing' },
-    { id: 'dns', command: 'dns', name: 'DNS-AMP', description: 'DNS amplification simulation for resolver testing' },
-    { id: 'icmp', command: 'icmp', name: 'ICMP-FLOOD', description: 'ICMP ping flood for latency testing' },
-    { id: 'slowloris', command: 'slowloris', name: 'SLOWLORIS', description: 'Slow connection hold for thread exhaustion testing' },
-    { id: 'mixed', command: 'mixed', name: 'MIXED', description: 'Combined method rotation for comprehensive testing' }
+    { id: 'udp', command: 'udp', name: 'UDP', layer: 4, description: 'UDP flood' },
+    { id: 'tcp', command: 'tcp', name: 'TCP', layer: 4, description: 'TCP SYN flood' },
+    { id: 'icmp', command: 'icmp', name: 'ICMP', layer: 4, description: 'ICMP flood' },
+    { id: 'dns', command: 'dns', name: 'DNS', layer: 4, description: 'DNS amp' },
+    { id: 'http', command: 'http', name: 'HTTP', layer: 7, description: 'HTTP GET flood' },
+    { id: 'post', command: 'post', name: 'POST', layer: 7, description: 'HTTP POST flood' },
+    { id: 'slowloris', command: 'slowloris', name: 'SLOWLORIS', layer: 7, description: 'Slowloris hold' },
+    { id: 'browser', command: 'browser', name: 'BROWSER', layer: 7, description: 'Browser flood' },
+    { id: 'cloudflare', command: 'cloudflare', name: 'CLOUDFLARE', layer: 7, description: 'CF bypass flood' }
   ],
 
   polling: {
