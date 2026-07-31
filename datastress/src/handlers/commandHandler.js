@@ -78,26 +78,15 @@ class CommandHandler {
   }
 
   sendMethods(bot, chatId) {
-    bot.sendMessage(chatId, `Methods\n\n${formatMethodsList()}`, { reply_markup: methodsKeyboard() });
+    bot.sendMessage(
+      chatId,
+      `Methods\n\nLayer 4: /udp /tcp /icmp /dns\nLayer 7: /http /post /slowloris /browser /cloudflare\n\nTap a method:`,
+      { reply_markup: methodsKeyboard() }
+    );
   }
 
   sendCommandsHelp(bot, chatId, telegramId) {
     attackHandler.sendCommandsHelp(bot, chatId, telegramId);
-  }
-
-  sendMethodDetail(bot, chatId, methodId) {
-    const method = config.methods.find((m) => m.id === methodId);
-
-    if (!method) {
-      bot.sendMessage(chatId, 'Not found.', { reply_markup: backToMenuKeyboard() });
-      return;
-    }
-
-    bot.sendMessage(
-      chatId,
-      `${method.name} (Layer ${method.layer})\n/${method.command} ip port duration\n\nExample:\n/${method.command} 1.2.3.4 80 60`,
-      { reply_markup: backToMenuKeyboard() }
-    );
   }
 
   sendPlans(bot, chatId) {

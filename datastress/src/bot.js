@@ -51,6 +51,11 @@ class DataStressBot {
       callbackHandler.handleCallback(this.bot, query);
     });
 
+    this.bot.on('message', (msg) => {
+      if (!msg.text || msg.text.startsWith('/')) return;
+      attackHandler.handleTapInput(this.bot, msg);
+    });
+
     this.bot.on('polling_error', (error) => {
       console.error('Polling error:', error.code, error.message);
 

@@ -2,12 +2,16 @@ const config = require('../../config/config');
 const userService = require('../services/userService');
 const paymentService = require('../services/paymentService');
 const commandHandler = require('./commandHandler');
+const attackHandler = require('./attackHandler');
+const { formatMethodsList } = require('../utils/commands');
 const {
   mainMenuKeyboard,
   backToMenuKeyboard,
   cryptoKeyboard,
   paymentConfirmKeyboard,
-  ownerApprovalKeyboard
+  ownerApprovalKeyboard,
+  methodsKeyboard,
+  methodSelectedKeyboard
 } = require('../utils/keyboards');
 
 class CallbackHandler {
@@ -19,6 +23,7 @@ class CallbackHandler {
     userService.registerUser(query.from);
 
     if (data === 'menu_main') {
+      attackHandler.clearMethodSession(telegramId);
       bot.answerCallbackQuery(query.id);
       bot.editMessageText('Menu', {
         chat_id: chatId,
@@ -29,8 +34,9 @@ class CallbackHandler {
     }
 
     if (data === 'menu_methods') {
+      attackHandler.clearMethodSession(telegramId);
       bot.answerCallbackQuery(query.id);
-      this.editOrSendMethods(bot, chatId, query.message.message_id);
+      this.showMethods(bot, chatId, query.message.message_id);
       return;
     }
 
@@ -46,15 +52,8 @@ class CallbackHandler {
       return;
     }
 
-    if (data === 'menu_commands') {
-      bot.answerCallbackQuery(query.id);
-      commandHandler.sendCommandsHelp(bot, chatId, telegramId);
-      return;
-    }
-
     if (data.startsWith('method_')) {
-      bot.answerCallbackQuery(query.id);
-      commandHandler.sendMethodDetail(bot, chatId, data.replace('method_', ''));
+      this.handleMethodTap(bot, query, data.replace('method_', ''));
       return;
     }
 
@@ -114,6 +113,56 @@ class CallbackHandler {
     }
 
     bot.answerCallbackQuery(query.id);
+  }
+
+  handleMethodTap(bot, query, methodId) {
+    const chatId = query.message.chat.id;
+    const telegramId = query.from.id;
+    const method = config.methods.find((m) => m.id === methodId);
+
+    if (!method) {
+      bot.answerCallbackQuery(query.id, { text: 'Not found' });
+      return;
+    }
+
+    const plan = userService.getActivePlan(telegramId);
+
+    if (!plan) {
+      bot.answerCallbackQuery(query.id, { text: 'No plan' });
+      bot.editMessageText('No active plan.\nBuy a plan first.', {
+        chat_id: chatId,
+        message_id: query.message.message_id,
+        reply_markup: backToMenuKeyboard()
+      }).catch(() => {
+        bot.sendMessage(chatId, 'No active plan.\nBuy a plan first.', { reply_markup: backToMenuKeyboard() });
+      });
+      return;
+    }
+
+    attackHandler.setMethodSession(telegramId, method);
+    bot.answerCallbackQuery(query.id, { text: method.name });
+
+    bot.editMessageText(attackHandler.getMethodPrompt(method), {
+      chat_id: chatId,
+      message_id: query.message.message_id,
+      reply_markup: methodSelectedKeyboard(methodId)
+    }).catch(() => {
+      bot.sendMessage(chatId, attackHandler.getMethodPrompt(method), {
+        reply_markup: methodSelectedKeyboard(methodId)
+      });
+    });
+  }
+
+  showMethods(bot, chatId, messageId) {
+    const text = `Methods\n\nLayer 4: /udp /tcp /icmp /dns\nLayer 7: /http /post /slowloris /browser /cloudflare\n\nTap a method:`;
+
+    bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: methodsKeyboard()
+    }).catch(() => {
+      commandHandler.sendMethods(bot, chatId);
+    });
   }
 
   handlePaymentConfirm(bot, query, paymentId) {
@@ -197,7 +246,7 @@ class CallbackHandler {
 
     bot.sendMessage(
       payment.telegram_id,
-      `Plan active: ${plan?.name}\nPayment ID: #${paymentId}\n\n/methods for commands`,
+      `Plan active: ${plan?.name}\nPayment ID: #${paymentId}\n\nTap Methods to start.`,
       { reply_markup: backToMenuKeyboard() }
     ).catch(() => {});
   }
@@ -226,19 +275,6 @@ class CallbackHandler {
       `Payment #${paymentId} rejected.`,
       { reply_markup: backToMenuKeyboard() }
     ).catch(() => {});
-  }
-
-  editOrSendMethods(bot, chatId, messageId) {
-    const { formatMethodsList } = require('../utils/commands');
-    const message = `Methods\n\n${formatMethodsList()}`;
-
-    bot.editMessageText(message, {
-      chat_id: chatId,
-      message_id: messageId,
-      reply_markup: require('../utils/keyboards').methodsKeyboard()
-    }).catch(() => {
-      commandHandler.sendMethods(bot, chatId);
-    });
   }
 
   editOrSendPlans(bot, chatId, messageId) {

@@ -5,7 +5,6 @@ function mainMenuKeyboard() {
     inline_keyboard: [
       [{ text: 'Methods', callback_data: 'menu_methods' }],
       [{ text: 'Plans', callback_data: 'menu_plans' }],
-      [{ text: 'Attack Commands', callback_data: 'menu_commands' }],
       [{ text: 'My Account', callback_data: 'menu_account' }]
     ]
   };
@@ -76,13 +75,36 @@ function ownerApprovalKeyboard(paymentId) {
 }
 
 function methodsKeyboard() {
-  const rows = config.methods.map((method) => [
-    { text: `${method.name} L${method.layer}`, callback_data: `method_${method.id}` }
-  ]);
+  const l4 = config.methods.filter((m) => m.layer === 4);
+  const l7 = config.methods.filter((m) => m.layer === 7);
+
+  const row = (method) => ({
+    text: `/${method.command}`,
+    callback_data: `method_${method.id}`
+  });
+
+  const rows = [];
+
+  for (let i = 0; i < l4.length; i += 2) {
+    rows.push(l4.slice(i, i + 2).map(row));
+  }
+
+  for (let i = 0; i < l7.length; i += 2) {
+    rows.push(l7.slice(i, i + 2).map(row));
+  }
 
   rows.push([{ text: 'Back to Menu', callback_data: 'menu_main' }]);
 
   return { inline_keyboard: rows };
+}
+
+function methodSelectedKeyboard(methodId) {
+  return {
+    inline_keyboard: [
+      [{ text: 'Change Method', callback_data: 'menu_methods' }],
+      [{ text: 'Back to Menu', callback_data: 'menu_main' }]
+    ]
+  };
 }
 
 module.exports = {
@@ -93,5 +115,6 @@ module.exports = {
   cryptoKeyboard,
   paymentConfirmKeyboard,
   ownerApprovalKeyboard,
-  methodsKeyboard
+  methodsKeyboard,
+  methodSelectedKeyboard
 };
