@@ -35,3 +35,9 @@ search-api/databases/*
 search-api/.search_index.db
 search-api/telegram.env
 search-api/__pycache__/
+
+# PaneliSearch
+panelisearch/venv/
+panelisearch/telegram.env
+panelisearch/__pycache__/
+panelisearch/*.log
