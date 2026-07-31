@@ -10,47 +10,31 @@ MESSAGE_LIMIT = 3900
 
 
 def format_match(index: int, row: dict) -> str:
-    source = row.get("source", "unknown")
-    file_type = row.get("type", "")
-
-    if file_type == "csv":
-        data = row.get("data", {})
-        name = " ".join(
-            str(data.get(key, ""))
-            for key in ("first_name", "last_name", "name")
-            if data.get(key)
-        ).strip()
-        lines = [f"{index}. {name or 'Record'} ({source})"]
-        for key in ("phone", "email", "city"):
-            if data.get(key):
-                lines.append(f"   {key.title()}: {data[key]}")
-        return "\n".join(lines)
-
-    if file_type == "txt":
-        text = str(row.get("text", ""))
+    lines = [f"{index}. {row.get('full_name') or 'Result'}"]
+    for key, label in (
+        ("identity_number", "TC"),
+        ("phone", "Phone"),
+        ("email", "Email"),
+        ("city", "City"),
+        ("country", "Country"),
+        ("notes", "Notes"),
+        ("details", "Details"),
+    ):
+        value = row.get(key)
+        if not value:
+            continue
+        text = str(value)
         if len(text) > 160:
             text = text[:157] + "..."
-        return f"{index}. [{source}] {text}"
-
-    if file_type == "json":
-        data = row.get("data", {})
-        if isinstance(data, dict):
-            title = data.get("name") or data.get("email") or "JSON record"
-            lines = [f"{index}. {title} ({source})"]
-            for key in ("phone", "email"):
-                if data.get(key):
-                    lines.append(f"   {key.title()}: {data[key]}")
-            return "\n".join(lines)
-        return f"{index}. JSON match ({source})"
-
-    return f"{index}. Match in {source}"
+        lines.append(f"   {label}: {text}")
+    return "\n".join(lines)
 
 
 def format_results_message(query: str, results: list[dict]) -> str:
     if not results:
         return f"No results for: {query}"
 
-    header = f"PaneliSearch found {len(results)} result(s) for: {query}\n\n"
+    header = f"Found {len(results)} result(s) for: {query}\n\n"
     body = "\n\n".join(format_match(index, row) for index, row in enumerate(results[:MAX_RESULTS], start=1))
     message = header + body
     if len(message) > MESSAGE_LIMIT:
@@ -63,11 +47,7 @@ async def cmd_start(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None
         return
     await update.message.reply_text(
         "PaneliSearch is ready.\n\n"
-        "Send any text to search the database:\n"
-        "• Name: John Smith\n"
-        "• Phone: 5551234567\n"
-        "• Email: john.smith@email.com\n"
-        "• Any keyword from csv, txt, or json files"
+        "Send a name, phone, email, or keyword to search."
     )
 
 
