@@ -137,7 +137,7 @@ Select a plan to view details and pay:`;
     const message = `Plan: ${plan.name}
 
 Max Attack Duration: ${plan.maxDuration} seconds
-Concurrent Slots: ${plan.concurrent}
+Concurrent: 1
 All Methods Included: Yes
 Price: ${plan.price} EUR
 

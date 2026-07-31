@@ -15,12 +15,12 @@ module.exports = {
   plans: [
     { id: 1, name: 'Starter', maxDuration: 60, price: 5, concurrent: 1 },
     { id: 2, name: 'Basic', maxDuration: 120, price: 10, concurrent: 1 },
-    { id: 3, name: 'Standard', maxDuration: 300, price: 20, concurrent: 2 },
-    { id: 4, name: 'Plus', maxDuration: 600, price: 35, concurrent: 2 },
-    { id: 5, name: 'Pro', maxDuration: 900, price: 50, concurrent: 3 },
-    { id: 6, name: 'Advanced', maxDuration: 1200, price: 75, concurrent: 3 },
-    { id: 7, name: 'Elite', maxDuration: 1800, price: 100, concurrent: 4 },
-    { id: 8, name: 'Ultimate', maxDuration: 3000, price: 150, concurrent: 5 }
+    { id: 3, name: 'Standard', maxDuration: 300, price: 20, concurrent: 1 },
+    { id: 4, name: 'Plus', maxDuration: 600, price: 35, concurrent: 1 },
+    { id: 5, name: 'Pro', maxDuration: 900, price: 50, concurrent: 1 },
+    { id: 6, name: 'Advanced', maxDuration: 1200, price: 75, concurrent: 1 },
+    { id: 7, name: 'Elite', maxDuration: 1800, price: 100, concurrent: 1 },
+    { id: 8, name: 'Ultimate', maxDuration: 3000, price: 150, concurrent: 1 }
   ],
 
   methods: [

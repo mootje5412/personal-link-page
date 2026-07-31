@@ -96,7 +96,7 @@ class CallbackHandler {
       }
 
       const paymentId = userService.createPayment(telegramId, planId, crypto, plan.price);
-      const message = paymentService.formatPaymentMessage(plan, crypto);
+      const message = paymentService.formatPaymentMessage(plan, crypto, paymentId);
 
       bot.answerCallbackQuery(query.id);
       bot.sendMessage(chatId, message, {
@@ -121,46 +121,95 @@ class CallbackHandler {
 
       if (payment.status === 'confirmed') {
         bot.answerCallbackQuery(query.id, { text: 'Already confirmed' });
+        bot.sendMessage(
+          chatId,
+          `Payment Already Active\n\nPayment ID: #${paymentId}\nYour plan is already activated.`,
+          { reply_markup: backToMenuKeyboard() }
+        );
         return;
       }
 
-      bot.answerCallbackQuery(query.id, { text: 'Payment submitted for review' });
+      const confirmed = userService.confirmPayment(paymentId);
+      const plan = config.plans.find((p) => p.id === payment.plan_id);
 
-      bot.editMessageText(
-        `${query.message.text}\n\nStatus: Pending review\nReference: #${paymentId}`,
-        {
-          chat_id: chatId,
-          message_id: query.message.message_id,
-          reply_markup: { inline_keyboard: [[{ text: 'Back to Menu', callback_data: 'menu_main' }]] }
-        }
-      ).catch(() => {});
+      if (confirmed) {
+        bot.answerCallbackQuery(query.id, { text: 'Plan activated' });
 
-      bot.sendMessage(
-        chatId,
-        `Payment Confirmation Received
+        bot.editMessageText(
+          `${query.message.text}\n\nStatus: Confirmed\nPayment ID: #${paymentId}`,
+          {
+            chat_id: chatId,
+            message_id: query.message.message_id,
+            reply_markup: { inline_keyboard: [[{ text: 'Back to Menu', callback_data: 'menu_main' }]] }
+          }
+        ).catch(() => {});
 
-Your payment for Plan ID ${payment.plan_id} (${payment.amount_eur} EUR via ${payment.crypto.toUpperCase()}) has been submitted.
-
-Status: Pending review
-Reference: #${paymentId}
-
-You will be notified once your plan is activated.`
-      );
-
-      if (config.adminUserId) {
-        const plan = config.plans.find((p) => p.id === payment.plan_id);
         bot.sendMessage(
-          config.adminUserId,
-          `New Payment Pending
+          chatId,
+          `Payment Confirmed
 
-Reference: #${paymentId}
+Payment ID: #${paymentId}
+Plan: ${plan?.name || payment.plan_id}
+Amount: ${payment.amount_eur} EUR
+Crypto: ${payment.crypto.toUpperCase()}
+
+Your plan has been activated automatically.
+Use Launch Attack from the main menu to begin testing.`,
+          { reply_markup: backToMenuKeyboard() }
+        );
+
+        if (config.adminUserId) {
+          bot.sendMessage(
+            config.adminUserId,
+            `Payment Auto-Confirmed
+
+Payment ID: #${paymentId}
+User: ${telegramId} (@${query.from.username || 'none'})
+Plan: ${plan?.name || payment.plan_id}
+Amount: ${payment.amount_eur} EUR
+Crypto: ${payment.crypto.toUpperCase()}
+
+Manual approve if needed: /approve ${paymentId}`
+          ).catch(() => {});
+        }
+      } else {
+        bot.answerCallbackQuery(query.id, { text: 'Activation failed - contact owner' });
+
+        bot.editMessageText(
+          `${query.message.text}\n\nStatus: Pending manual approval\nPayment ID: #${paymentId}`,
+          {
+            chat_id: chatId,
+            message_id: query.message.message_id,
+            reply_markup: { inline_keyboard: [[{ text: 'Back to Menu', callback_data: 'menu_main' }]] }
+          }
+        ).catch(() => {});
+
+        bot.sendMessage(
+          chatId,
+          `Payment Received - Manual Review Required
+
+Payment ID: #${paymentId}
+Plan: ${plan?.name || payment.plan_id}
+Amount: ${payment.amount_eur} EUR
+Crypto: ${payment.crypto.toUpperCase()}
+
+Auto-activation failed. Give the owner your Payment ID: #${paymentId}`
+        );
+
+        if (config.adminUserId) {
+          bot.sendMessage(
+            config.adminUserId,
+            `Payment Needs Manual Approval
+
+Payment ID: #${paymentId}
 User: ${telegramId} (@${query.from.username || 'none'})
 Plan: ${plan?.name || payment.plan_id}
 Amount: ${payment.amount_eur} EUR
 Crypto: ${payment.crypto.toUpperCase()}
 
 Approve: /approve ${paymentId}`
-        ).catch(() => {});
+          ).catch(() => {});
+        }
       }
 
       return;
