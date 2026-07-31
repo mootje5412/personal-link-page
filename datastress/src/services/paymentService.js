@@ -19,24 +19,41 @@ class PaymentService {
     const wallet = this.getWallet(crypto);
     const label = this.getCryptoLabel(crypto);
 
-    return `Payment Details
+    return `PAYMENT DETAILS
+────────────────────
+Payment ID:  #${paymentId}
+Plan:        ${plan.name}
+Duration:    ${plan.maxDuration}s max
+Concurrent:  ${plan.concurrent} slot${plan.concurrent > 1 ? 's' : ''}
+Price:       ${plan.price} EUR
+Crypto:      ${label}
+────────────────────
 
-Payment ID: #${paymentId}
-Plan: ${plan.name}
-Max Duration: ${plan.maxDuration}s
-Concurrent: 1
-Price: ${plan.price} EUR
-Method: ${label}
-
-Send exactly ${plan.price} EUR equivalent in ${crypto.toUpperCase()} to:
+Send exactly ${plan.price} EUR in ${crypto.toUpperCase()} to:
 
 ${wallet}
 
-Save your Payment ID: #${paymentId}
-If auto-activation fails, contact the owner with this ID.
+────────────────────
+Save Payment ID: #${paymentId}
 
-After sending, press "I Have Sent Payment" below.
-Your plan will be activated automatically.`;
+After sending, tap "I Have Sent Payment".
+The owner will verify your payment before activation.`;
+  }
+
+  formatOwnerPaymentAlert(payment, user, plan) {
+    return `NEW PAYMENT REQUEST
+────────────────────
+Payment ID:  #${payment.id}
+User:        ${payment.telegram_id}
+Username:    @${user?.username || 'none'}
+Name:        ${user?.first_name || 'Unknown'}
+Plan:        ${plan?.name || payment.plan_id}
+Amount:      ${payment.amount_eur} EUR
+Crypto:      ${payment.crypto.toUpperCase()}
+Status:      Awaiting verification
+────────────────────
+
+Verify the payment was received, then approve or reject.`;
   }
 }
 

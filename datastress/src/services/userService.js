@@ -2,6 +2,10 @@ const db = require('../../database/init');
 const config = require('../../config/config');
 
 class UserService {
+  isOwner(telegramId) {
+    return config.adminUserId > 0 && Number(telegramId) === Number(config.adminUserId);
+  }
+
   registerUser(telegramUser) {
     const { id, username, first_name, last_name } = telegramUser;
 
@@ -29,6 +33,14 @@ class UserService {
   }
 
   getActivePlan(telegramId) {
+    if (this.isOwner(telegramId)) {
+      return {
+        ...config.ownerPlan,
+        expires_at: null,
+        isOwner: true
+      };
+    }
+
     const user = this.getUser(telegramId);
     if (!user || !user.plan_id || !user.plan_expires_at) {
       return null;
@@ -44,7 +56,7 @@ class UserService {
       return null;
     }
 
-    return { ...plan, expires_at: user.plan_expires_at };
+    return { ...plan, expires_at: user.plan_expires_at, isOwner: false };
   }
 
   activatePlan(telegramId, planId, days = 30) {
@@ -71,9 +83,22 @@ class UserService {
     return db.prepare('SELECT * FROM payments WHERE id = ?').get(paymentId);
   }
 
-  confirmPayment(paymentId) {
+  submitPaymentForReview(paymentId) {
     const payment = this.getPayment(paymentId);
     if (!payment || payment.status !== 'pending') {
+      return null;
+    }
+
+    db.prepare(`
+      UPDATE payments SET status = 'awaiting_approval' WHERE id = ?
+    `).run(paymentId);
+
+    return this.getPayment(paymentId);
+  }
+
+  confirmPayment(paymentId) {
+    const payment = this.getPayment(paymentId);
+    if (!payment || !['pending', 'awaiting_approval'].includes(payment.status)) {
       return null;
     }
 
@@ -88,12 +113,25 @@ class UserService {
     return this.getPayment(paymentId);
   }
 
+  rejectPayment(paymentId) {
+    const payment = this.getPayment(paymentId);
+    if (!payment || !['pending', 'awaiting_approval'].includes(payment.status)) {
+      return null;
+    }
+
+    db.prepare(`
+      UPDATE payments SET status = 'rejected' WHERE id = ?
+    `).run(paymentId);
+
+    return this.getPayment(paymentId);
+  }
+
   getPendingPayments() {
     return db.prepare(`
       SELECT p.*, u.username, u.first_name
       FROM payments p
       LEFT JOIN users u ON u.telegram_id = p.telegram_id
-      WHERE p.status = 'pending'
+      WHERE p.status IN ('pending', 'awaiting_approval')
       ORDER BY p.created_at DESC
     `).all();
   }

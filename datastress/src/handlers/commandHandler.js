@@ -1,5 +1,6 @@
 const config = require('../../config/config');
 const userService = require('../services/userService');
+const attackHandler = require('./attackHandler');
 const {
   mainMenuKeyboard,
   backToMenuKeyboard,
@@ -17,37 +18,80 @@ class CommandHandler {
 
     userService.registerUser(msg.from);
 
-    const welcomeMessage = `DataStress - Educational Network Stress Testing
+    const plan = userService.getActivePlan(msg.from.id);
+    const planLine = plan
+      ? plan.isOwner
+        ? 'Plan: Owner (Unlimited)'
+        : `Plan: ${plan.name} (${plan.maxDuration}s | ${plan.concurrent}c)`
+      : 'Plan: None';
 
+    const welcomeMessage = `DATASTRESS
+Educational Network Stress Testing
+────────────────────
 Hello ${firstName}.
 
-DataStress is an educational platform for learning about network load testing and stress analysis. Use it only on systems you own or have explicit written permission to test.
+DataStress is built for authorized load testing and
+network stress analysis on systems you own or have
+explicit permission to test.
+
+${planLine}
 
 Features:
-- Multiple attack methods for research
-- Tiered plans with duration limits (60s to 3000s)
-- Crypto payment support
+  - 8 attack methods via slash commands
+  - Plans from 60s to 3000s (EUR pricing)
+  - Crypto payments with owner verification
 
-Important:
-This tool is strictly for educational and authorized testing purposes. Unauthorized use against third-party systems is illegal.
+Commands:
+  /start    Main menu
+  /help     Full command list
+  /account  Your subscription
+  /methods  Available methods
 
-Select an option below:`;
+Use the buttons below to get started.`;
 
     bot.sendMessage(chatId, welcomeMessage, { reply_markup: mainMenuKeyboard() });
   }
 
   handleHelp(bot, msg) {
     const chatId = msg.chat.id;
+    const plan = userService.getActivePlan(msg.from.id);
 
-    const helpMessage = `DataStress Commands
+    const methodLines = config.methods
+      .map((m) => `  /${m.command} <ip> <port> <duration>  -  ${m.name}`)
+      .join('\n');
 
-/start - Main menu
-/help - Show this help
-/account - View your account
+    let helpMessage = `DATASTRESS HELP
+────────────────────
+General:
+  /start     Main menu
+  /help      This message
+  /account   Your subscription
+  /methods   View all methods
 
-Use the inline buttons to browse methods, plans, and launch tests.`;
+Attack format:
+  /method ip port duration
+
+Methods:
+${methodLines}
+
+Examples:
+  /udp 192.168.1.1 80 60
+  /tcp 10.0.0.5 443 120
+  /http 127.0.0.1 8080 30`;
+
+    if (plan) {
+      helpMessage += `\n\nYour limits:
+  Duration:   ${plan.isOwner ? 'Unlimited' : `${plan.maxDuration}s`}
+  Concurrent: ${plan.isOwner ? 'Unlimited' : plan.concurrent}`;
+    } else {
+      helpMessage += '\n\nNo active plan. Purchase one under Plans.';
+    }
 
     bot.sendMessage(chatId, helpMessage, { reply_markup: backToMenuKeyboard() });
+  }
+
+  handleMethods(bot, msg) {
+    this.sendMethods(bot, msg.chat.id);
   }
 
   handleAccount(bot, msg) {
@@ -58,45 +102,56 @@ Use the inline buttons to browse methods, plans, and launch tests.`;
     const user = userService.getUser(telegramId);
     const plan = userService.getActivePlan(telegramId);
 
-    let message = `Your Account
+    let message = `YOUR ACCOUNT
+────────────────────
+User ID:   ${telegramId}
+Username:  ${user?.username ? `@${user.username}` : 'Not set'}`;
 
-User ID: ${telegramId}
-Username: ${user?.username ? `@${user.username}` : 'Not set'}
-`;
-
-    if (plan) {
+    if (plan?.isOwner) {
       message += `
-Active Plan: ${plan.name}
-Max Duration: ${plan.maxDuration}s
-Concurrent Slots: ${plan.concurrent}
-Expires: ${new Date(plan.expires_at).toLocaleString()}`;
+Role:      Owner
+Duration:  Unlimited
+Concurrent: Unlimited
+Expires:   Never`;
+    } else if (plan) {
+      message += `
+Plan:      ${plan.name}
+Duration:  ${plan.maxDuration}s max
+Concurrent: ${plan.concurrent} slot${plan.concurrent > 1 ? 's' : ''}
+Expires:   ${new Date(plan.expires_at).toLocaleString()}`;
     } else {
       message += `
-Active Plan: None
+Plan:      None
 
-Purchase a plan to launch stress tests.`;
+Purchase a plan and wait for owner approval.`;
     }
 
     bot.sendMessage(chatId, message, { reply_markup: backToMenuKeyboard() });
   }
 
   sendMainMenu(bot, chatId) {
-    const message = `DataStress Menu
-
-Select an option:`;
-
-    bot.sendMessage(chatId, message, { reply_markup: mainMenuKeyboard() });
+    bot.sendMessage(chatId, 'DATASTRESS MENU\n────────────────────\nSelect an option:', {
+      reply_markup: mainMenuKeyboard()
+    });
   }
 
   sendMethods(bot, chatId) {
-    const lines = config.methods.map((m) => `- ${m.name}: ${m.description}`);
-    const message = `Available Methods
+    const lines = config.methods.map(
+      (m) => `  /${m.command}\n  ${m.name} - ${m.description}`
+    );
 
-${lines.join('\n')}
+    const message = `AVAILABLE METHODS
+────────────────────
 
-Tap a method for details:`;
+${lines.join('\n\n')}
+
+Usage: /method ip port duration`;
 
     bot.sendMessage(chatId, message, { reply_markup: methodsKeyboard() });
+  }
+
+  sendCommandsHelp(bot, chatId, telegramId) {
+    attackHandler.sendCommandsHelp(bot, chatId, telegramId);
   }
 
   sendMethodDetail(bot, chatId, methodId) {
@@ -107,21 +162,26 @@ Tap a method for details:`;
       return;
     }
 
-    const message = `Method: ${method.name}
-
+    const message = `${method.name}
+────────────────────
 ${method.description}
 
-Use this method when launching an attack from the main menu.`;
+Command:
+  /${method.command} <ip> <port> <duration>
+
+Example:
+  /${method.command} 192.168.1.1 80 60`;
 
     bot.sendMessage(chatId, message, { reply_markup: backToMenuKeyboard() });
   }
 
   sendPlans(bot, chatId) {
-    const message = `Subscription Plans
+    const message = `SUBSCRIPTION PLANS
+────────────────────
+All plans include every method.
+Plans above 70 EUR include extra concurrent slots.
 
-All plans include access to all methods. Duration limits apply per attack.
-
-Select a plan to view details and pay:`;
+Select a plan:`;
 
     bot.sendMessage(chatId, message, { reply_markup: plansKeyboard() });
   }
@@ -134,14 +194,16 @@ Select a plan to view details and pay:`;
       return;
     }
 
-    const message = `Plan: ${plan.name}
+    const premiumNote = plan.price > 70 ? '\nPremium: Extra concurrent slots included' : '';
 
-Max Attack Duration: ${plan.maxDuration} seconds
-Concurrent: 1
-All Methods Included: Yes
-Price: ${plan.price} EUR
-
-Tap Pay to proceed with payment.`;
+    const message = `${plan.name.toUpperCase()} PLAN
+────────────────────
+Max Duration:  ${plan.maxDuration} seconds
+Concurrent:    ${plan.concurrent} slot${plan.concurrent > 1 ? 's' : ''}
+All Methods:   Included
+Price:         ${plan.price} EUR${premiumNote}
+────────────────────
+Tap Pay to proceed. Owner verifies all payments.`;
 
     bot.sendMessage(chatId, message, { reply_markup: planDetailKeyboard(planId) });
   }

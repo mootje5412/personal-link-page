@@ -1,16 +1,14 @@
 const config = require('../../config/config');
 const userService = require('../services/userService');
 const paymentService = require('../services/paymentService');
-const attackService = require('../services/attackService');
 const commandHandler = require('./commandHandler');
 const {
   mainMenuKeyboard,
   backToMenuKeyboard,
   cryptoKeyboard,
-  paymentConfirmKeyboard
+  paymentConfirmKeyboard,
+  ownerApprovalKeyboard
 } = require('../utils/keyboards');
-
-const attackSessions = new Map();
 
 class CallbackHandler {
   handleCallback(bot, query) {
@@ -22,7 +20,7 @@ class CallbackHandler {
 
     if (data === 'menu_main') {
       bot.answerCallbackQuery(query.id);
-      bot.editMessageText('DataStress Menu\n\nSelect an option:', {
+      bot.editMessageText('DATASTRESS MENU\n────────────────────\nSelect an option:', {
         chat_id: chatId,
         message_id: query.message.message_id,
         reply_markup: mainMenuKeyboard()
@@ -48,9 +46,9 @@ class CallbackHandler {
       return;
     }
 
-    if (data === 'menu_attack') {
+    if (data === 'menu_commands') {
       bot.answerCallbackQuery(query.id);
-      this.startAttackFlow(bot, chatId, telegramId, query.from);
+      commandHandler.sendCommandsHelp(bot, chatId, telegramId);
       return;
     }
 
@@ -78,9 +76,16 @@ class CallbackHandler {
       }
 
       bot.answerCallbackQuery(query.id);
-      bot.sendMessage(chatId, `With what do you wanna pay?\n\nPlan: ${plan.name} - ${plan.price} EUR`, {
-        reply_markup: cryptoKeyboard(planId)
-      });
+      bot.sendMessage(
+        chatId,
+        `SELECT PAYMENT METHOD
+────────────────────
+Plan:  ${plan.name}
+Price: ${plan.price} EUR
+
+With what do you wanna pay?`,
+        { reply_markup: cryptoKeyboard(planId) }
+      );
       return;
     }
 
@@ -106,121 +111,207 @@ class CallbackHandler {
     }
 
     if (data.startsWith('confirm_pay_')) {
-      const paymentId = Number(data.replace('confirm_pay_', ''));
-      const payment = userService.getPayment(paymentId);
+      this.handlePaymentConfirm(bot, query, Number(data.replace('confirm_pay_', '')));
+      return;
+    }
 
-      if (!payment) {
-        bot.answerCallbackQuery(query.id, { text: 'Payment not found' });
-        return;
-      }
+    if (data.startsWith('owner_approve_')) {
+      this.handleOwnerApprove(bot, query, Number(data.replace('owner_approve_', '')));
+      return;
+    }
 
-      if (payment.telegram_id !== telegramId) {
-        bot.answerCallbackQuery(query.id, { text: 'Unauthorized' });
-        return;
-      }
-
-      if (payment.status === 'confirmed') {
-        bot.answerCallbackQuery(query.id, { text: 'Already confirmed' });
-        bot.sendMessage(
-          chatId,
-          `Payment Already Active\n\nPayment ID: #${paymentId}\nYour plan is already activated.`,
-          { reply_markup: backToMenuKeyboard() }
-        );
-        return;
-      }
-
-      const confirmed = userService.confirmPayment(paymentId);
-      const plan = config.plans.find((p) => p.id === payment.plan_id);
-
-      if (confirmed) {
-        bot.answerCallbackQuery(query.id, { text: 'Plan activated' });
-
-        bot.editMessageText(
-          `${query.message.text}\n\nStatus: Confirmed\nPayment ID: #${paymentId}`,
-          {
-            chat_id: chatId,
-            message_id: query.message.message_id,
-            reply_markup: { inline_keyboard: [[{ text: 'Back to Menu', callback_data: 'menu_main' }]] }
-          }
-        ).catch(() => {});
-
-        bot.sendMessage(
-          chatId,
-          `Payment Confirmed
-
-Payment ID: #${paymentId}
-Plan: ${plan?.name || payment.plan_id}
-Amount: ${payment.amount_eur} EUR
-Crypto: ${payment.crypto.toUpperCase()}
-
-Your plan has been activated automatically.
-Use Launch Attack from the main menu to begin testing.`,
-          { reply_markup: backToMenuKeyboard() }
-        );
-
-        if (config.adminUserId) {
-          bot.sendMessage(
-            config.adminUserId,
-            `Payment Auto-Confirmed
-
-Payment ID: #${paymentId}
-User: ${telegramId} (@${query.from.username || 'none'})
-Plan: ${plan?.name || payment.plan_id}
-Amount: ${payment.amount_eur} EUR
-Crypto: ${payment.crypto.toUpperCase()}
-
-Manual approve if needed: /approve ${paymentId}`
-          ).catch(() => {});
-        }
-      } else {
-        bot.answerCallbackQuery(query.id, { text: 'Activation failed - contact owner' });
-
-        bot.editMessageText(
-          `${query.message.text}\n\nStatus: Pending manual approval\nPayment ID: #${paymentId}`,
-          {
-            chat_id: chatId,
-            message_id: query.message.message_id,
-            reply_markup: { inline_keyboard: [[{ text: 'Back to Menu', callback_data: 'menu_main' }]] }
-          }
-        ).catch(() => {});
-
-        bot.sendMessage(
-          chatId,
-          `Payment Received - Manual Review Required
-
-Payment ID: #${paymentId}
-Plan: ${plan?.name || payment.plan_id}
-Amount: ${payment.amount_eur} EUR
-Crypto: ${payment.crypto.toUpperCase()}
-
-Auto-activation failed. Give the owner your Payment ID: #${paymentId}`
-        );
-
-        if (config.adminUserId) {
-          bot.sendMessage(
-            config.adminUserId,
-            `Payment Needs Manual Approval
-
-Payment ID: #${paymentId}
-User: ${telegramId} (@${query.from.username || 'none'})
-Plan: ${plan?.name || payment.plan_id}
-Amount: ${payment.amount_eur} EUR
-Crypto: ${payment.crypto.toUpperCase()}
-
-Approve: /approve ${paymentId}`
-          ).catch(() => {});
-        }
-      }
-
+    if (data.startsWith('owner_reject_')) {
+      this.handleOwnerReject(bot, query, Number(data.replace('owner_reject_', '')));
       return;
     }
 
     bot.answerCallbackQuery(query.id);
   }
 
+  handlePaymentConfirm(bot, query, paymentId) {
+    const chatId = query.message.chat.id;
+    const telegramId = query.from.id;
+    const payment = userService.getPayment(paymentId);
+
+    if (!payment) {
+      bot.answerCallbackQuery(query.id, { text: 'Payment not found' });
+      return;
+    }
+
+    if (payment.telegram_id !== telegramId) {
+      bot.answerCallbackQuery(query.id, { text: 'Unauthorized' });
+      return;
+    }
+
+    if (payment.status === 'confirmed') {
+      bot.answerCallbackQuery(query.id, { text: 'Already approved' });
+      return;
+    }
+
+    if (payment.status === 'awaiting_approval') {
+      bot.answerCallbackQuery(query.id, { text: 'Already submitted' });
+      bot.sendMessage(
+        chatId,
+        `PAYMENT PENDING
+────────────────────
+Payment ID: #${paymentId}
+Status:     Awaiting owner approval
+
+The owner is reviewing your payment.`,
+        { reply_markup: backToMenuKeyboard() }
+      );
+      return;
+    }
+
+    if (payment.status === 'rejected') {
+      bot.answerCallbackQuery(query.id, { text: 'Payment was rejected' });
+      return;
+    }
+
+    const submitted = userService.submitPaymentForReview(paymentId);
+    const plan = config.plans.find((p) => p.id === payment.plan_id);
+    const user = userService.getUser(telegramId);
+
+    if (!submitted) {
+      bot.answerCallbackQuery(query.id, { text: 'Could not submit payment' });
+      return;
+    }
+
+    bot.answerCallbackQuery(query.id, { text: 'Submitted for review' });
+
+    bot.editMessageText(
+      `${query.message.text}\n\n────────────────────\nStatus: Awaiting owner approval\nPayment ID: #${paymentId}`,
+      {
+        chat_id: chatId,
+        message_id: query.message.message_id,
+        reply_markup: { inline_keyboard: [[{ text: 'Back to Menu', callback_data: 'menu_main' }]] }
+      }
+    ).catch(() => {});
+
+    bot.sendMessage(
+      chatId,
+      `PAYMENT SUBMITTED
+────────────────────
+Payment ID: #${paymentId}
+Plan:       ${plan?.name || payment.plan_id}
+Amount:     ${payment.amount_eur} EUR
+Crypto:     ${payment.crypto.toUpperCase()}
+Status:     Pending owner verification
+────────────────────
+Your plan will activate once the owner
+confirms your payment was received.
+
+Keep Payment ID: #${paymentId}`,
+      { reply_markup: backToMenuKeyboard() }
+    );
+
+    if (config.adminUserId) {
+      bot.sendMessage(
+        config.adminUserId,
+        paymentService.formatOwnerPaymentAlert(submitted, user, plan),
+        { reply_markup: ownerApprovalKeyboard(paymentId) }
+      ).catch(() => {});
+    }
+
+    return;
+  }
+
+  handleOwnerApprove(bot, query, paymentId) {
+    const chatId = query.message.chat.id;
+
+    if (!userService.isOwner(query.from.id)) {
+      bot.answerCallbackQuery(query.id, { text: 'Unauthorized' });
+      return;
+    }
+
+    const payment = userService.confirmPayment(paymentId);
+    const plan = config.plans.find((p) => p.id === payment?.plan_id);
+
+    if (!payment) {
+      bot.answerCallbackQuery(query.id, { text: 'Already processed or not found' });
+      return;
+    }
+
+    bot.answerCallbackQuery(query.id, { text: 'Approved' });
+
+    bot.editMessageReplyMarkup(
+      { inline_keyboard: [[{ text: `Approved #${paymentId}`, callback_data: 'menu_main' }]] },
+      { chat_id: chatId, message_id: query.message.message_id }
+    ).catch(() => {});
+
+    bot.sendMessage(
+      chatId,
+      `PAYMENT APPROVED
+────────────────────
+Payment ID: #${paymentId}
+User:       ${payment.telegram_id}
+Plan:       ${plan?.name || payment.plan_id}
+Status:     Activated`
+    );
+
+    bot.sendMessage(
+      payment.telegram_id,
+      `PLAN ACTIVATED
+────────────────────
+Payment ID: #${paymentId}
+Plan:       ${plan?.name || payment.plan_id}
+Duration:   ${plan?.maxDuration || 'N/A'}s max
+Concurrent: ${plan?.concurrent || 1} slot${plan?.concurrent > 1 ? 's' : ''}
+────────────────────
+Your payment was verified and approved.
+
+Launch attacks using slash commands:
+  /udp ip port duration
+  /help for full list`,
+      { reply_markup: backToMenuKeyboard() }
+    ).catch(() => {});
+  }
+
+  handleOwnerReject(bot, query, paymentId) {
+    const chatId = query.message.chat.id;
+
+    if (!userService.isOwner(query.from.id)) {
+      bot.answerCallbackQuery(query.id, { text: 'Unauthorized' });
+      return;
+    }
+
+    const payment = userService.rejectPayment(paymentId);
+
+    if (!payment) {
+      bot.answerCallbackQuery(query.id, { text: 'Already processed or not found' });
+      return;
+    }
+
+    bot.answerCallbackQuery(query.id, { text: 'Rejected' });
+
+    bot.editMessageReplyMarkup(
+      { inline_keyboard: [[{ text: `Rejected #${paymentId}`, callback_data: 'menu_main' }]] },
+      { chat_id: chatId, message_id: query.message.message_id }
+    ).catch(() => {});
+
+    bot.sendMessage(
+      chatId,
+      `PAYMENT REJECTED
+────────────────────
+Payment ID: #${paymentId}
+User:       ${payment.telegram_id}`
+    );
+
+    bot.sendMessage(
+      payment.telegram_id,
+      `PAYMENT REJECTED
+────────────────────
+Payment ID: #${paymentId}
+
+Your payment could not be verified.
+Contact the owner if you believe this is an error.`,
+      { reply_markup: backToMenuKeyboard() }
+    ).catch(() => {});
+  }
+
   editOrSendMethods(bot, chatId, messageId) {
-    const lines = config.methods.map((m) => `- ${m.name}: ${m.description}`);
-    const message = `Available Methods\n\n${lines.join('\n')}\n\nTap a method for details:`;
+    const lines = config.methods.map((m) => `  /${m.command} - ${m.name}`);
+    const message = `AVAILABLE METHODS\n────────────────────\n\n${lines.join('\n')}\n\nTap a method for details:`;
 
     bot.editMessageText(message, {
       chat_id: chatId,
@@ -232,7 +323,7 @@ Approve: /approve ${paymentId}`
   }
 
   editOrSendPlans(bot, chatId, messageId) {
-    const message = `Subscription Plans\n\nAll plans include access to all methods. Duration limits apply per attack.\n\nSelect a plan to view details and pay:`;
+    const message = `SUBSCRIPTION PLANS\n────────────────────\nAll plans include every method.\nPlans above 70 EUR include extra concurrent slots.\n\nSelect a plan:`;
 
     bot.editMessageText(message, {
       chat_id: chatId,
@@ -241,92 +332,6 @@ Approve: /approve ${paymentId}`
     }).catch(() => {
       commandHandler.sendPlans(bot, chatId);
     });
-  }
-
-  startAttackFlow(bot, chatId, telegramId, from) {
-    const plan = userService.getActivePlan(telegramId);
-
-    if (!plan) {
-      bot.sendMessage(
-        chatId,
-        'No Active Plan\n\nYou need an active subscription to launch attacks.\n\nGo to Plans to purchase one.',
-        { reply_markup: backToMenuKeyboard() }
-      );
-      return;
-    }
-
-    attackSessions.set(telegramId, { step: 'target', plan });
-
-    bot.sendMessage(
-      chatId,
-      `Launch Attack\n\nActive Plan: ${plan.name}\nMax Duration: ${plan.maxDuration}s\n\nSend target in this format:\n\nhost port method duration\n\nExample:\n192.168.1.1 80 http 60\n\nAvailable methods: ${config.methods.map((m) => m.id).join(', ')}`
-    );
-  }
-
-  handleMessage(bot, msg) {
-    const telegramId = msg.from.id;
-    const chatId = msg.chat.id;
-    const session = attackSessions.get(telegramId);
-
-    if (!session) {
-      return false;
-    }
-
-    const parts = msg.text.trim().split(/\s+/);
-
-    if (parts.length < 4) {
-      bot.sendMessage(chatId, 'Invalid format. Use: host port method duration\n\nExample: 192.168.1.1 80 http 60');
-      return true;
-    }
-
-    const [target, portStr, method, durationStr] = parts;
-    const port = Number(portStr);
-    const duration = Number(durationStr);
-    const plan = session.plan;
-
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      bot.sendMessage(chatId, 'Invalid port. Must be between 1 and 65535.');
-      return true;
-    }
-
-    if (!Number.isInteger(duration) || duration < 1) {
-      bot.sendMessage(chatId, 'Invalid duration. Must be a positive number.');
-      return true;
-    }
-
-    if (duration > plan.maxDuration) {
-      bot.sendMessage(chatId, `Duration exceeds your plan limit of ${plan.maxDuration}s.`);
-      return true;
-    }
-
-    const validMethod = config.methods.find((m) => m.id === method.toLowerCase());
-
-    if (!validMethod) {
-      bot.sendMessage(chatId, `Unknown method "${method}". Available: ${config.methods.map((m) => m.id).join(', ')}`);
-      return true;
-    }
-
-    attackSessions.delete(telegramId);
-
-    const statusMsg = bot.sendMessage(chatId, `Launching attack...\n\nTarget: ${target}:${port}\nMethod: ${validMethod.name}\nDuration: ${duration}s`);
-
-    statusMsg.then((sent) => {
-      const attack = attackService.launchAttack({
-        telegramId,
-        username: msg.from.username,
-        target,
-        port,
-        method: validMethod.name,
-        duration
-      });
-
-      bot.editMessageText(
-        `Attack Completed\n\nTarget: ${target}:${port}\nMethod: ${validMethod.name}\nDuration: ${duration}s\nStatus: ${attack.status}\nTimestamp: ${attack.timestamp}\n\nLogged to attacks.csv`,
-        { chat_id: chatId, message_id: sent.message_id, reply_markup: backToMenuKeyboard() }
-      );
-    });
-
-    return true;
   }
 }
 

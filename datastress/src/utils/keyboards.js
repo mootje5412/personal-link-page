@@ -5,7 +5,7 @@ function mainMenuKeyboard() {
     inline_keyboard: [
       [{ text: 'Methods', callback_data: 'menu_methods' }],
       [{ text: 'Plans', callback_data: 'menu_plans' }],
-      [{ text: 'Launch Attack', callback_data: 'menu_attack' }],
+      [{ text: 'Attack Commands', callback_data: 'menu_commands' }],
       [{ text: 'My Account', callback_data: 'menu_account' }]
     ]
   };
@@ -20,7 +20,7 @@ function backToMenuKeyboard() {
 function plansKeyboard() {
   const rows = config.plans.map((plan) => [
     {
-      text: `${plan.name} - ${plan.maxDuration}s - ${plan.price} EUR`,
+      text: `${plan.name} | ${plan.maxDuration}s | ${plan.concurrent}c | ${plan.price} EUR`,
       callback_data: `plan_${plan.id}`
     }
   ]);
@@ -64,6 +64,17 @@ function paymentConfirmKeyboard(paymentId) {
   };
 }
 
+function ownerApprovalKeyboard(paymentId) {
+  return {
+    inline_keyboard: [
+      [
+        { text: 'Approve', callback_data: `owner_approve_${paymentId}` },
+        { text: 'Reject', callback_data: `owner_reject_${paymentId}` }
+      ]
+    ]
+  };
+}
+
 function methodsKeyboard() {
   const rows = config.methods.map((method) => [
     { text: method.name, callback_data: `method_${method.id}` }
@@ -81,5 +92,6 @@ module.exports = {
   planDetailKeyboard,
   cryptoKeyboard,
   paymentConfirmKeyboard,
+  ownerApprovalKeyboard,
   methodsKeyboard
 };
