@@ -8,6 +8,10 @@ on:
       - 'datastress/**'
       - '.github/workflows/datastress-bot.yml'
 
+concurrency:
+  group: datastress-bot
+  cancel-in-progress: true
+
 jobs:
   run-bot:
     runs-on: ubuntu-latest

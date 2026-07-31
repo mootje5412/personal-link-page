@@ -2,7 +2,14 @@ const config = require('../../config/config');
 
 class PaymentService {
   getWallet(crypto) {
-    return config.wallets[crypto.toLowerCase()] || null;
+    const key = crypto.toLowerCase();
+    const wallet = config.wallets[key];
+
+    if (!wallet) {
+      return null;
+    }
+
+    return wallet;
   }
 
   getCryptoLabel(crypto) {
@@ -16,11 +23,16 @@ class PaymentService {
   formatPaymentMessage(plan, crypto, paymentId) {
     const wallet = this.getWallet(crypto);
 
+    if (!wallet) {
+      return `Payment #${paymentId}\nInvalid payment method. Use BTC or ETH.`;
+    }
+
     return `Payment #${paymentId}
 Plan: ${plan.name} | ${plan.price} EUR
 Pay with: ${this.getCryptoLabel(crypto)}
 
-Send ${plan.price} EUR to:
+Send ${plan.price} EUR in ${this.getCryptoLabel(crypto)} to:
+
 ${wallet}
 
 Then tap "I Have Sent Payment".
