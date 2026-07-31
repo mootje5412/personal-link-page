@@ -1,0 +1,6 @@
+node_modules/
+.env
+database/users.db
+database/users.db-wal
+database/users.db-shm
+data/attacks.csv

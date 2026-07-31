@@ -1,0 +1,15 @@
+{
+  "name": "datastress-bot",
+  "version": "1.0.0",
+  "description": "DataStress Telegram bot - educational network stress testing",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "dotenv": "^16.4.7",
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}
