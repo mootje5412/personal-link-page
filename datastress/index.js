@@ -1,5 +1,3 @@
-require('dotenv').config();
-
 const DataStressBot = require('./src/bot');
 
 console.log('Starting DataStress bot...');

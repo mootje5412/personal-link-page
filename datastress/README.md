@@ -4,24 +4,26 @@ Educational network stress testing Telegram bot.
 
 ## Setup
 
-1. Create a bot via [@BotFather](https://t.me/BotFather) and copy the token.
-2. Copy `.env.example` to `.env` and fill in your values:
-
-```bash
-cp .env.example .env
-```
-
-3. Install dependencies:
+1. Edit `config/config.js` if needed (admin ID, wallet addresses).
+2. Install dependencies:
 
 ```bash
 npm install
 ```
 
-4. Start the bot:
+3. Start the bot:
 
 ```bash
 npm start
 ```
+
+## Config
+
+All settings are in `config/config.js`:
+
+- `botToken` - Telegram bot token
+- `adminUserId` - Your Telegram user ID for `/approve`
+- `wallets` - BTC, ETH, LTC, USDT addresses
 
 ## Features
 
@@ -39,25 +41,10 @@ npm start
 
 ## Admin
 
-Set `ADMIN_USER_ID` in `.env`. Approve pending payments with:
+Set your Telegram ID in `config/config.js` as `adminUserId`. Payments auto-activate when the user confirms. If auto-activation fails, manually approve with:
 
 ```
 /approve <payment_id>
-```
-
-## Project Structure
-
-```
-datastress/
-├── config/          # Bot configuration and plans
-├── database/        # SQLite init and schema
-├── data/            # Attack CSV logs
-├── src/
-│   ├── handlers/    # Command and callback handlers
-│   ├── services/    # User, attack, payment services
-│   └── utils/       # Keyboard builders
-├── index.js         # Entry point
-└── package.json
 ```
 
 ## Disclaimer

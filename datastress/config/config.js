@@ -1,15 +1,13 @@
-require('dotenv').config();
-
 module.exports = {
-  botToken: process.env.TELEGRAM_BOT_TOKEN,
+  botToken: '8938024759:AAFzKBp3tDRLTHup7SSpKyoH6WJMnmof7Hs',
   botName: 'DataStress',
-  adminUserId: Number(process.env.ADMIN_USER_ID) || 0,
+  adminUserId: 0,
 
   wallets: {
-    btc: process.env.WALLET_BTC || 'bc1qexamplebtcaddress',
-    eth: process.env.WALLET_ETH || '0xExampleEthAddress',
-    ltc: process.env.WALLET_LTC || 'ltc1qexampleltcaddress',
-    usdt: process.env.WALLET_USDT || '0xExampleUsdtAddress'
+    btc: 'bc1qexamplebtcaddress',
+    eth: '0xExampleEthAddress',
+    ltc: 'ltc1qexampleltcaddress',
+    usdt: '0xExampleUsdtAddress'
   },
 
   plans: [

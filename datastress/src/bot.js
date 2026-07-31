@@ -5,10 +5,6 @@ const callbackHandler = require('./handlers/callbackHandler');
 
 class DataStressBot {
   constructor() {
-    if (!config.botToken) {
-      throw new Error('TELEGRAM_BOT_TOKEN is required. Copy .env.example to .env and set your token.');
-    }
-
     this.bot = new (require('node-telegram-bot-api'))(config.botToken, {
       polling: config.polling
     });
