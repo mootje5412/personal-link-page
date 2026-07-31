@@ -1,5 +1,5 @@
 const config = require('../config/config');
-const userService = require('../services/userService');
+const userService = require('./services/userService');
 const commandHandler = require('./handlers/commandHandler');
 const callbackHandler = require('./handlers/callbackHandler');
 
