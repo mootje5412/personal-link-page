@@ -38,6 +38,10 @@ export function DatabaseStatsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     reload()
+    const timer = window.setInterval(() => {
+      reload()
+    }, 30000)
+    return () => window.clearInterval(timer)
   }, [reload])
 
   useEffect(() => {
