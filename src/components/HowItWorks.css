@@ -5,10 +5,7 @@
 }
 
 .how-bg {
-  position: absolute;
-  inset: 0;
-  background: var(--gradient-glow);
-  pointer-events: none;
+  display: none;
 }
 
 .how-it-works .container {
@@ -64,18 +61,17 @@
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: #fff;
-  background: var(--gradient);
+  color: #ffffff;
+  background: #000000;
   border-radius: 12px;
   flex-shrink: 0;
-  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.35);
 }
 
 .step-line {
   flex: 1;
   height: 2px;
   margin-left: 16px;
-  background: linear-gradient(90deg, rgba(129, 140, 248, 0.5), transparent);
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.25), transparent);
 }
 
 .step-content h3 {

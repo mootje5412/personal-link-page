@@ -10,20 +10,12 @@
   justify-content: space-between;
   gap: 40px;
   padding: 56px 64px;
-  background: var(--gradient-dark);
+  background: #000000;
   color: var(--text-light);
   border-radius: var(--radius-xl);
   position: relative;
   overflow: hidden;
   box-shadow: var(--shadow-lg);
-}
-
-.cta-inner::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--gradient-glow);
-  pointer-events: none;
 }
 
 .cta-copy,
@@ -33,11 +25,7 @@
 }
 
 .cta-copy .section-label {
-  color: var(--accent-light);
-}
-
-.cta-copy .section-label::before {
-  background: linear-gradient(90deg, var(--accent-light), var(--primary-light));
+  color: var(--muted-light);
 }
 
 .cta-copy h2 {
@@ -70,7 +58,7 @@
 .cta-actions .btn-ghost:hover {
   background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  color: #ffffff;
 }
 
 @media (max-width: 768px) {

@@ -59,7 +59,7 @@
 }
 
 .highlight:hover {
-  background: #fafbff;
+  background: var(--surface);
 }
 
 .highlight-icon {
@@ -68,11 +68,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--gradient-soft);
-  border: 1px solid rgba(79, 70, 229, 0.12);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
   border-radius: 12px;
   flex-shrink: 0;
-  color: var(--primary);
+  color: #000000;
 }
 
 .highlight-text {

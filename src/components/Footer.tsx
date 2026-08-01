@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import Logo from './Logo'
 import './Footer.css'
 
 const Footer = () => {
@@ -8,12 +7,7 @@ const Footer = () => {
       <div className="container footer-inner">
         <div className="footer-top">
           <div className="footer-brand">
-            <p className="footer-name">
-              <span className="footer-logo-mark">
-                <Logo size={20} variant="light" />
-              </span>
-              VeriPanel
-            </p>
+            <p className="footer-name">VeriPanel</p>
             <p className="footer-desc">Türkiye&apos;nin güvenilir veri sorgulama paneli</p>
           </div>
           <div className="footer-links">
