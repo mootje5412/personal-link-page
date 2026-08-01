@@ -16,8 +16,7 @@ tar -czf /tmp/search-api-deploy.tar.gz \
   search-api/requirements.txt \
   search-api/run.sh \
   search-api/restart.sh \
-  search-api/cleanup.sh \
-  search-api/.env.example
+  search-api/cleanup.sh
 
 echo "Uploading to server..."
 scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \

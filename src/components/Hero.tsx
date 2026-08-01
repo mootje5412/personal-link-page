@@ -18,13 +18,13 @@ const Hero = () => {
           </div>
 
           <h1>
-            Veriyi sorgulamanın
-            <em> en hızlı yolu</em>
+            Telefon ve veri
+            <em> tek panelde</em>
           </h1>
 
           <p className="hero-lead">
-            TC kimlik, isim, adres, telefon ve aile bilgisi — tüm sorgular tek
-            panelde, milisaniyeler içinde sonuçlanır.
+            Telefon, TC kimlik, isim ve adres — hızlı sorgu, temiz panel,
+            anında sonuç. Kayıt ol, anahtarını al, hemen başla.
           </p>
 
           <div className="hero-actions">
@@ -59,15 +59,15 @@ const Hero = () => {
             </header>
 
             <div className="hero-panel-tabs" role="tablist" aria-label="Sorgu türleri">
-              <span className="hero-tab active" role="tab" aria-selected="true">TC Kimlik</span>
+              <span className="hero-tab active" role="tab" aria-selected="true">Telefon</span>
+              <span className="hero-tab" role="tab" aria-selected="false">TC Kimlik</span>
               <span className="hero-tab" role="tab" aria-selected="false">İsim</span>
-              <span className="hero-tab" role="tab" aria-selected="false">Adres</span>
             </div>
 
             <div className="hero-panel-search">
-              <label className="hero-search-label">Kimlik numarası</label>
+              <label className="hero-search-label">Telefon numarası</label>
               <div className="hero-search-row">
-                <input readOnly value="12345678901" aria-label="TC Kimlik numarası" />
+                <input readOnly value="05551234567" aria-label="Telefon numarası" />
                 <button type="button" className="hero-search-btn">Sorgula</button>
               </div>
             </div>
@@ -75,7 +75,7 @@ const Hero = () => {
             <div className="hero-panel-results">
               <div className="hero-results-head">
                 <span>Sonuç</span>
-                <span className="hero-results-time">0.4sn</span>
+                <span className="hero-results-time">0.3sn</span>
               </div>
               <dl className="hero-result-list">
                 <div className="hero-result-item">
@@ -83,16 +83,16 @@ const Hero = () => {
                   <dd>Ahmet Yılmaz</dd>
                 </div>
                 <div className="hero-result-item">
-                  <dt>Doğum Yeri</dt>
+                  <dt>Telefon</dt>
+                  <dd>0555 123 45 67</dd>
+                </div>
+                <div className="hero-result-item">
+                  <dt>İl</dt>
                   <dd>İstanbul</dd>
                 </div>
                 <div className="hero-result-item">
-                  <dt>Adres</dt>
-                  <dd>Kadıköy, İstanbul</dd>
-                </div>
-                <div className="hero-result-item">
-                  <dt>Anne Adı</dt>
-                  <dd>Fatma Yılmaz</dd>
+                  <dt>TC</dt>
+                  <dd>123********</dd>
                 </div>
               </dl>
             </div>

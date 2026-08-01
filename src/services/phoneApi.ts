@@ -22,8 +22,8 @@ export type PhoneSearchResponse = {
   detail?: string
 }
 
-const API_BASE = import.meta.env.VITE_PHONE_API_URL || '/phone-api'
-const API_KEY = import.meta.env.VITE_PHONE_API_KEY || 'z2GFltjwp4rgccrOJdtc'
+const API_BASE = '/phone-api'
+const API_KEY = 'z2GFltjwp4rgccrOJdtc'
 
 export async function searchPhoneNumber(query: string): Promise<PhoneSearchResponse> {
   const params = new URLSearchParams({
