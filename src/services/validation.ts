@@ -1,6 +1,13 @@
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/
 const API_KEY_RE = /^vp_[A-Za-z0-9_-]{41,61}$/
 
+export class ApiUnavailableError extends Error {
+  constructor() {
+    super('API unavailable')
+    this.name = 'ApiUnavailableError'
+  }
+}
+
 export function validateUsername(value: string): string | null {
   const trimmed = value.trim()
 
@@ -38,27 +45,21 @@ export function validateApiKey(value: string): string | null {
 }
 
 export async function parseApiResponse<T>(res: Response): Promise<T> {
-  const contentType = res.headers.get('content-type') ?? ''
+  const text = await res.text()
+
+  if (!text.trim()) {
+    throw new ApiUnavailableError()
+  }
+
+  if (text.trimStart().startsWith('<!DOCTYPE') || text.trimStart().startsWith('<html')) {
+    throw new ApiUnavailableError()
+  }
+
   let data: unknown
-
-  if (contentType.includes('application/json')) {
-    try {
-      data = await res.json()
-    } catch {
-      throw new Error('Sunucudan geçersiz yanıt alındı.')
-    }
-  } else {
-    const text = await res.text()
-
-    if (text.trimStart().startsWith('<!DOCTYPE') || text.trimStart().startsWith('<html')) {
-      throw new Error('Sunucuya şu an ulaşılamıyor. Lütfen biraz sonra tekrar deneyin.')
-    }
-
-    try {
-      data = JSON.parse(text)
-    } catch {
-      throw new Error('Sunucudan geçersiz yanıt alındı.')
-    }
+  try {
+    data = JSON.parse(text)
+  } catch {
+    throw new ApiUnavailableError()
   }
 
   if (!res.ok) {
@@ -66,4 +67,8 @@ export async function parseApiResponse<T>(res: Response): Promise<T> {
   }
 
   return data as T
+}
+
+export function isApiUnavailableError(err: unknown) {
+  return err instanceof ApiUnavailableError || (err instanceof TypeError && err.message === 'Failed to fetch')
 }
