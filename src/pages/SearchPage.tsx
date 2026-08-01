@@ -7,6 +7,7 @@ import {
 } from '../services/dashboardApi'
 import { recordLocalSearch } from '../services/localAnalytics'
 import { PhoneSearchResult, searchPhoneNumber } from '../services/phoneApi'
+import { isApiUnavailableError } from '../services/validation'
 import './SearchPage.css'
 
 const VALID_TYPES: SearchType[] = ['tc', 'isim', 'adres', 'telefon', 'aile']
@@ -54,19 +55,29 @@ const SearchPage = () => {
         recordLocalSearch('telefon', query.trim())
       } else {
         const result = await performSearch(activeType, query.trim()) as {
+          message?: string
           result?: { durationMs?: number }
         }
-        setMessage(`Sorgu tamamlandı · ${result.result?.durationMs ?? 0}ms`)
+        setMessage(
+          result.message
+            ?? `Sorgu tamamlandı · ${result.result?.durationMs ?? 0}ms`
+        )
       }
       setQuery('')
     } catch (err) {
       if (isPhoneSearch) {
         setMessage(err instanceof Error ? err.message : 'Telefon sorgusu başarısız.')
-      } else {
-        recordLocalSearch(activeType, query.trim())
-        setMessage('Sorgu kaydedildi')
-        setQuery('')
+        return
       }
+
+      if (isApiUnavailableError(err)) {
+        recordLocalSearch(activeType, query.trim())
+        setMessage('Sorgu geçmişe eklendi. Bu sorgu türü henüz aktif değil.')
+        setQuery('')
+        return
+      }
+
+      setMessage(err instanceof Error ? err.message : 'Sorgu başarısız.')
     } finally {
       setSearching(false)
     }

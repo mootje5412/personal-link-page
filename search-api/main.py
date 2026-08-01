@@ -24,10 +24,14 @@ PORT = int(os.environ.get("PORT", "8080"))
 API_VERSION = "2026-08-01-phone"
 API_KEY = os.environ.get("API_KEY", "z2GFltjwp4rgccrOJdtc")
 AUTO_REBUILD = os.environ.get("AUTO_REBUILD", "0") == "1"
+AUTO_WATCH = os.environ.get("AUTO_WATCH", "1") == "1"
+WATCH_INTERVAL = max(10, int(os.environ.get("WATCH_INTERVAL", "30")))
 API_USAGE = {
     "phone": "/api/phone?q=905xxxxxxxxx&key=YOUR_KEY",
     "status": "/api/phone",
+    "database": "/api/database?key=YOUR_KEY",
 }
+LINE_COUNT_CACHE: dict[str, tuple[float, int | None, int | None]] = {}
 INDEX_LOCK = threading.Lock()
 INDEX_READY = threading.Event()
 INDEX_BUILDING = threading.Event()
@@ -68,6 +72,9 @@ INSERT INTO people (
 async def lifespan(_app: FastAPI):
     thread = threading.Thread(target=build_index_background, daemon=True)
     thread.start()
+    if AUTO_WATCH:
+        watcher = threading.Thread(target=database_watcher_loop, daemon=True)
+        watcher.start()
     if os.environ.get("TELEGRAM_BOT_TOKEN", "").strip():
         from telegram_bot import start_telegram_bot_thread
 
@@ -834,6 +841,21 @@ def count_file_lines(path: Path) -> int | None:
     return None
 
 
+def cached_line_counts(path: Path) -> tuple[int | None, int | None]:
+    mtime = path.stat().st_mtime
+    cached = LINE_COUNT_CACHE.get(path.name)
+    if cached and cached[0] == mtime:
+        return cached[1], cached[2]
+
+    lines = count_file_lines(path)
+    data_lines = None
+    if lines is not None:
+        data_lines = max(lines - 1, 0) if file_has_header(path) and lines > 0 else lines
+
+    LINE_COUNT_CACHE[path.name] = (mtime, lines, data_lines)
+    return lines, data_lines
+
+
 def file_stats(path: Path) -> dict:
     stat = path.stat()
     suffix = path.suffix.lower()
@@ -882,25 +904,27 @@ def collect_stats(count_lines: bool = False) -> dict:
             "needs_import": file_needs_import(path, indexed_meta) if indexed_meta else True,
         }
         if count_lines:
-            lines = count_file_lines(path)
+            lines, data_lines = cached_line_counts(path)
             row["lines"] = lines
-            if lines is not None:
-                row["data_lines"] = (
-                    max(lines - 1, 0) if file_has_header(path) and lines > 0 else lines
-                )
+            row["data_lines"] = data_lines
         file_rows.append(row)
 
     line_counts = [row["lines"] for row in file_rows if isinstance(row["lines"], int)]
+    data_line_counts = [row["data_lines"] for row in file_rows if isinstance(row["data_lines"], int)]
+    pending_files = sum(1 for row in file_rows if row.get("needs_import"))
 
     stats = {
         "files": len(file_rows),
         "total_lines": sum(line_counts) if count_lines else None,
+        "total_data_lines": sum(data_line_counts) if count_lines and data_line_counts else None,
+        "pending_files": pending_files,
         "total_size_bytes": sum(row["size_bytes"] for row in file_rows),
         "total_size_mb": round(sum(row["size_bytes"] for row in file_rows) / (1024 * 1024), 2),
         "free_disk_mb": free_disk_bytes() // (1024 * 1024),
         "index_ready": INDEX_READY.is_set(),
         "index_building": INDEX_BUILDING.is_set(),
         "auto_rebuild": AUTO_REBUILD,
+        "auto_watch": AUTO_WATCH,
         "indexed_records": (
             count_records()
             if INDEX_READY.is_set() and INDEX_DB.exists() and not INDEX_BUILDING.is_set()
@@ -1482,13 +1506,19 @@ def bootstrap_source_meta(conn: sqlite3.Connection) -> dict[str, dict]:
     return load_indexed_sources(conn)
 
 
-def index_pending_sources(conn: sqlite3.Connection, sql_db_only: bool = True) -> int:
+def index_pending_sources(
+    conn: sqlite3.Connection,
+    sql_db_only: bool = True,
+    new_files_only: bool = False,
+) -> int:
     indexed = bootstrap_source_meta(conn)
     total_added = 0
     updated = dict(indexed)
 
     for path in source_files():
         if sql_db_only and not source_is_importable(path):
+            continue
+        if new_files_only and path.name in indexed:
             continue
         if not file_needs_import(path, indexed):
             continue
@@ -1503,6 +1533,68 @@ def index_pending_sources(conn: sqlite3.Connection, sql_db_only: bool = True) ->
 
     save_indexed_sources(conn, updated)
     return total_added
+
+
+def source_files_changed(indexed: dict[str, dict]) -> bool:
+    for path in source_files():
+        entry = indexed.get(path.name)
+        if entry is None:
+            continue
+        if entry.get("mtime") != path.stat().st_mtime:
+            return True
+    return False
+
+
+def has_new_source_files(indexed: dict[str, dict]) -> bool:
+    return any(path.name not in indexed for path in source_files())
+
+
+def sync_database_sources() -> None:
+    if not AUTO_WATCH or INDEX_BUILDING.is_set() or not INDEX_READY.is_set():
+        return
+    if not INDEX_DB.exists() or not index_usable():
+        return
+
+    with INDEX_LOCK:
+        conn = connect_index()
+        try:
+            indexed = load_indexed_sources(conn)
+            if source_files_changed(indexed):
+                print("Database watcher: source file changed, rebuilding index...", flush=True)
+                rebuild_index_async(force=True)
+                return
+
+            if not has_new_source_files(indexed):
+                added = index_pending_sources(conn, sql_db_only=False, new_files_only=False)
+                conn.commit()
+                if added:
+                    print(f"Database watcher: added {added} records from updated SQL/DB files", flush=True)
+                return
+
+            tune_sqlite_for_bulk(conn)
+            ensure_index_schema(conn)
+            added = index_pending_sources(conn, sql_db_only=False, new_files_only=True)
+            conn.commit()
+            restore_sqlite_settings(conn)
+            if added:
+                print(f"Database watcher: indexed {added} records from new database file(s)", flush=True)
+        except Exception as error:
+            print(f"Database watcher sync failed: {error}", flush=True)
+        finally:
+            conn.close()
+
+
+def database_watcher_loop() -> None:
+    if not AUTO_WATCH:
+        return
+
+    print(f"Database watcher started (every {WATCH_INTERVAL}s)", flush=True)
+    while True:
+        time.sleep(WATCH_INTERVAL)
+        try:
+            sync_database_sources()
+        except Exception as error:
+            print(f"Database watcher error: {error}", flush=True)
 
 
 def index_sql_db_sources(conn: sqlite3.Connection) -> int:
@@ -1841,6 +1933,38 @@ def public_stats_payload(stats: dict) -> dict:
         for key, value in stats.items()
         if key not in {"sources", "index_error"}
     }
+
+
+def public_database_payload(stats: dict) -> dict:
+    if stats.get("index_building"):
+        status = "indexing"
+    elif stats.get("index_ready"):
+        status = "ready"
+    else:
+        status = "starting"
+
+    return {
+        "files": stats.get("files", 0),
+        "total_lines": stats.get("total_lines"),
+        "total_data_lines": stats.get("total_data_lines"),
+        "total_size_mb": stats.get("total_size_mb", 0),
+        "indexed_records": stats.get("indexed_records", 0),
+        "pending_files": stats.get("pending_files", 0),
+        "index_ready": stats.get("index_ready", False),
+        "index_building": stats.get("index_building", False),
+        "auto_watch": stats.get("auto_watch", AUTO_WATCH),
+        "status": status,
+    }
+
+
+@app.get("/api/database")
+def api_database(_: None = Depends(verify_api_key)) -> Response:
+    started = time.perf_counter()
+    stats = collect_stats(count_lines=True)
+    return raw_json(
+        database=public_database_payload(stats),
+        ms=round((time.perf_counter() - started) * 1000, 2),
+    )
 
 
 @app.get("/api/stats")

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useDatabaseStats } from '../context/DatabaseStatsContext'
 import {
   AnalyticsSummary,
   SEARCH_TYPE_LABELS,
   SearchType,
   fetchAnalytics,
 } from '../services/dashboardApi'
+import { databaseStatusLabel, formatCount } from '../services/databaseApi'
 import { getLocalAnalytics } from '../services/localAnalytics'
 import './DashboardPage.css'
 
@@ -24,6 +26,7 @@ function formatDate(value: string) {
 
 const DashboardPage = () => {
   const { user } = useAuth()
+  const { database, loading: databaseLoading, error: databaseError } = useDatabaseStats()
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -54,9 +57,67 @@ const DashboardPage = () => {
         <p className="dashboard-subtitle">
           Sorgu geçmişin ve kullanım istatistiklerin burada. Sol menüden bir sorgu türü seç.
         </p>
+        {!databaseLoading && database?.total_data_lines != null && (
+          <p className="dashboard-data-summary">
+            Veritabanında şu an{' '}
+            <strong>{formatCount(database.total_data_lines)}</strong> veri satırı var
+            {database.indexed_records > 0 && (
+              <> — <strong>{formatCount(database.indexed_records)}</strong> kayıt aranabilir</>
+            )}
+            .
+          </p>
+        )}
       </header>
 
       {error && <p className="dashboard-error" role="alert">{error}</p>}
+      {databaseError && <p className="dashboard-error" role="alert">{databaseError}</p>}
+
+      <section className="dashboard-panel dashboard-database" aria-label="Veritabanı durumu">
+        <h2>Veritabanı</h2>
+        <p className="dashboard-panel-lead">
+          Sunucudaki veri dosyalarının satır sayısı ve indeks durumu. Yeni dosya eklendiğinde otomatik indekslenir.
+        </p>
+        <div className="dashboard-stats dashboard-stats--database">
+          <article className="dashboard-stat-card">
+            <span className="dashboard-stat-label">Dosya sayısı</span>
+            <strong className="dashboard-stat-value">
+              {databaseLoading ? '—' : formatCount(database?.files ?? 0)}
+            </strong>
+          </article>
+          <article className="dashboard-stat-card">
+            <span className="dashboard-stat-label">Toplam satır</span>
+            <strong className="dashboard-stat-value">
+              {databaseLoading ? '—' : formatCount(database?.total_lines)}
+            </strong>
+          </article>
+          <article className="dashboard-stat-card dashboard-stat-card--highlight">
+            <span className="dashboard-stat-label">Veri satırı</span>
+            <strong className="dashboard-stat-value">
+              {databaseLoading ? '—' : formatCount(database?.total_data_lines)}
+            </strong>
+          </article>
+          <article className="dashboard-stat-card">
+            <span className="dashboard-stat-label">İndekslenen kayıt</span>
+            <strong className="dashboard-stat-value">
+              {databaseLoading ? '—' : formatCount(database?.indexed_records ?? 0)}
+            </strong>
+          </article>
+          <article className="dashboard-stat-card">
+            <span className="dashboard-stat-label">Durum</span>
+            <strong className="dashboard-stat-value dashboard-stat-value--status">
+              {databaseLoading
+                ? '—'
+                : databaseStatusLabel(database?.status ?? 'starting', database?.index_building ?? false)}
+            </strong>
+          </article>
+        </div>
+        {!databaseLoading && database && database.pending_files > 0 && (
+          <p className="dashboard-search-msg">
+            {database.pending_files} dosya indeks bekliyor
+            {database.auto_watch ? ' — otomatik izleme açık' : ''}.
+          </p>
+        )}
+      </section>
 
       <section className="dashboard-stats" aria-label="Sorgu analitiği">
         <article className="dashboard-stat-card">

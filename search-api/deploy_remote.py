@@ -38,6 +38,8 @@ WorkingDirectory={REMOTE_DIR}
 Environment=API_KEY={API_KEY}
 Environment=PORT=8080
 Environment=AUTO_REBUILD=0
+Environment=AUTO_WATCH=1
+Environment=WATCH_INTERVAL=30
 ExecStart={REMOTE_DIR}/venv/bin/python {REMOTE_DIR}/main.py
 Restart=always
 RestartSec=5
