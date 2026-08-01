@@ -12,6 +12,11 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
+      '/phone-api': {
+        target: 'http://109.71.252.128:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/phone-api/, ''),
+      },
     },
   },
 })

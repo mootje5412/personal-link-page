@@ -19,6 +19,13 @@ if [ ! -d venv ]; then
   python3 -m venv venv
 fi
 
+if [ -f .env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . ./.env
+  set +a
+fi
+
 if [ -f telegram.env ]; then
   set -a
   # shellcheck disable=SC1091

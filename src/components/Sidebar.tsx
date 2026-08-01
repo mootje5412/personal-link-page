@@ -12,10 +12,10 @@ type SidebarProps = {
 }
 
 const searchItems: Array<{ type: SearchType; label: string }> = [
+  { type: 'telefon', label: 'Telefon Sorgu' },
   { type: 'tc', label: SEARCH_TYPE_LABELS.tc },
   { type: 'isim', label: SEARCH_TYPE_LABELS.isim },
   { type: 'adres', label: SEARCH_TYPE_LABELS.adres },
-  { type: 'telefon', label: 'Telefon Sorgu' },
   { type: 'aile', label: SEARCH_TYPE_LABELS.aile },
 ]
 
