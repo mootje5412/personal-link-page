@@ -95,4 +95,50 @@ export function toPublicUser(user) {
   }
 }
 
+export function recordSearch({ userId, searchType, queryPreview }) {
+  const stmt = db.prepare(`
+    INSERT INTO search_logs (user_id, search_type, query_preview)
+    VALUES (?, ?, ?)
+  `)
+  const result = stmt.run(userId, searchType, queryPreview)
+  return db.prepare('SELECT * FROM search_logs WHERE id = ?').get(result.lastInsertRowid)
+}
+
+export function getAnalyticsSummary(userId) {
+  const total = db.prepare('SELECT COUNT(*) AS count FROM search_logs WHERE user_id = ?').get(userId).count
+
+  const today = db.prepare(`
+    SELECT COUNT(*) AS count FROM search_logs
+    WHERE user_id = ? AND date(created_at) = date('now')
+  `).get(userId).count
+
+  const week = db.prepare(`
+    SELECT COUNT(*) AS count FROM search_logs
+    WHERE user_id = ? AND created_at >= datetime('now', '-7 days')
+  `).get(userId).count
+
+  const month = db.prepare(`
+    SELECT COUNT(*) AS count FROM search_logs
+    WHERE user_id = ? AND created_at >= datetime('now', '-30 days')
+  `).get(userId).count
+
+  const byType = db.prepare(`
+    SELECT search_type AS type, COUNT(*) AS count
+    FROM search_logs
+    WHERE user_id = ?
+    GROUP BY search_type
+    ORDER BY count DESC
+  `).all(userId)
+
+  const recent = db.prepare(`
+    SELECT search_type AS type, query_preview AS query, created_at AS createdAt
+    FROM search_logs
+    WHERE user_id = ?
+    ORDER BY created_at DESC
+    LIMIT 8
+  `).all(userId)
+
+  return { total, today, week, month, byType, recent }
+}
+
 export default db

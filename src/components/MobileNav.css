@@ -51,4 +51,10 @@
     opacity: 0.9;
     color: #ffffff !important;
   }
+
+  .mobile-nav-logout {
+    border: none;
+    font-family: inherit;
+    cursor: pointer;
+  }
 }

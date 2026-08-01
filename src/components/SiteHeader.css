@@ -107,8 +107,28 @@
   }
 }
 
+.header-user {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 9px 12px;
+  border-radius: var(--radius-full);
+}
+
+.header-user:hover {
+  color: #000000;
+  background: var(--surface);
+}
+
 @media (max-width: 768px) {
-  .header-user {
-    display: none;
+  .header-auth-group {
+    padding: 3px;
+  }
+
+  .header-login,
+  .header-cta,
+  .header-auth-btn {
+    padding: 9px 14px;
+    font-size: 12px;
   }
 }

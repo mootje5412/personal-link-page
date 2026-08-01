@@ -15,7 +15,7 @@ const AuthBrand = ({ title, subtitle }: AuthBrandProps) => {
 
         <ul className="auth-brand-features">
           <li>Anahtar tabanlı güvenli giriş</li>
-          <li>SQL veritabanında şifreli saklama</li>
+          <li>Şifreli anahtar saklama</li>
           <li>Şifre veya e-posta gerekmez</li>
         </ul>
       </div>
