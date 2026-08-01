@@ -1,8 +1,14 @@
 import { getStoredToken } from './authApi'
-import { parseApiResponse } from './validation'
+import { isLocalToken } from './localAuth'
+import { ApiUnavailableError, isApiUnavailableError, parseApiResponse } from './validation'
 
 export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const token = getStoredToken()
+
+  if (isLocalToken(token)) {
+    throw new ApiUnavailableError()
+  }
+
   const headers = new Headers(init.headers)
 
   if (token) {
@@ -13,6 +19,13 @@ export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}
     headers.set('Content-Type', 'application/json')
   }
 
-  const res = await fetch(input, { ...init, headers })
-  return parseApiResponse(res)
+  try {
+    const res = await fetch(input, { ...init, headers })
+    return parseApiResponse(res)
+  } catch (err) {
+    if (isApiUnavailableError(err)) {
+      throw new ApiUnavailableError()
+    }
+    throw err
+  }
 }

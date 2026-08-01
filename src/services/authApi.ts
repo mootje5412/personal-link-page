@@ -1,48 +1,48 @@
-import { parseApiResponse } from './validation'
+import { localLogin, localRegister } from './localAuth'
+import type { AuthResponse, AuthUser, RegisterResponse } from './authTypes'
+import { isApiUnavailableError, parseApiResponse } from './validation'
 
-export type AuthUser = {
-  id: number
-  username: string
-  email: string | null
-  keyPrefix?: string
-  createdAt?: string
-}
-
-export type AuthResponse = {
-  user: AuthUser
-  token: string
-}
-
-export type RegisterResponse = AuthResponse & {
-  apiKey: string
-  message?: string
-}
+export type { AuthResponse, AuthUser, RegisterResponse } from './authTypes'
 
 const TOKEN_KEY = 'veripanel_token'
 const USER_KEY = 'veripanel_user'
 
 export async function register(username: string, acceptedTerms: boolean): Promise<RegisterResponse> {
-  const res = await fetch('/api/auth/register', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      username,
-      acceptedTerms,
-      termsVersion: '1.0',
-    }),
-  })
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username,
+        acceptedTerms,
+        termsVersion: '1.0',
+      }),
+    })
 
-  return parseApiResponse<RegisterResponse>(res)
+    return await parseApiResponse<RegisterResponse>(res)
+  } catch (err) {
+    if (isApiUnavailableError(err)) {
+      return localRegister(username)
+    }
+    throw err
+  }
 }
 
 export async function login(apiKey: string): Promise<AuthResponse> {
-  const res = await fetch('/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ apiKey: apiKey.trim() }),
-  })
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey: apiKey.trim() }),
+    })
 
-  return parseApiResponse<AuthResponse>(res)
+    return await parseApiResponse<AuthResponse>(res)
+  } catch (err) {
+    if (isApiUnavailableError(err)) {
+      return localLogin(apiKey)
+    }
+    throw err
+  }
 }
 
 export function saveSession({ user, token }: AuthResponse) {
