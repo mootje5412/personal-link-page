@@ -1,10 +1,8 @@
 export type DatabaseSummary = {
-  files: number
   total_lines: number | null
   total_data_lines: number | null
   total_size_mb: number
   indexed_records: number
-  pending_files: number
   index_ready: boolean
   index_building: boolean
   auto_watch: boolean

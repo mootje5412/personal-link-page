@@ -64,14 +64,15 @@ function DashboardShell() {
           </div>
         </header>
 
-        <div className="dashboard-data-bar" aria-label="Veritabanı veri satırı">
-          <span className="dashboard-data-bar-label">Toplam veri satırı</span>
+        <div className="dashboard-data-bar" aria-label="Veritabanı istatistikleri">
+          <span className="dashboard-data-bar-label">Veri satırı</span>
           <strong className="dashboard-data-bar-value">
             {loading ? '—' : formatCount(database?.total_data_lines)}
           </strong>
           {!loading && database && (
             <span className="dashboard-data-bar-meta">
-              · {formatCount(database.files)} dosya · {formatCount(database.indexed_records)} kayıt indeksli
+              · {formatCount(database.indexed_records)} kayıt indeksli
+              · {formatCount(database.total_lines)} toplam satır
             </span>
           )}
         </div>
