@@ -2,7 +2,6 @@ import { FormEvent, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import AuthBrand from '../components/AuthBrand'
-import Logo from '../components/Logo'
 import { useAuth } from '../context/AuthContext'
 import { login } from '../services/authApi'
 import './AuthPages.css'
@@ -43,12 +42,6 @@ const LoginPage = () => {
 
         <div className="auth-panel">
           <div className="auth-card">
-            <div className="auth-card-logo">
-              <span className="auth-card-logo-mark">
-                <Logo size={28} />
-              </span>
-            </div>
-
             <h1>Giriş yap</h1>
             <p className="auth-lead">
               <strong>API anahtarını</strong> gir. Anahtarın scrypt ile hashlenmiş hali SQL
@@ -91,7 +84,7 @@ const LoginPage = () => {
                 <p className="auth-field-hint">Kayıt sırasında aldığınız vp_ ile başlayan anahtar</p>
               </div>
 
-              <button type="submit" className="btn btn-dark auth-submit" disabled={loading || !apiKey.trim()}>
+              <button type="submit" className="btn auth-submit" disabled={loading || !apiKey.trim()}>
                 {loading ? 'Doğrulanıyor…' : 'Giriş yap'}
               </button>
             </form>

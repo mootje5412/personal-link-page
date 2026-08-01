@@ -37,19 +37,18 @@
   }
 
   .mobile-nav a:active {
-    color: var(--primary-dark);
-    background: var(--gradient-soft);
+    color: #000000;
+    background: var(--surface);
   }
 
   .mobile-nav-accent {
-    color: #fff !important;
-    background: var(--gradient);
+    color: #ffffff !important;
+    background: #000000;
     flex: 1.2;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
   }
 
   .mobile-nav-accent:active {
     opacity: 0.9;
-    color: #fff !important;
+    color: #ffffff !important;
   }
 }

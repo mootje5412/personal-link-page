@@ -32,10 +32,7 @@
   font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 1;
-  background: linear-gradient(135deg, #fff 0%, var(--accent-light) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #ffffff;
 }
 
 .stat-label {

@@ -3,7 +3,6 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
 import AuthBrand from '../components/AuthBrand'
 import ApiKeyReveal from '../components/ApiKeyReveal'
-import Logo from '../components/Logo'
 import { useAuth } from '../context/AuthContext'
 import { register } from '../services/authApi'
 import './AuthPages.css'
@@ -75,12 +74,6 @@ const RegisterPage = () => {
               <ApiKeyReveal apiKey={issuedKey} onContinue={handleKeySaved} />
             ) : (
               <>
-                <div className="auth-card-logo">
-                  <span className="auth-card-logo-mark">
-                    <Logo size={28} />
-                  </span>
-                </div>
-
                 <h1>Kayıt ol</h1>
                 <p className="auth-lead">
                   Sadece <strong>kullanıcı adı</strong> yeterli. Sistem otomatik olarak güvenli bir
@@ -140,7 +133,7 @@ const RegisterPage = () => {
                     )}
                   </div>
 
-                  <button type="submit" className="btn btn-dark auth-submit" disabled={loading || !acceptedTerms}>
+                  <button type="submit" className="btn auth-submit" disabled={loading || !acceptedTerms}>
                     {loading ? 'Anahtar oluşturuluyor…' : 'API anahtarı oluştur'}
                   </button>
                 </form>
