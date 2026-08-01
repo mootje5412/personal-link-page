@@ -1,116 +1,124 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { FormEvent, useState } from 'react'
 import { useDatabaseStats } from '../context/DatabaseStatsContext'
-import { SEARCH_TYPE_LABELS, SearchType } from '../services/dashboardApi'
-import { databaseStatusLabel, formatCount } from '../services/databaseApi'
-import { getLocalAnalytics, RECENT_SEARCH_LIMIT } from '../services/localAnalytics'
+import { databaseStatusLabel } from '../services/databaseApi'
+import { recordLocalSearch } from '../services/localAnalytics'
+import { formatSearchMessage, queryDatabase, SearchResult } from '../services/searchApi'
 import './DashboardPage.css'
 
-function formatDate(value: string) {
-  try {
-    return new Intl.DateTimeFormat('tr-TR', {
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(value))
-  } catch {
-    return value
-  }
-}
-
 const DashboardPage = () => {
-  const { user } = useAuth()
-  const location = useLocation()
-  const { database, loading: databaseLoading, error: databaseError, reload } = useDatabaseStats()
-  const [recent, setRecent] = useState(getLocalAnalytics().recent)
+  const { database, loading: databaseLoading } = useDatabaseStats()
+  const [query, setQuery] = useState('')
+  const [searching, setSearching] = useState(false)
+  const [message, setMessage] = useState('')
+  const [results, setResults] = useState<SearchResult[]>([])
 
-  const loadRecent = useCallback(() => {
-    setRecent(getLocalAnalytics().recent.slice(0, RECENT_SEARCH_LIMIT))
-  }, [])
+  const indexBusy = databaseLoading || database?.index_building || database?.status !== 'ready'
+  const indexStatus = databaseLoading
+    ? 'Veritabanı durumu kontrol ediliyor…'
+    : databaseStatusLabel(database?.status ?? 'starting', database?.index_building ?? false)
 
-  useEffect(() => {
-    loadRecent()
-    reload()
-  }, [loadRecent, reload, location.pathname])
+  async function handleSearch(e: FormEvent) {
+    e.preventDefault()
+    if (!query.trim() || indexBusy) return
 
-  useEffect(() => {
-    const refresh = () => {
-      loadRecent()
-      reload()
+    setSearching(true)
+    setMessage('')
+    setResults([])
+
+    try {
+      const data = await queryDatabase('telefon', query.trim())
+      const searchedQuery = query.trim()
+      setResults(data.results ?? [])
+      setMessage(formatSearchMessage(data))
+      recordLocalSearch('telefon', searchedQuery)
+      setQuery('')
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Telefon sorgusu başarısız.')
+    } finally {
+      setSearching(false)
     }
-    window.addEventListener('veripanel:search-recorded', refresh)
-    window.addEventListener('focus', refresh)
-    return () => {
-      window.removeEventListener('veripanel:search-recorded', refresh)
-      window.removeEventListener('focus', refresh)
-    }
-  }, [loadRecent, reload])
-
-  const displayName = user?.username ?? 'Kullanıcı'
+  }
 
   return (
-    <div className="dashboard-page">
-      <header className="dashboard-welcome">
-        <h1>Hoş geldin, {displayName}</h1>
-        <p className="dashboard-subtitle">
-          Veritabanı istatistikleri ve son telefon sorguların burada. Sol menüden telefon sorgusu yap.
-        </p>
-      </header>
-
-      {databaseError && <p className="dashboard-error" role="alert">{databaseError}</p>}
-
-      <section className="dashboard-stats" aria-label="Veritabanı istatistikleri">
-        <article className="dashboard-stat-card dashboard-stat-card--highlight">
-          <span className="dashboard-stat-label">Veri satırı</span>
-          <strong className="dashboard-stat-value">
-            {databaseLoading ? '—' : formatCount(database?.total_data_lines)}
-          </strong>
-        </article>
-        <article className="dashboard-stat-card">
-          <span className="dashboard-stat-label">Toplam satır</span>
-          <strong className="dashboard-stat-value">
-            {databaseLoading ? '—' : formatCount(database?.total_lines)}
-          </strong>
-        </article>
-        <article className="dashboard-stat-card">
-          <span className="dashboard-stat-label">İndekslenen kayıt</span>
-          <strong className="dashboard-stat-value">
-            {databaseLoading ? '—' : formatCount(database?.indexed_records ?? 0)}
-          </strong>
-        </article>
-        <article className="dashboard-stat-card">
-          <span className="dashboard-stat-label">Durum</span>
-          <strong className="dashboard-stat-value dashboard-stat-value--status">
-            {databaseLoading
-              ? '—'
-              : databaseStatusLabel(database?.status ?? 'starting', database?.index_building ?? false)}
-          </strong>
-        </article>
-      </section>
-
-      <section className="dashboard-panel">
-        <h2>Son sorgular</h2>
-        <p className="dashboard-panel-lead">En son {RECENT_SEARCH_LIMIT} telefon sorgusu.</p>
-        {recent.length === 0 && (
-          <p className="dashboard-empty">Henüz sorgu yok. Sol menüden telefon sorgusu başlat.</p>
+    <div className="dashboard-search">
+      <form className="dashboard-search-form" onSubmit={handleSearch}>
+        <label className="dashboard-search-label" htmlFor="dashboard-search-input">
+          Telefon numarası
+        </label>
+        <div className="dashboard-search-row">
+          <input
+            id="dashboard-search-input"
+            type="tel"
+            inputMode="numeric"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="05xxxxxxxxx"
+            maxLength={120}
+            required
+            disabled={indexBusy}
+            autoFocus
+          />
+          <button type="submit" className="btn" disabled={searching || !query.trim() || indexBusy}>
+            {searching ? 'Sorgulanıyor…' : 'Sorgula'}
+          </button>
+        </div>
+        {indexBusy && (
+          <p className="dashboard-search-indexing" role="status">
+            {indexStatus} — indeks hazır olunca sorgu yapabilirsin.
+          </p>
         )}
+        {message && <p className="dashboard-search-msg">{message}</p>}
+      </form>
 
-        <ul className="dashboard-recent-list">
-          {recent.slice(0, RECENT_SEARCH_LIMIT).map((item, index) => (
-            <li key={`${item.createdAt}-${index}`}>
-              <div>
-                <span className="dashboard-recent-type">
-                  {SEARCH_TYPE_LABELS[item.type as SearchType] ?? item.type}
-                </span>
-                <span className="dashboard-recent-query">{item.query}</span>
-              </div>
-              <time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {results.length > 0 && (
+        <section className="dashboard-results" aria-label="Arama sonuçları">
+          <div className="dashboard-results-mobile">
+            {results.map((row, index) => (
+              <article key={`${row.phone}-${row.identity_number}-${index}`} className="dashboard-result-row">
+                <div className="dashboard-result-cell">
+                  <span>E-posta</span>
+                  <strong>{row.email || '—'}</strong>
+                </div>
+                <div className="dashboard-result-cell">
+                  <span>Telefon</span>
+                  <strong>{row.phone || '—'}</strong>
+                </div>
+                <div className="dashboard-result-cell">
+                  <span>İsim</span>
+                  <strong>{row.full_name || '—'}</strong>
+                </div>
+                <div className="dashboard-result-cell">
+                  <span>Numara</span>
+                  <strong>{row.identity_number || '—'}</strong>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="dashboard-results-table-wrap">
+            <table className="dashboard-results-table">
+              <thead>
+                <tr>
+                  <th>E-posta</th>
+                  <th>Telefon</th>
+                  <th>İsim</th>
+                  <th>Numara</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((row, index) => (
+                  <tr key={`${row.phone}-${row.identity_number}-${index}`}>
+                    <td>{row.email || '—'}</td>
+                    <td>{row.phone || '—'}</td>
+                    <td>{row.full_name || '—'}</td>
+                    <td>{row.identity_number || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </div>
   )
 }

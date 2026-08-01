@@ -1,24 +1,12 @@
-import { useEffect, useState } from 'react'
-import { Outlet, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { DatabaseStatsProvider, useDatabaseStats } from '../context/DatabaseStatsContext'
-import { formatCount } from '../services/databaseApi'
-import Sidebar from './Sidebar'
-import MobileNav from './MobileNav'
+import { DatabaseStatsProvider } from '../context/DatabaseStatsContext'
 import './DashboardLayout.css'
-
-const SIDEBAR_KEY = 'veripanel_sidebar_collapsed'
 
 function DashboardShell() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const { database, loading } = useDatabaseStats()
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === '1')
-  const [mobileOpen, setMobileOpen] = useState(false)
-
-  useEffect(() => {
-    localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0')
-  }, [collapsed])
 
   useEffect(() => {
     document.body.classList.add('dashboard-body')
@@ -33,68 +21,23 @@ function DashboardShell() {
   if (!user) return null
 
   return (
-    <div className={`dashboard-shell ${collapsed ? 'sidebar-collapsed' : ''}`}>
-      <Sidebar
-        collapsed={collapsed}
-        mobileOpen={mobileOpen}
-        onToggleCollapse={() => setCollapsed((v) => !v)}
-        onCloseMobile={() => setMobileOpen(false)}
-        onLogout={handleLogout}
-        username={user.username}
-      />
+    <div className="dashboard-shell">
+      <header className="dashboard-navbar">
+        <Link to="/panel" className="dashboard-navbar-brand">
+          VeriPanel
+        </Link>
 
-      <div className="dashboard-main">
-        <header className="dashboard-topbar">
-          <button
-            type="button"
-            className="dashboard-menu-btn"
-            onClick={() => setMobileOpen(true)}
-            aria-label="Menüyü aç"
-          >
-            <span />
-            <span />
-            <span />
+        <div className="dashboard-navbar-actions">
+          <span className="dashboard-navbar-user">@{user.username}</span>
+          <button type="button" className="dashboard-navbar-logout" onClick={handleLogout}>
+            Çıkış
           </button>
-          <div className="dashboard-topbar-meta">
-            <span className="dashboard-topbar-label">Panel</span>
-            <span className="dashboard-topbar-user">@{user.username}</span>
-          </div>
-          <div className="dashboard-topbar-data" aria-label="Veri satırı sayısı">
-            <span className="dashboard-topbar-data-label">Veri satırı</span>
-            <strong>{loading ? '—' : formatCount(database?.total_data_lines)}</strong>
-          </div>
-        </header>
-
-        <div className="dashboard-data-bar dashboard-data-bar--mobile" aria-label="Veritabanı istatistikleri">
-          <div className="dashboard-data-bar-stat">
-            <span>Veri satırı</span>
-            <strong>{loading ? '—' : formatCount(database?.total_data_lines)}</strong>
-          </div>
-          <div className="dashboard-data-bar-stat">
-            <span>İndeks</span>
-            <strong>{loading ? '—' : formatCount(database?.indexed_records)}</strong>
-          </div>
         </div>
+      </header>
 
-        <div className="dashboard-data-bar dashboard-data-bar--desktop" aria-label="Veritabanı istatistikleri">
-          <span className="dashboard-data-bar-label">Veri satırı</span>
-          <strong className="dashboard-data-bar-value">
-            {loading ? '—' : formatCount(database?.total_data_lines)}
-          </strong>
-          {!loading && database && (
-            <span className="dashboard-data-bar-meta">
-              · {formatCount(database.indexed_records)} kayıt indeksli
-              · {formatCount(database.total_lines)} toplam satır
-            </span>
-          )}
-        </div>
-
-        <main className="dashboard-content">
-          <Outlet context={{ refreshKey: 0 }} />
-        </main>
-
-        <MobileNav />
-      </div>
+      <main className="dashboard-content">
+        <Outlet />
+      </main>
     </div>
   )
 }
