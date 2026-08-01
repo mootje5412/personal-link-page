@@ -1,0 +1,349 @@
+from __future__ import annotations
+
+import re
+from typing import Any
+
+import httpx
+
+from config.settings import settings
+from models.search import DetectedSearch, SearchResponse, SearchResult, SearchType
+
+FIELD_ALIASES = {
+    "fullname": "Name",
+    "full_name": "Name",
+    "name": "Name",
+    "firstname": "First Name",
+    "first_name": "First Name",
+    "lastname": "Last Name",
+    "last_name": "Last Name",
+    "ssn": "SSN",
+    "phone": "Phone",
+    "mobile": "Mobile",
+    "email": "Email",
+    "address": "Address",
+    "city": "City",
+    "state": "State",
+    "zip": "ZIP",
+    "dob": "DOB",
+    "birthdate": "DOB",
+    "birthdate__c": "DOB",
+    "vin": "VIN",
+    "case": "Case",
+    "court": "Court",
+    "offense": "Offense",
+    "offensecode": "Offense Code",
+    "chargesfileddate": "Charges Filed",
+    "agency": "Agency",
+    "age": "Age",
+    "height": "Height",
+    "weight": "Weight",
+    "sex": "Sex",
+    "status": "Status",
+    "id": "Id",
+}
+
+
+def _flatten_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        return str(value)
+    text = str(value).strip()
+    return text
+
+
+def _format_dob(value: str) -> str:
+    text = value.strip()
+    if not text:
+        return text
+    if len(text) == 10 and text[4] == "-" and text[7] == "-":
+        year, month, day = text.split("-")
+        return f"{month}/{day}/{year}"
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if len(digits) == 8:
+        return f"{digits[4:6]}/{digits[6:8]}/{digits[:4]}"
+    return text
+
+
+def _normalize_key(key: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", key.lower())
+
+
+ODIDO_KEY_MAP: dict[str, tuple[str, bool]] = {
+    "firstname": ("First Name", False),
+    "lastname": ("Last Name", False),
+    "birthdate": ("DOB", True),
+    "birthdatec": ("DOB", True),
+    "phone": ("Phone", False),
+    "mobilephone": ("Mobile", False),
+    "email": ("Email", False),
+    "salutation": ("Salutation", False),
+    "initialsc": ("Initials", False),
+    "genderc": ("Gender", False),
+    "vlocitycmtgenderc": ("Gender", False),
+    "nationalityc": ("Nationality", False),
+    "idnumberc": ("ID Number", False),
+    "idtypec": ("ID Type", False),
+    "idvalidc": ("ID Valid", True),
+    "brandc": ("Brand", False),
+    "vlocitycmtstatusc": ("Status", False),
+    "copslanguagec": ("Language", False),
+    "accountsegmentindicatorc": ("Segment", False),
+}
+
+
+def _odido_title(record: dict[str, Any], fields: dict[str, str]) -> str:
+    first = _flatten_value(record.get("FirstName"))
+    last = _flatten_value(record.get("LastName")) or fields.get("Last Name", "")
+    initials = fields.get("Initials", "")
+    name = _flatten_value(record.get("Name"))
+
+    if first and last:
+        return f"{first} {last}"
+    if initials and last:
+        return f"{initials} {last}".strip()
+    if name:
+        return name
+    if last:
+        return last
+    return "Odido Record"
+
+
+def _record_from_odido(record: dict[str, Any], index: int) -> SearchResult:
+    fields: dict[str, str] = {}
+
+    for key, value in record.items():
+        if value in (None, "", []):
+            continue
+        mapping = ODIDO_KEY_MAP.get(_normalize_key(key))
+        if not mapping:
+            continue
+        label, is_date = mapping
+        text = _format_dob(_flatten_value(value)) if is_date else _flatten_value(value)
+        if _normalize_key(key) in {"genderc", "vlocitycmtgenderc"} and fields.get("Gender"):
+            continue
+        if label == "DOB" and fields.get("DOB"):
+            continue
+        if text.lower() in {"false", "true", "no", "null"} and label not in {"Gender"}:
+            if text.lower() in {"false", "true"}:
+                continue
+        fields[label] = text
+
+    title = _odido_title(record, fields)
+    return SearchResult(title=title, fields=fields, raw=record)
+
+
+def _record_from_mapping(record: dict[str, Any], index: int) -> SearchResult:
+    fields: dict[str, str] = {}
+
+    if "Variable" in record and "Value" in record:
+        variable = _flatten_value(record.get("Variable"))
+        value = _flatten_value(record.get("Value"))
+        if variable and value:
+            fields[variable] = value
+        title = fields.get("Make") or fields.get("Model") or variable or f"Result {index}"
+        return SearchResult(title=title, fields=fields, raw=record)
+
+    for key, value in record.items():
+        if value in (None, "", []):
+            continue
+        label = FIELD_ALIASES.get(str(key).lower(), str(key).replace("_", " ").title())
+        text = _flatten_value(value)
+        if label.lower() == "dob":
+            text = _format_dob(text)
+        if label == "Name":
+            continue
+        fields[label] = text
+
+    title = (
+        _flatten_value(record.get("fullName"))
+        or _flatten_value(record.get("full_name"))
+        or _flatten_value(record.get("Name"))
+        or _flatten_value(record.get("name"))
+        or fields.pop("Name", None)
+        or f"Result {index}"
+    )
+    return SearchResult(title=title, fields=fields, raw=record)
+
+
+def _extract_records(payload: Any) -> tuple[list[Any], int, str]:
+    if not isinstance(payload, dict):
+        return [], 0, ""
+
+    data = payload.get("data")
+    if isinstance(data, dict):
+        if str(data.get("status", "")).lower() == "error":
+            nested = data.get("results")
+            if isinstance(nested, dict):
+                return [], 0, str(nested.get("message") or nested.get("error") or "Search failed.")
+            return [], 0, str(data.get("message") or "Search failed.")
+
+        nested = data.get("results")
+        if isinstance(nested, dict):
+            if nested.get("error") and nested.get("error") is not False:
+                error_text = str(nested.get("message") or nested.get("error"))
+                if error_text == "INTELIUS_BLOCKED":
+                    error_text = "Intelius blocked (anti-bot). Try criminal lookup: John Doe CA"
+                return [], 0, error_text
+
+            if isinstance(nested.get("results"), list):
+                records = nested["results"]
+                total = int(nested.get("returned") or nested.get("total") or len(records))
+                return records, total, ""
+
+            if isinstance(nested.get("Results"), list):
+                records = nested["Results"]
+                total = int(nested.get("Count") or len(records))
+                return records, total, ""
+
+        for key in ("records", "matches", "items"):
+            if isinstance(data.get(key), list):
+                records = data[key]
+                return records, len(records), ""
+
+    for key in ("results", "data", "records", "matches", "items"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            return value, len(value), ""
+
+    return [], 0, ""
+
+
+VIN_KEEP_FIELDS = {
+    "VIN",
+    "Model Year",
+    "Make",
+    "Model",
+    "Trim",
+    "Body Class",
+    "Vehicle Type",
+    "Drive Type",
+    "Transmission Style",
+    "Engine Number of Cylinders",
+    "Displacement (L)",
+    "Fuel Type - Primary",
+    "Doors",
+    "Plant Country",
+    "Manufacturer Name",
+}
+
+
+def _format_vin_results(records: list[Any]) -> SearchResult:
+    fields: dict[str, str] = {}
+    for item in records:
+        if not isinstance(item, dict):
+            continue
+        variable = _flatten_value(item.get("Variable"))
+        value = _flatten_value(item.get("Value"))
+        if not variable or not value:
+            continue
+        if value.lower() in {"null", "not applicable", "n/a"}:
+            continue
+        if variable not in VIN_KEEP_FIELDS:
+            continue
+        fields[variable] = value
+
+    title = " ".join(
+        part
+        for part in (
+            fields.get("Model Year"),
+            fields.get("Make"),
+            fields.get("Model"),
+            fields.get("Trim"),
+        )
+        if part
+    ).strip() or "VIN Lookup"
+
+    return SearchResult(title=title, fields=fields, raw={"fields": fields})
+
+
+def _parse_results(payload: Any, search_type: SearchType | None = None) -> tuple[list[SearchResult], int, str]:
+    if payload is None:
+        return [], 0, "No data returned."
+
+    if isinstance(payload, dict) and payload.get("success") is False:
+        return [], 0, str(payload.get("error") or payload.get("message") or "Search failed.")
+
+    records, total, error = _extract_records(payload)
+    if error:
+        return [], 0, error
+
+    if records:
+        if search_type == SearchType.VIN and isinstance(records[0], dict) and "Variable" in records[0]:
+            vin_result = _format_vin_results(records)
+            return [vin_result], 1, ""
+
+        parse_record = (
+            _record_from_odido
+            if search_type == SearchType.ODIDO
+            else _record_from_mapping
+        )
+        parsed = [
+            parse_record(item, idx)
+            for idx, item in enumerate(records, start=1)
+            if isinstance(item, dict)
+        ]
+        if parsed:
+            return parsed, total or len(parsed), ""
+
+        text_rows = [SearchResult(title=str(item)) for item in records if item]
+        return text_rows, len(text_rows), ""
+
+    if isinstance(payload, dict) and payload.get("success") is True:
+        return [], 0, ""
+
+    return [], 0, "Unexpected API response format."
+
+
+class ZopzTloClient:
+    def _response(self, detected: DetectedSearch, **kwargs) -> SearchResponse:
+        kwargs.setdefault("search_type", detected.search_type)
+        kwargs.setdefault("query", detected.display_query)
+        kwargs.setdefault("label", detected.label)
+        return SearchResponse(**kwargs)
+
+    async def search(self, detected: DetectedSearch) -> SearchResponse:
+        if not settings.api_key:
+            return self._response(
+                detected,
+                api_connected=False,
+                message="API key is not configured.",
+            )
+
+        endpoint = detected.search_type.value
+        url = f"{settings.api_base_url.rstrip('/')}/{endpoint}"
+        params = {"q": detected.api_query, "key": settings.api_key}
+
+        try:
+            transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
+            async with httpx.AsyncClient(timeout=settings.api_timeout, transport=transport) as client:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+                payload = response.json()
+        except httpx.TimeoutException:
+            return self._response(detected, message="Search timed out. Try again.")
+        except httpx.HTTPStatusError as error:
+            body = ""
+            try:
+                body = error.response.text[:200]
+            except Exception:
+                pass
+            if error.response.status_code == 403 and "whitelist" in body.lower():
+                return self._response(
+                    detected,
+                    message="API IP not whitelisted. Contact support.",
+                )
+            return self._response(detected, message=f"API error {error.response.status_code}.")
+        except ValueError:
+            return self._response(detected, message="API returned invalid JSON.")
+        except httpx.HTTPError as error:
+            return self._response(detected, message=f"Network error: {error}")
+
+        results, total, message = _parse_results(payload, detected.search_type)
+        return self._response(
+            detected,
+            results=results,
+            total=total,
+            message=message,
+            raw=payload,
+        )

@@ -35,3 +35,10 @@ search-api/databases/*
 search-api/.search_index.db
 search-api/telegram.env
 search-api/__pycache__/
+
+# HexTLO bot
+hextlo/.venv/
+hextlo/.env
+hextlo/data/
+hextlo/__pycache__/
+hextlo/**/__pycache__/
