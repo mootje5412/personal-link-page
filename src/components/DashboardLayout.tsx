@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { DatabaseStatsProvider, useDatabaseStats } from '../context/DatabaseStatsContext'
 import { formatCount } from '../services/databaseApi'
 import Sidebar from './Sidebar'
+import MobileNav from './MobileNav'
 import './DashboardLayout.css'
 
 const SIDEBAR_KEY = 'veripanel_sidebar_collapsed'
@@ -64,7 +65,18 @@ function DashboardShell() {
           </div>
         </header>
 
-        <div className="dashboard-data-bar" aria-label="Veritabanı istatistikleri">
+        <div className="dashboard-data-bar dashboard-data-bar--mobile" aria-label="Veritabanı istatistikleri">
+          <div className="dashboard-data-bar-stat">
+            <span>Veri satırı</span>
+            <strong>{loading ? '—' : formatCount(database?.total_data_lines)}</strong>
+          </div>
+          <div className="dashboard-data-bar-stat">
+            <span>İndeks</span>
+            <strong>{loading ? '—' : formatCount(database?.indexed_records)}</strong>
+          </div>
+        </div>
+
+        <div className="dashboard-data-bar dashboard-data-bar--desktop" aria-label="Veritabanı istatistikleri">
           <span className="dashboard-data-bar-label">Veri satırı</span>
           <strong className="dashboard-data-bar-value">
             {loading ? '—' : formatCount(database?.total_data_lines)}
@@ -80,6 +92,8 @@ function DashboardShell() {
         <main className="dashboard-content">
           <Outlet context={{ refreshKey: 0 }} />
         </main>
+
+        <MobileNav />
       </div>
     </div>
   )
