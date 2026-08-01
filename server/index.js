@@ -6,13 +6,13 @@ import rateLimit from 'express-rate-limit'
 import jwt from 'jsonwebtoken'
 import {
   createUser,
-  findUserByEmail,
   findUserByUsername,
   findUsersByKeyPrefix,
   toPublicUser,
 } from './db.js'
 import {
   CURRENT_TERMS_VERSION,
+  authFailureDelay,
   generateApiKey,
   getApiKeyPrefix,
   hashApiKey,
@@ -25,15 +25,19 @@ const PORT = process.env.PORT || 3001
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-change-in-production'
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 if (JWT_SECRET === 'dev-only-change-in-production' && process.env.NODE_ENV === 'production') {
   console.error('JWT_SECRET must be set in production.')
   process.exit(1)
 }
 
-app.use(helmet())
-app.use(express.json({ limit: '16kb' }))
+if (!process.env.KEY_PEPPER && process.env.NODE_ENV === 'production') {
+  console.error('KEY_PEPPER must be set in production.')
+  process.exit(1)
+}
+
+app.use(helmet({ hsts: { maxAge: 31536000, includeSubDomains: true } }))
+app.use(express.json({ limit: '8kb' }))
 app.use(cors({
   origin: process.env.CLIENT_ORIGIN?.split(',') || ['http://localhost:5173', 'http://127.0.0.1:5173'],
   credentials: true,
@@ -41,20 +45,23 @@ app.use(cors({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Çok fazla deneme. Lütfen daha sonra tekrar dene.' },
 })
 
-function validateRegister({ username, email, acceptedTerms }) {
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Saatlik kayıt limitine ulaşıldı. Lütfen sonra tekrar dene.' },
+})
+
+function validateRegister({ username, acceptedTerms }) {
   if (!username || !USERNAME_RE.test(username)) {
     return 'Kullanıcı adı 3-32 karakter olmalı (harf, rakam, _).'
-  }
-  if (email !== undefined && email !== null && email !== '') {
-    if (!EMAIL_RE.test(email)) {
-      return 'Geçerli bir e-posta gir.'
-    }
   }
   if (!acceptedTerms) {
     return 'Devam etmek için kullanım şartlarını kabul etmelisiniz.'
@@ -66,12 +73,13 @@ function signToken(user) {
   return jwt.sign(
     { sub: user.id, username: user.username, keyPrefix: user.api_key_prefix },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: '7d', algorithm: 'HS256' }
   )
 }
 
 async function authenticateByApiKey(apiKey) {
   if (!isValidApiKeyFormat(apiKey)) {
+    await authFailureDelay()
     return null
   }
 
@@ -83,6 +91,7 @@ async function authenticateByApiKey(apiKey) {
     if (valid) return user
   }
 
+  await authFailureDelay()
   return null
 }
 
@@ -98,16 +107,14 @@ app.get('/api/auth/terms', (_req, res) => {
   })
 })
 
-app.post('/api/auth/register', authLimiter, async (req, res) => {
+app.post('/api/auth/register', registerLimiter, authLimiter, async (req, res) => {
   try {
-    const { username, email, acceptedTerms, termsVersion } = req.body ?? {}
+    const { username, acceptedTerms, termsVersion } = req.body ?? {}
     const trimmedUser = String(username ?? '').trim()
-    const trimmedEmail = email ? String(email).trim().toLowerCase() : null
     const termsAccepted = acceptedTerms === true || acceptedTerms === 'true'
 
     const validationError = validateRegister({
       username: trimmedUser,
-      email: trimmedEmail,
       acceptedTerms: termsAccepted,
     })
     if (validationError) {
@@ -122,17 +129,13 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       return res.status(409).json({ error: 'Bu kullanıcı adı alınmış.' })
     }
 
-    if (trimmedEmail && findUserByEmail(trimmedEmail)) {
-      return res.status(409).json({ error: 'Bu e-posta kayıtlı.' })
-    }
-
     const apiKey = generateApiKey()
     const apiKeyHash = await hashApiKey(apiKey)
     const apiKeyPrefix = getApiKeyPrefix(apiKey)
 
     const user = createUser({
       username: trimmedUser,
-      email: trimmedEmail,
+      email: null,
       apiKeyHash,
       apiKeyPrefix,
       termsVersion: CURRENT_TERMS_VERSION,

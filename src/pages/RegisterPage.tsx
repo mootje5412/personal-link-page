@@ -13,14 +13,13 @@ VeriPanel kullanım şartları:
 2. Platform yalnızca yasal ve yetkili amaçlarla kullanılmalıdır.
 3. Sorgu limitleri paketinize göre uygulanır.
 4. Kötüye kullanım tespit edildiğinde hesap askıya alınabilir.
-5. VeriPanel, hizmet sürekliliği için gerekli teknik önlemleri alır; anahtarlar veritabanında hashlenerek saklanır.
+5. API anahtarları scrypt ile hashlenerek SQL veritabanında saklanır — düz metin tutulmaz.
 `.trim()
 
 const RegisterPage = () => {
   const navigate = useNavigate()
   const { user, loginSuccess } = useAuth()
   const [username, setUsername] = useState('')
-  const [email, setEmail] = useState('')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [showTerms, setShowTerms] = useState(false)
   const [error, setError] = useState('')
@@ -41,7 +40,7 @@ const RegisterPage = () => {
 
     setLoading(true)
     try {
-      const data = await register(username.trim(), true, email.trim() || undefined)
+      const data = await register(username.trim(), true)
       setIssuedKey(data.apiKey)
       setPendingSession({ user: data.user, token: data.token })
     } catch (err) {
@@ -69,7 +68,7 @@ const RegisterPage = () => {
             <>
               <h1>Kayıt ol</h1>
               <p className="auth-lead">
-                Hesap oluşturun — size özel bir API anahtarı üretilecek. Giriş için bu anahtarı kullanacaksınız.
+                Sadece kullanıcı adı seçin. Size özel bir API anahtarı oluşturulur — şifre veya e-posta gerekmez.
               </p>
 
               <form className="auth-form" onSubmit={handleSubmit}>
@@ -88,20 +87,6 @@ const RegisterPage = () => {
                     maxLength={32}
                     pattern="[a-zA-Z0-9_]+"
                     required
-                  />
-                </div>
-
-                <div className="auth-field">
-                  <label htmlFor="register-email">
-                    E-posta <span>(isteğe bağlı)</span>
-                  </label>
-                  <input
-                    id="register-email"
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="ornek@mail.com"
                   />
                 </div>
 
@@ -133,7 +118,7 @@ const RegisterPage = () => {
                 </div>
 
                 <button type="submit" className="btn auth-submit" disabled={loading || !acceptedTerms}>
-                  {loading ? 'Anahtar oluşturuluyor…' : 'Hesap oluştur ve anahtar al'}
+                  {loading ? 'Anahtar oluşturuluyor…' : 'Anahtar oluştur'}
                 </button>
               </form>
 

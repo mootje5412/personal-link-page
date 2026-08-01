@@ -1,27 +1,29 @@
 type LogoProps = {
   size?: number
   className?: string
+  variant?: 'dark' | 'light'
 }
 
-const Logo = ({ size = 32, className }: LogoProps) => (
-  <svg
-    className={className}
-    width={size}
-    height={size}
-    viewBox="0 0 48 48"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    aria-hidden="true"
-  >
-    <path
-      d="M5 6h5.5L21 42h-5L5 6z"
-      fill="currentColor"
-    />
-    <path
-      d="M23.5 6H28v15.5c0-2.4 1.8-6.5 10-6.5 7.5 0 11 4.8 11 10.8 0 6.8-4.5 11.7-12.5 11.7-6.5 0-10-3.5-10.5-7V42h-4.5V6h1.5z"
-      fill="currentColor"
-    />
-  </svg>
-)
+const Logo = ({ size = 32, className, variant = 'dark' }: LogoProps) => {
+  const fill = variant === 'light' ? '#ffffff' : '#000000'
+
+  return (
+    <svg
+      className={className}
+      width={size}
+      height={size}
+      viewBox="0 0 48 48"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path d="M8 9h5.2L22.5 39H17.3L8 9z" fill={fill} />
+      <path
+        d="M25.2 9H30v14.8c0-2.6 2-7 9.8-7 7.2 0 10.5 4.6 10.5 10.2 0 6.4-4.4 11-12.3 11-6.4 0-9.8-3.6-10-7V39h-4.8V9h1.8z"
+        fill={fill}
+      />
+    </svg>
+  )
+}
 
 export default Logo

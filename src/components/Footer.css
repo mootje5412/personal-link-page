@@ -26,10 +26,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--gradient);
-  color: #fff;
+  background: #000000;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
 }
 
 .footer-desc {

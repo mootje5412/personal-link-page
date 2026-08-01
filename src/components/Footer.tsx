@@ -10,7 +10,7 @@ const Footer = () => {
           <div className="footer-brand">
             <p className="footer-name">
               <span className="footer-logo-mark">
-                <Logo size={20} />
+                <Logo size={20} variant="light" />
               </span>
               VeriPanel
             </p>

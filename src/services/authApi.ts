@@ -16,12 +16,6 @@ export type RegisterResponse = AuthResponse & {
   message?: string
 }
 
-export type TermsInfo = {
-  version: string
-  title: string
-  summary: string
-}
-
 const TOKEN_KEY = 'veripanel_token'
 const USER_KEY = 'veripanel_user'
 
@@ -33,27 +27,15 @@ async function parseJson<T>(res: Response): Promise<T> {
   return data as T
 }
 
-export async function fetchTerms(): Promise<TermsInfo> {
-  const res = await fetch('/api/auth/terms')
-  return parseJson<TermsInfo>(res)
-}
-
-export async function register(
-  username: string,
-  acceptedTerms: boolean,
-  email?: string
-): Promise<RegisterResponse> {
-  const body: Record<string, string | boolean> = {
-    username,
-    acceptedTerms,
-    termsVersion: '1.0',
-  }
-  if (email?.trim()) body.email = email.trim()
-
+export async function register(username: string, acceptedTerms: boolean): Promise<RegisterResponse> {
   const res = await fetch('/api/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      username,
+      acceptedTerms,
+      termsVersion: '1.0',
+    }),
   })
   return parseJson<RegisterResponse>(res)
 }
