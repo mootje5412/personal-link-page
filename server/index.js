@@ -232,7 +232,7 @@ app.post('/api/search', authMiddleware, (req, res) => {
 
     return res.json({
       ok: true,
-      message: 'Sorgu kaydedildi.',
+      message: 'Sorgu tamamlandı.',
       result: {
         type,
         query: preview,
