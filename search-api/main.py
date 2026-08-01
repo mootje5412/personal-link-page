@@ -12,26 +12,21 @@ import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_DIR = BASE_DIR / "databases"
 INDEX_DB = BASE_DIR / ".search_index.db"
 SCHEMA_VERSION = 9
-PORT = 8080
-API_VERSION = "2026-07-24-telegram-fix2"
-CREDIT = "api made by Ami.192 on signal"
+PORT = int(os.environ.get("PORT", "8080"))
+API_VERSION = "2026-08-01-phone"
+API_KEY = os.environ.get("API_KEY", "z2GFltjwp4rgccrOJdtc")
 AUTO_REBUILD = os.environ.get("AUTO_REBUILD", "0") == "1"
 API_USAGE = {
-    "status": "/api",
-    "stats": "/api/stats",
-    "rebuild": "/api/rebuild",
-    "reimport": "/api/reimport",
-    "name": "/api?q=Mootje bicep",
-    "phone": "/api?q=905544784243",
-    "email": "/api?q=email@example.com",
-    "id": "/api?q=12345678901",
+    "phone": "/api/phone?q=905xxxxxxxxx&key=YOUR_KEY",
+    "status": "/api/phone",
 }
 INDEX_LOCK = threading.Lock()
 INDEX_READY = threading.Event()
@@ -73,13 +68,32 @@ INSERT INTO people (
 async def lifespan(_app: FastAPI):
     thread = threading.Thread(target=build_index_background, daemon=True)
     thread.start()
-    from telegram_bot import start_telegram_bot_thread
+    if os.environ.get("TELEGRAM_BOT_TOKEN", "").strip():
+        from telegram_bot import start_telegram_bot_thread
 
-    start_telegram_bot_thread()
+        start_telegram_bot_thread()
     yield
 
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+
+def verify_api_key(
+    key: str | None = Query(default=None),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    authorization: str | None = Header(default=None),
+) -> None:
+    token = key or x_api_key
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    if not token or token != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
 
 COLUMN_MAP = {
     "name": "first_name",
@@ -1667,6 +1681,14 @@ def format_result(row: sqlite3.Row) -> dict:
     except json.JSONDecodeError:
         extra = {}
 
+    hidden_keys = {"source", "file", "filename", "path", "table", "database", "db", "origin"}
+    if extra:
+        extra = {
+            key: value
+            for key, value in extra.items()
+            if key.lower() not in hidden_keys
+        }
+
     result = {
         "first_name": row["first_name"],
         "last_name": row["last_name"],
@@ -1797,28 +1819,86 @@ def search(q: str | None = None) -> tuple[list[dict], dict]:
     return results, parsed
 
 
+def search_phone(q: str) -> tuple[list[dict], dict]:
+    digits = phone_digits(q)
+    if not digits or not looks_like_phone_digits(digits):
+        raise ValueError("Geçerli bir telefon numarası girin")
+
+    return search(q)
+
+
 def raw_json(**data) -> Response:
-    payload = {"credit": CREDIT, "version": API_VERSION, **data}
+    payload = {"ok": True, "version": API_VERSION, **data}
     return Response(
         content=json.dumps(payload, ensure_ascii=False, indent=2),
         media_type="application/json; charset=utf-8",
     )
 
 
+def public_stats_payload(stats: dict) -> dict:
+    return {
+        key: value
+        for key, value in stats.items()
+        if key not in {"sources", "index_error"}
+    }
+
+
 @app.get("/api/stats")
 def api_stats(
+    _: None = Depends(verify_api_key),
     count_lines: bool = Query(default=False, description="Scan files to count lines (slow on big files)"),
 ) -> Response:
     started = time.perf_counter()
     return raw_json(
-        ok=True,
-        stats=collect_stats(count_lines=count_lines),
+        stats=public_stats_payload(collect_stats(count_lines=count_lines)),
+        ms=round((time.perf_counter() - started) * 1000, 2),
+    )
+
+
+@app.get("/api/phone")
+def api_phone(
+    q: str | None = Query(default=None, description="Telefon numarası"),
+    _: None = Depends(verify_api_key),
+) -> Response:
+    started = time.perf_counter()
+
+    if not q or not q.strip():
+        if not INDEX_READY.is_set() or INDEX_BUILDING.is_set():
+            return raw_json(
+                ready=False,
+                status="indexing" if INDEX_BUILDING.is_set() else "starting",
+                records=count_records() if INDEX_DB.exists() and not INDEX_BUILDING.is_set() else 0,
+                usage=API_USAGE,
+            )
+        return raw_json(
+            ready=True,
+            status="ready",
+            records=count_records(),
+            usage=API_USAGE,
+        )
+
+    try:
+        results, query = search_phone(q)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except sqlite3.Error as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+    return raw_json(
+        ready=INDEX_READY.is_set(),
+        success=True,
+        query=query,
+        found=len(results),
+        returned=len(results),
+        results=results,
         ms=round((time.perf_counter() - started) * 1000, 2),
     )
 
 
 @app.get("/api/reimport")
-def api_reimport() -> Response:
+def api_reimport(_: None = Depends(verify_api_key)) -> Response:
     if not INDEX_DB.exists() or not index_usable():
         rebuild_index_async(force=True)
         return raw_json(
@@ -1862,7 +1942,7 @@ def api_reimport() -> Response:
 
 
 @app.get("/api/rebuild")
-def api_rebuild() -> Response:
+def api_rebuild(_: None = Depends(verify_api_key)) -> Response:
     if INDEX_BUILDING.is_set():
         return raw_json(ok=True, rebuilding=True, message="Rebuild already running")
     rebuild_index_async(force=True)
@@ -1875,7 +1955,8 @@ def api_rebuild() -> Response:
 
 @app.get("/api")
 def api(
-    q: str | None = Query(default=None, description="Name, phone, email, or ID number"),
+    q: str | None = Query(default=None, description="Legacy search query"),
+    _: None = Depends(verify_api_key),
 ) -> Response:
     started = time.perf_counter()
 
@@ -1928,11 +2009,12 @@ def api_search_legacy(
     first_name: str | None = Query(default=None),
     last_name: str | None = Query(default=None),
     identity_number: str | None = Query(default=None),
+    _: None = Depends(verify_api_key),
 ) -> Response:
+    if phone:
+        return api_phone(q=phone)
     if q:
         return api(q=q)
-    if phone:
-        return api(q=phone)
     if email:
         return api(q=email)
     if first_name and last_name:

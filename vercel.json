@@ -4,6 +4,10 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/phone-api/(.*)",
+      "destination": "http://109.71.252.128:8080/$1"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
