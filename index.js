@@ -1,27 +1,24 @@
-const FindNowBot = require('./src/bot');
+const OdidoZoekerBot = require('./src/bot');
 
-// Start the bot immediately
-console.log('Starting FindNow Bot...');
-const bot = new FindNowBot();
+console.log('Gezochte Mensen Odido Zoeker wordt gestart...');
+const bot = new OdidoZoekerBot();
 bot.start();
 
-// Handle shutdown gracefully
 process.on('SIGINT', () => {
-  console.log('\nBot is shutting down...');
+  console.log('\nBot wordt afgesloten...');
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  console.log('\nBot is shutting down...');
+  console.log('\nBot wordt afgesloten...');
   process.exit(0);
 });
 
-// Prevent multiple instances
 process.on('uncaughtException', (error) => {
   if (error.message.includes('ETELEGRAM') || error.message.includes('409 Conflict')) {
-    console.error('Another bot instance is running. Please kill it first with: pkill -9 -f "node index.js"');
+    console.error('Er draait al een andere bot-instantie. Stop die eerst met: pkill -9 -f "node index.js"');
     process.exit(1);
-  } else {
-    console.error('Uncaught exception:', error);
   }
+
+  console.error('Onverwachte fout:', error);
 });

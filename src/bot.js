@@ -3,78 +3,57 @@ const config = require('../config/config');
 const commandHandler = require('./handlers/commandHandler');
 const messageHandler = require('./handlers/messageHandler');
 const paginationHandler = require('./handlers/paginationHandler');
-const machinePaginationHandler = require('./handlers/machinePaginationHandler');
 
-class FindNowBot {
+class OdidoZoekerBot {
   constructor() {
-    this.bot = new TelegramBot(config.botToken, { 
-      polling: config.polling 
+    this.bot = new TelegramBot(config.botToken, {
+      polling: config.polling,
     });
     this.init();
   }
 
   init() {
-    console.log(`${config.botName} v${config.version} is starting...`);
-    
-    // Clear all sessions on startup
-    paginationHandler.clearAllSessions();
-    
-    // Register command handlers
-    this.bot.onText(/\/start/, (msg) => commandHandler.handleStart(this.bot, msg));
-    this.bot.onText(/\/prices/, (msg) => commandHandler.handlePrices(this.bot, msg));
-    this.bot.onText(/\/account/, (msg) => commandHandler.handleAccount(this.bot, msg));
-    this.bot.onText(/\/myid/, (msg) => commandHandler.handleMyId(this.bot, msg));
-    this.bot.onText(/\/machine (.+)/, (msg, match) => commandHandler.handleMachine(this.bot, msg, match));
-    this.bot.onText(/\/download(?:\s+|_)(.+)/, (msg, match) => commandHandler.handleDownload(this.bot, msg, match));
-    
-    // Admin commands
-    this.bot.onText(/\/grant (.+)/, (msg, match) => commandHandler.handleGrant(this.bot, msg, match));
-    this.bot.onText(/\/grantid (.+)/, (msg, match) => commandHandler.handleGrantId(this.bot, msg, match));
-    this.bot.onText(/\/revoke (.+)/, (msg, match) => commandHandler.handleRevoke(this.bot, msg, match));
-    this.bot.onText(/\/users/, (msg) => commandHandler.handleListUsers(this.bot, msg));
-    
-    // Handle callback queries for pagination and pricing
+    console.log(`${config.botName} v${config.version} wordt gestart...`);
+
+    this.bot.onText(/^\/start(?:@\w+)?(?:\s|$)/i, (msg) => {
+      commandHandler.handleStart(this.bot, msg);
+    });
+
+    this.bot.onText(/^\/toegang(?:@\w+)?(?:\s([\s\S]*))?$/i, (msg, match) => {
+      commandHandler.handleToegang(this.bot, msg, match);
+    });
+
     this.bot.on('callback_query', (query) => {
-      if (query.data.startsWith('page_') || query.data === 'current') {
+      if (query.data.startsWith('page_')) {
         paginationHandler.handleCallback(this.bot, query);
-      } else if (query.data.startsWith('mpage_') || query.data === 'mcurrent') {
-        machinePaginationHandler.handleCallback(this.bot, query);
-      } else if (query.data.startsWith('price_')) {
-        commandHandler.handlePriceCallback(this.bot, query);
-      } else if (query.data === 'back_to_prices') {
-        commandHandler.handlePrices(this.bot, query.message);
-        this.bot.answerCallbackQuery(query.id);
-      } else if (query.data.startsWith('download_machine_')) {
-        commandHandler.handleMachineDownloadCallback(this.bot, query);
       }
     });
-    
-    // Handle regular messages
+
     this.bot.on('message', (msg) => {
-      if (!msg.text || msg.text.startsWith('/')) return;
+      if (!msg.text || msg.text.startsWith('/')) {
+        return;
+      }
+
       messageHandler.handleMessage(this.bot, msg);
     });
 
-    // Error handling — exit on 409 so duplicate instances stop fighting
     this.bot.on('polling_error', (error) => {
       console.error('Polling error:', error.code);
       console.error(error.message);
 
       if (error.code === 'ETELEGRAM' && String(error.message).includes('409 Conflict')) {
-        console.error('Another bot instance is already polling this token. Stopping this instance.');
-        console.error('Run on your server: pkill -9 -f "node index.js" && cd ~/findnow-bot && ./restart.sh');
+        console.error('Er draait al een andere bot-instantie op dit token. Deze instantie stopt.');
         this.bot.stopPolling();
         process.exit(1);
       }
     });
 
-    console.log('Bot is running and ready!');
-    console.log('All previous sessions have been cleared');
+    console.log('Bot is actief en klaar voor zoekopdrachten.');
   }
 
   start() {
-    // Bot is already started via polling
+    // Polling start automatisch via de constructor.
   }
 }
 
-module.exports = FindNowBot;
+module.exports = OdidoZoekerBot;

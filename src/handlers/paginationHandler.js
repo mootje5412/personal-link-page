@@ -1,186 +1,111 @@
-const { buildHeader, formatCategoryBlock, CATEGORY_LABELS } = require('../utils/resultFormatter');
+const { PAGE_SIZE, formatPageMessage } = require('../utils/formatResults');
 
 class PaginationHandler {
   constructor() {
     this.sessions = new Map();
-    this.ITEMS_PER_PAGE = 8;
-    this.MAX_MESSAGE_LENGTH = 3900;
-    this.MAX_ITEM_LENGTH = 500;
+  }
 
-    setInterval(() => {
-      const now = Date.now();
-      for (const [chatId, session] of this.sessions.entries()) {
-        if (now - session.timestamp > 5 * 60 * 1000) {
-          this.sessions.delete(chatId);
-        }
-      }
-    }, 30000);
+  saveSession(chatId, session) {
+    this.sessions.set(chatId, session);
+  }
+
+  getSession(chatId) {
+    return this.sessions.get(chatId);
   }
 
   clearSession(chatId) {
     this.sessions.delete(chatId);
   }
 
-  clearAllSessions() {
-    this.sessions.clear();
-  }
+  createKeyboard(page, totalPages) {
+    const buttons = [];
 
-  normalizeResult(item) {
-    if (typeof item === 'string') {
-      return { category: 'result', text: item };
-    }
-    return item;
-  }
-
-  truncateText(text) {
-    if (text.length <= this.MAX_ITEM_LENGTH) {
-      return text;
-    }
-    return `${text.substring(0, this.MAX_ITEM_LENGTH)}\n...(truncated)`;
-  }
-
-  formatResultBlock(index, result) {
-    const entry = this.normalizeResult(result);
-    const text = this.truncateText(entry.text || '');
-    return formatCategoryBlock(index, entry.category, text);
-  }
-
-  buildPageMessage(query, pageResults, page, totalPages, totalResults, startIndex) {
-    let message = `${buildHeader(query, page, totalPages, totalResults)}\n\n`;
-
-    for (let index = 0; index < pageResults.length; index += 1) {
-      const block = `${this.formatResultBlock(startIndex + index + 1, pageResults[index])}\n\n`;
-
-      if (message.length + block.length > this.MAX_MESSAGE_LENGTH) {
-        message += 'More results on the next page.';
-        break;
-      }
-
-      message += block;
-    }
-
-    return message.trim();
-  }
-
-  buildDownloadRow(pageResults, startIndex) {
-    const row = [];
-
-    pageResults.forEach((result, index) => {
-      const entry = this.normalizeResult(result);
-      if (!entry.machineId) {
-        return;
-      }
-
-      const label = CATEGORY_LABELS[entry.category] || 'DL';
-      row.push({
-        text: `Download #${startIndex + index + 1}`,
-        callback_data: `download_machine_${entry.machineId}`
-      });
-    });
-
-    if (row.length === 0) {
-      return null;
-    }
-
-    return row.slice(0, 3);
-  }
-
-  createKeyboard(page, totalPages, pageResults = [], startIndex = 0) {
-    const keyboard = [];
-    const downloadRow = this.buildDownloadRow(pageResults, startIndex);
-
-    if (downloadRow) {
-      keyboard.push(downloadRow);
-    }
-
-    const nav = [];
     if (page > 0) {
-      nav.push({ text: '◀ Prev', callback_data: `page_${page - 1}` });
+      buttons.push({ text: '⬅️ Vorige', callback_data: `page_${page - 1}` });
     }
-    nav.push({ text: `${page + 1}/${totalPages}`, callback_data: 'current' });
+
+    buttons.push({ text: `${page + 1} / ${totalPages}`, callback_data: 'page_current' });
+
     if (page < totalPages - 1) {
-      nav.push({ text: 'Next ▶', callback_data: `page_${page + 1}` });
+      buttons.push({ text: 'Volgende ➡️', callback_data: `page_${page + 1}` });
     }
 
-    keyboard.push(nav);
-
-    return { inline_keyboard: keyboard };
+    return { inline_keyboard: [buttons] };
   }
 
-  sendPaginatedResults(bot, chatId, query, results, page = 0) {
-    const totalPages = Math.max(1, Math.ceil(results.length / this.ITEMS_PER_PAGE));
-    const safePage = Math.min(page, totalPages - 1);
-    const start = safePage * this.ITEMS_PER_PAGE;
-    const pageResults = results.slice(start, start + this.ITEMS_PER_PAGE);
+  async sendResults(bot, chatId, query, results, page = 0, messageId = null, searchOptions = {}) {
+    const formatted = formatPageMessage(query, results, page, searchOptions);
+    const keyboard = this.createKeyboard(formatted.page, formatted.totalPages);
 
-    this.sessions.set(chatId, {
+    this.saveSession(chatId, {
       query,
       results,
-      page: safePage,
-      timestamp: Date.now()
+      page: formatted.page,
+      messageId,
+      broad: searchOptions.broad || false,
     });
 
-    const message = this.buildPageMessage(query, pageResults, safePage, totalPages, results.length, start);
-    const keyboard = this.createKeyboard(safePage, totalPages, pageResults, start);
-
-    return bot.sendMessage(chatId, message, {
+    const messageOptions = {
       reply_markup: keyboard,
-      disable_web_page_preview: true
+      disable_web_page_preview: true,
+    };
+
+    if (messageId) {
+      await bot.editMessageText(formatted.text, {
+        chat_id: chatId,
+        message_id: messageId,
+        ...messageOptions,
+      });
+      return messageId;
+    }
+
+    const sent = await bot.sendMessage(chatId, formatted.text, messageOptions);
+    this.saveSession(chatId, {
+      query,
+      results,
+      page: formatted.page,
+      messageId: sent.message_id,
+      broad: searchOptions.broad || false,
     });
+    return sent.message_id;
   }
 
-  handleCallback(bot, callbackQuery) {
+  async handleCallback(bot, callbackQuery) {
     const chatId = callbackQuery.message.chat.id;
     const messageId = callbackQuery.message.message_id;
     const data = callbackQuery.data;
 
-    if (data === 'current') {
-      bot.answerCallbackQuery(callbackQuery.id);
+    if (data === 'page_current') {
+      await bot.answerCallbackQuery(callbackQuery.id);
       return;
     }
 
     if (!data.startsWith('page_')) {
-      bot.answerCallbackQuery(callbackQuery.id);
       return;
     }
 
-    const page = parseInt(data.split('_')[1], 10);
-    const session = this.sessions.get(chatId);
+    const page = Number.parseInt(data.replace('page_', ''), 10);
+    const session = this.getSession(chatId);
 
-    if (!session) {
-      bot.answerCallbackQuery(callbackQuery.id, {
-        text: 'Session expired. Search again.',
-        show_alert: true
-      });
+    if (!session || Number.isNaN(page)) {
+      await bot.answerCallbackQuery(callbackQuery.id, { text: 'Zoekopdracht verlopen. Zoek opnieuw.' });
       return;
     }
 
-    const totalPages = Math.max(1, Math.ceil(session.results.length / this.ITEMS_PER_PAGE));
-    const safePage = Math.min(Math.max(page, 0), totalPages - 1);
-    const start = safePage * this.ITEMS_PER_PAGE;
-    const pageResults = session.results.slice(start, start + this.ITEMS_PER_PAGE);
-
-    session.page = safePage;
-    session.timestamp = Date.now();
-
-    const message = this.buildPageMessage(
-      session.query,
-      pageResults,
-      safePage,
-      totalPages,
-      session.results.length,
-      start
-    );
-    const keyboard = this.createKeyboard(safePage, totalPages, pageResults, start);
-
-    bot.editMessageText(message, {
-      chat_id: chatId,
-      message_id: messageId,
-      reply_markup: keyboard,
-      disable_web_page_preview: true
-    });
-
-    bot.answerCallbackQuery(callbackQuery.id);
+    try {
+      await this.sendResults(
+        bot,
+        chatId,
+        session.query,
+        session.results,
+        page,
+        messageId,
+        { broad: session.broad },
+      );
+      await bot.answerCallbackQuery(callbackQuery.id);
+    } catch (error) {
+      await bot.answerCallbackQuery(callbackQuery.id, { text: 'Kon pagina niet laden.' });
+    }
   }
 }
 

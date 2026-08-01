@@ -1,0 +1,16 @@
+{
+  "name": "gezochte-mensen-odido-zoeker",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Telegram bot voor Odido zoekopdrachten",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,79 +1,61 @@
-const osintService = require('../services/osintService');
+const odidoService = require('../services/odidoService');
+const accessService = require('../services/accessService');
 const paginationHandler = require('./paginationHandler');
-const userService = require('../services/userService');
-const config = require('../../config/config');
+const { formatEmptyMessage } = require('../utils/formatResults');
 
 class MessageHandler {
   async handleMessage(bot, msg) {
     const chatId = msg.chat.id;
-    const userId = msg.from.id;
-    const messageText = msg.text;
+    const query = msg.text.trim();
+    const access = accessService.hasAccess(msg.from);
 
-    userService.registerUser(userId, msg.from.username, msg.from.first_name, msg.from.last_name);
+    if (!query) {
+      return;
+    }
 
-    const isOwner = userId === config.ownerId;
-
-    if (!isOwner) {
-      const accessCheck = userService.checkAccess(userId);
-
-      if (!accessCheck.hasAccess) {
-        bot.sendMessage(chatId, `Access Denied
-
-${accessCheck.message}
-
-Use /prices to view plans or contact @strafbaar to purchase.`);
-        return;
-      }
+    if (!access.allowed) {
+      await bot.sendMessage(chatId, accessService.getAccessDeniedMessage());
+      return;
     }
 
     paginationHandler.clearSession(chatId);
 
-    const query = messageText.trim();
-    const searchMsg = await bot.sendMessage(chatId, `FindNow OSINT\n\nSearching: ${query}\nChecking breach, stealer, and OSINT sources...`);
-
-    let lastCount = 0;
-    let lastEdit = 0;
-
-    const updateProgress = async (results) => {
-      if (results.length === lastCount) {
-        return;
-      }
-
-      lastCount = results.length;
-      const now = Date.now();
-      if (now - lastEdit < 700) {
-        return;
-      }
-
-      lastEdit = now;
-      await bot.editMessageText(
-        `FindNow OSINT\n\nSearching: ${query}\nFound ${results.length} result${results.length === 1 ? '' : 's'} so far...`,
-        { chat_id: chatId, message_id: searchMsg.message_id }
-      ).catch(() => {});
-    };
+    const loadingMsg = await bot.sendMessage(
+      chatId,
+      `🔍 Zoeken naar: ${query}\n\nNaam, e-mail, domein, telefoon...\nEven geduld...`,
+    );
 
     try {
-      const results = await osintService.search(query, updateProgress);
+      await bot.sendChatAction(chatId, 'typing');
+      const search = await odidoService.searchOdido(query);
 
-      await bot.deleteMessage(chatId, searchMsg.message_id).catch(() => {});
-
-      if (results && results.length > 0) {
-        if (!isOwner) {
-          userService.useCredit(userId);
-        }
-
-        await paginationHandler.sendPaginatedResults(bot, chatId, query, results, 0);
-      } else {
-        bot.sendMessage(chatId, `FindNow OSINT\n\nNo results for: ${query}\n\nTry another query or use /machine <name> for stealer machines.`);
+      if (!search.results.length) {
+        await bot.editMessageText(formatEmptyMessage(query), {
+          chat_id: chatId,
+          message_id: loadingMsg.message_id,
+        });
+        return;
       }
+
+      await paginationHandler.sendResults(
+        bot,
+        chatId,
+        query,
+        search.results,
+        0,
+        loadingMsg.message_id,
+        { broad: search.broad },
+      );
     } catch (error) {
-      console.error('Search error:', error);
-      bot.editMessageText(`Search failed for: ${query}\n\nPlease try again.`, {
-        chat_id: chatId,
-        message_id: searchMsg.message_id
-      }).catch(() => {
-        bot.sendMessage(chatId, `Search failed for: ${query}\n\nPlease try again.`);
-      });
+      const errorText = error.message || 'Er ging iets mis bij het zoeken.';
+
+      await bot.editMessageText(
+        `❌ Zoeken mislukt voor: ${query}\n\n${errorText}`,
+        {
+          chat_id: chatId,
+          message_id: loadingMsg.message_id,
+        },
+      );
     }
   }
 }

@@ -2,55 +2,64 @@
 
 SERVER="109.71.252.128"
 USER="root"
-PASS="zWE2CTnItIWftvmTdxF4"
-REMOTE_DIR="/root/findnow-bot"
+PASS="${DEPLOY_PASSWORD:-}"
+REMOTE_DIR="/root/odido-zoeker"
 
-echo "Creating deployment package..."
+if [ -z "$PASS" ]; then
+  echo "Stel DEPLOY_PASSWORD in voor SSH-toegang."
+  exit 1
+fi
+
+echo "Deployment-pakket maken..."
 cd /workspace
 tar -czf bot-deploy.tar.gz \
   config/ \
   src/ \
   index.js \
-  package.json \
-  .gitignore
+  bot-package.json \
+  restart.sh
 
-echo "Connecting to server..."
+echo "Verbinden met server..."
 
-# Create directory and upload files
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${USER}@${SERVER} << 'ENDSSH'
-mkdir -p /root/findnow-bot
-echo "Directory created"
+mkdir -p /root/odido-zoeker
+echo "Map aangemaakt"
 ENDSSH
 
-echo "Uploading bot files..."
+echo "Bestanden uploaden..."
 scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null bot-deploy.tar.gz ${USER}@${SERVER}:${REMOTE_DIR}/
 
-echo "Installing and starting bot..."
+echo "Installeren en bot starten..."
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${USER}@${SERVER} << 'ENDSSH'
-cd /root/findnow-bot
+cd /root/odido-zoeker
 tar -xzf bot-deploy.tar.gz
 rm bot-deploy.tar.gz
+mv bot-package.json package.json
 
-# Check if Node.js is installed
 if ! command -v node &> /dev/null; then
-    echo "Installing Node.js..."
+    echo "Node.js installeren..."
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
     apt-get install -y nodejs
 fi
 
-echo "Installing dependencies..."
+echo "Dependencies installeren..."
 npm install
 
-echo "Stopping any existing bot..."
-pkill -f "node index.js" || true
+echo "Oude bot instanties stoppen..."
+pkill -9 -f "/root/odido-zoeker" 2>/dev/null || true
+pkill -9 -f "node /root/findnow-bot/index.js" 2>/dev/null || true
+sleep 1
 
-echo "Starting bot..."
-nohup npm start > bot.log 2>&1 &
+echo "Bot starten via pm2..."
+chmod +x restart.sh
+pm2 delete odido-zoeker 2>/dev/null || true
+pm2 start index.js --name odido-zoeker
+pm2 save
 
-sleep 2
-echo "Bot started!"
-tail -n 20 bot.log
+sleep 3
+echo "Bot gestart!"
+pm2 logs odido-zoeker --lines 20 --nostream
 ENDSSH
 
-echo "Deployment complete!"
-echo "Bot is running on ${SERVER}"
+echo "Deployment voltooid!"
+echo "Bot draait op ${SERVER} in ${REMOTE_DIR}"
