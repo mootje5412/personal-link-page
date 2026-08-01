@@ -39,9 +39,10 @@ const SearchPage = () => {
 
     try {
       const data = await queryDatabase(activeType, query.trim())
+      const searchedQuery = query.trim()
       setResults(data.results ?? [])
       setMessage(formatSearchMessage(data))
-      recordLocalSearch(activeType, query.trim())
+      recordLocalSearch(activeType, searchedQuery)
       setQuery('')
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Sorgu başarısız.')
