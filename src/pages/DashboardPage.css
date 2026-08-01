@@ -237,7 +237,23 @@
   font-size: 20px;
 }
 
+.dashboard-stats--database {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.dashboard-stat-value--status {
+  font-size: clamp(18px, 2.5vw, 24px);
+}
+
+.dashboard-database {
+  margin-bottom: 0;
+}
+
 @media (max-width: 900px) {
+  .dashboard-stats--database {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .dashboard-stats {
     grid-template-columns: repeat(2, 1fr);
   }

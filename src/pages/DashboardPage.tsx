@@ -6,6 +6,12 @@ import {
   SearchType,
   fetchAnalytics,
 } from '../services/dashboardApi'
+import {
+  DatabaseSummary,
+  databaseStatusLabel,
+  fetchDatabaseStats,
+  formatCount,
+} from '../services/databaseApi'
 import { getLocalAnalytics } from '../services/localAnalytics'
 import './DashboardPage.css'
 
@@ -25,8 +31,11 @@ function formatDate(value: string) {
 const DashboardPage = () => {
   const { user } = useAuth()
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null)
+  const [database, setDatabase] = useState<DatabaseSummary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [databaseLoading, setDatabaseLoading] = useState(true)
   const [error, setError] = useState('')
+  const [databaseError, setDatabaseError] = useState('')
 
   const loadAnalytics = useCallback(async () => {
     try {
@@ -41,9 +50,38 @@ const DashboardPage = () => {
     }
   }, [])
 
+  const loadDatabase = useCallback(async () => {
+    try {
+      const data = await fetchDatabaseStats()
+      setDatabase(data)
+      setDatabaseError('')
+    } catch {
+      setDatabase(null)
+      setDatabaseError('Veritabanı istatistikleri yüklenemedi.')
+    } finally {
+      setDatabaseLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     loadAnalytics()
   }, [loadAnalytics])
+
+  useEffect(() => {
+    loadDatabase()
+  }, [loadDatabase])
+
+  useEffect(() => {
+    if (!database?.index_building && !(database?.pending_files ?? 0)) {
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      loadDatabase()
+    }, 5000)
+
+    return () => window.clearInterval(timer)
+  }, [database?.index_building, database?.pending_files, loadDatabase])
 
   const displayName = user?.username ?? 'Kullanıcı'
 
@@ -57,6 +95,54 @@ const DashboardPage = () => {
       </header>
 
       {error && <p className="dashboard-error" role="alert">{error}</p>}
+      {databaseError && <p className="dashboard-error" role="alert">{databaseError}</p>}
+
+      <section className="dashboard-panel dashboard-database" aria-label="Veritabanı durumu">
+        <h2>Veritabanı</h2>
+        <p className="dashboard-panel-lead">
+          Sunucudaki veri dosyalarının satır sayısı ve indeks durumu. Yeni dosya eklendiğinde otomatik indekslenir.
+        </p>
+        <div className="dashboard-stats dashboard-stats--database">
+          <article className="dashboard-stat-card">
+            <span className="dashboard-stat-label">Dosya sayısı</span>
+            <strong className="dashboard-stat-value">
+              {databaseLoading ? '—' : formatCount(database?.files ?? 0)}
+            </strong>
+          </article>
+          <article className="dashboard-stat-card">
+            <span className="dashboard-stat-label">Toplam satır</span>
+            <strong className="dashboard-stat-value">
+              {databaseLoading ? '—' : formatCount(database?.total_lines)}
+            </strong>
+          </article>
+          <article className="dashboard-stat-card">
+            <span className="dashboard-stat-label">Veri satırı</span>
+            <strong className="dashboard-stat-value">
+              {databaseLoading ? '—' : formatCount(database?.total_data_lines)}
+            </strong>
+          </article>
+          <article className="dashboard-stat-card">
+            <span className="dashboard-stat-label">İndekslenen kayıt</span>
+            <strong className="dashboard-stat-value">
+              {databaseLoading ? '—' : formatCount(database?.indexed_records ?? 0)}
+            </strong>
+          </article>
+          <article className="dashboard-stat-card">
+            <span className="dashboard-stat-label">Durum</span>
+            <strong className="dashboard-stat-value dashboard-stat-value--status">
+              {databaseLoading
+                ? '—'
+                : databaseStatusLabel(database?.status ?? 'starting', database?.index_building ?? false)}
+            </strong>
+          </article>
+        </div>
+        {!databaseLoading && database && database.pending_files > 0 && (
+          <p className="dashboard-search-msg">
+            {database.pending_files} dosya indeks bekliyor
+            {database.auto_watch ? ' — otomatik izleme açık' : ''}.
+          </p>
+        )}
+      </section>
 
       <section className="dashboard-stats" aria-label="Sorgu analitiği">
         <article className="dashboard-stat-card">
