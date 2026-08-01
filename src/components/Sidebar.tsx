@@ -1,5 +1,4 @@
 import { Link, useLocation } from 'react-router-dom'
-import { SEARCH_TYPE_LABELS, SearchType } from '../services/dashboardApi'
 import './Sidebar.css'
 
 type SidebarProps = {
@@ -10,14 +9,6 @@ type SidebarProps = {
   onLogout: () => void
   username: string
 }
-
-const searchItems: Array<{ type: SearchType; label: string }> = [
-  { type: 'telefon', label: 'Telefon Sorgu' },
-  { type: 'tc', label: SEARCH_TYPE_LABELS.tc },
-  { type: 'isim', label: SEARCH_TYPE_LABELS.isim },
-  { type: 'adres', label: SEARCH_TYPE_LABELS.adres },
-  { type: 'aile', label: SEARCH_TYPE_LABELS.aile },
-]
 
 const Sidebar = ({
   collapsed,
@@ -30,11 +21,11 @@ const Sidebar = ({
   const location = useLocation()
 
   function isDashboardActive() {
-    return location.pathname === '/panel' && !location.pathname.startsWith('/panel/sorgu')
+    return location.pathname === '/panel'
   }
 
-  function isSearchActive(type: SearchType) {
-    return location.pathname === `/panel/sorgu/${type}`
+  function isPhoneSearchActive() {
+    return location.pathname === '/panel/sorgu/telefon'
   }
 
   return (
@@ -84,18 +75,15 @@ const Sidebar = ({
             <span className="sidebar-link-label">Panel</span>
           </Link>
 
-          {!collapsed && <p className="sidebar-section-label">Sorgular</p>}
+          {!collapsed && <p className="sidebar-section-label">Sorgu</p>}
 
-          {searchItems.map((item) => (
-            <Link
-              key={item.type}
-              to={`/panel/sorgu/${item.type}`}
-              className={`sidebar-link sidebar-search-link ${isSearchActive(item.type) ? 'active' : ''}`}
-              onClick={onCloseMobile}
-            >
-              <span className="sidebar-link-label">{item.label}</span>
-            </Link>
-          ))}
+          <Link
+            to="/panel/sorgu/telefon"
+            className={`sidebar-link sidebar-search-link ${isPhoneSearchActive() ? 'active' : ''}`}
+            onClick={onCloseMobile}
+          >
+            <span className="sidebar-link-label">Telefon Sorgu</span>
+          </Link>
         </nav>
 
         <div className="sidebar-footer">
