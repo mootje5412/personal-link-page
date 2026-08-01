@@ -6,19 +6,20 @@
   .mobile-nav {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     position: fixed;
     bottom: 16px;
     left: 16px;
     right: 16px;
     height: auto;
     padding: 6px;
-    background: rgba(20, 20, 20, 0.9);
+    background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--line-strong);
     border-radius: var(--radius-full);
     z-index: 100;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
     padding-bottom: max(6px, env(safe-area-inset-bottom));
   }
 
@@ -28,7 +29,7 @@
     align-items: center;
     justify-content: center;
     height: 44px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--muted);
     border-radius: var(--radius-full);
@@ -37,29 +38,17 @@
 
   .mobile-nav a:active {
     color: var(--text);
-    background: var(--surface-hover);
-  }
-
-  .mobile-nav-login {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    color: #fff;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    flex: 1.15;
-  }
-
-  .mobile-nav-login:active {
-    background: rgba(255, 255, 255, 0.14);
-    color: #fff;
+    background: var(--surface);
   }
 
   .mobile-nav-accent {
-    color: #000;
-    background: #fff;
+    color: #fff !important;
+    background: #000;
     flex: 1.2;
+  }
+
+  .mobile-nav-accent:active {
+    background: #262626 !important;
+    color: #fff !important;
   }
 }

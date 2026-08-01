@@ -22,15 +22,13 @@
   gap: 24px;
   min-height: var(--stack-card-h);
   padding: 36px 40px;
-  background: rgba(255, 255, 255, 0.04);
+  background: #fff;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   transform-origin: top center;
   will-change: transform, opacity;
-  transition: transform 0.15s ease-out, opacity 0.15s ease-out, border-color 0.2s;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease-out, opacity 0.15s ease-out, border-color 0.2s, box-shadow 0.2s;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
 }
 
 .scroll-stack-card:last-child {
@@ -38,6 +36,7 @@
 }
 
 .stack-index {
+  font-family: var(--font-display);
   font-size: 14px;
   font-weight: 700;
   color: var(--muted);
@@ -47,6 +46,7 @@
 }
 
 .stack-content h3 {
+  font-family: var(--font-display);
   font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.03em;

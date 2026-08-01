@@ -11,13 +11,19 @@ const SiteHeader = () => {
     <header className="site-header">
       <div className="container header-inner">
         <Link to="/" className="logo">
-          <span className="logo-icon">A</span>
-          Apex Panel
+          <span className="logo-mark">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 7h16M4 12h10M4 17h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+          </span>
+          VeriPanel
         </Link>
 
         {isHome && (
           <nav className="nav">
+            <a href="#sorgu">Sorgu</a>
             <a href="#ozellikler">Özellikler</a>
+            <a href="#nasil-calisir">Nasıl Çalışır</a>
             <a href="#fiyatlar">Fiyatlar</a>
           </nav>
         )}

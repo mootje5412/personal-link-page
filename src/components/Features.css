@@ -1,5 +1,4 @@
 .features {
-  border-top: 1px solid var(--line);
   padding-bottom: 96px;
 }
 
@@ -28,6 +27,7 @@
 }
 
 .features-head-sticky h2 {
+  font-family: var(--font-display);
   font-size: clamp(28px, 4vw, 40px);
   font-weight: 700;
   letter-spacing: -0.04em;
@@ -51,7 +51,7 @@
 }
 
 .highlight {
-  background: var(--glass);
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   padding: 32px;
@@ -61,6 +61,7 @@
 }
 
 .highlight strong {
+  font-family: var(--font-display);
   font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.03em;

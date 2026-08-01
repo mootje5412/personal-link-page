@@ -2,6 +2,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: var(--surface);
 }
 
 .auth-main {
@@ -16,15 +17,14 @@
   width: 100%;
   max-width: 440px;
   padding: 40px 36px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--line-strong);
+  background: #fff;
+  border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.08);
 }
 
 .auth-card h1 {
+  font-family: var(--font-display);
   font-size: 28px;
   font-weight: 700;
   letter-spacing: -0.04em;
@@ -54,14 +54,14 @@
 
 .auth-field label span {
   font-weight: 400;
-  color: #555;
+  color: var(--muted);
 }
 
 .auth-field input {
   width: 100%;
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 12px;
   color: var(--text);
   font-family: inherit;
@@ -71,20 +71,20 @@
 
 .auth-field input:focus {
   outline: none;
-  border-color: rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: #000;
+  background: #fff;
 }
 
 .auth-field input::placeholder {
-  color: #555;
+  color: #a3a3a3;
 }
 
 .auth-error {
   padding: 12px 14px;
-  background: rgba(255, 80, 80, 0.08);
-  border: 1px solid rgba(255, 80, 80, 0.25);
+  background: rgba(220, 38, 38, 0.06);
+  border: 1px solid rgba(220, 38, 38, 0.2);
   border-radius: 12px;
-  color: #ff8a8a;
+  color: #dc2626;
   font-size: 14px;
   line-height: 1.5;
 }
