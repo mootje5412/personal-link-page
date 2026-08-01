@@ -135,7 +135,7 @@ export function getAnalyticsSummary(userId) {
     FROM search_logs
     WHERE user_id = ?
     ORDER BY created_at DESC
-    LIMIT 8
+    LIMIT 3
   `).all(userId)
 
   return { total, today, week, month, byType, recent }

@@ -2,6 +2,12 @@ import { AnalyticsSummary, SearchType } from './dashboardApi'
 
 const KEY = 'veripanel_local_searches'
 
+const INVALID_RECENT_QUERIES = new Set([
+  'Sorgu kaydedildi',
+  'Sorgu kaydedildi.',
+  'Sorgu geçmişe eklendi. Bu sorgu türü henüz aktif değil.',
+])
+
 type LocalSearch = {
   type: SearchType
   query: string
@@ -53,7 +59,10 @@ export function getLocalAnalytics(): AnalyticsSummary {
     week: items.filter((i) => isWithinDays(i.createdAt, 7)).length,
     month: items.filter((i) => isWithinDays(i.createdAt, 30)).length,
     byType: [...byTypeMap.entries()].map(([type, count]) => ({ type, count })),
-    recent: items.slice(0, 8).map((i) => ({
+    recent: items
+      .filter((item) => item.query.trim() && !INVALID_RECENT_QUERIES.has(item.query.trim()))
+      .slice(0, 3)
+      .map((i) => ({
       type: i.type,
       query: i.query,
       createdAt: i.createdAt,
