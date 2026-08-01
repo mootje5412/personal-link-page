@@ -1,19 +1,22 @@
 import { FormEvent, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import SiteHeader from '../components/SiteHeader'
+import AuthBrand from '../components/AuthBrand'
 import ApiKeyReveal from '../components/ApiKeyReveal'
+import Logo from '../components/Logo'
 import { useAuth } from '../context/AuthContext'
 import { register } from '../services/authApi'
 import './AuthPages.css'
 
 const TERMS_TEXT = `
-VeriPanel kullanım şartları:
+VeriPanel Kullanım Şartları v1.0
 
-1. Hesabınız size özel API anahtarı ile korunur. Anahtarınızı güvenli tutmak sizin sorumluluğunuzdadır.
+1. Hesabınız benzersiz API anahtarı ile korunur. Anahtarınızı güvenli tutmak sizin sorumluluğunuzdadır.
 2. Platform yalnızca yasal ve yetkili amaçlarla kullanılmalıdır.
 3. Sorgu limitleri paketinize göre uygulanır.
 4. Kötüye kullanım tespit edildiğinde hesap askıya alınabilir.
-5. API anahtarları scrypt ile hashlenerek SQL veritabanında saklanır — düz metin tutulmaz.
+5. API anahtarları scrypt algoritması ile hashlenerek SQL veritabanında saklanır. Düz metin asla tutulmaz.
+6. Anahtarınızı kaybederseniz kurtarma mümkün değildir — yeni hesap oluşturmanız gerekir.
 `.trim()
 
 const RegisterPage = () => {
@@ -60,73 +63,94 @@ const RegisterPage = () => {
   return (
     <div className="auth-page">
       <SiteHeader />
-      <main className="auth-main">
-        <div className="auth-card">
-          {issuedKey ? (
-            <ApiKeyReveal apiKey={issuedKey} onContinue={handleKeySaved} />
-          ) : (
-            <>
-              <h1>Kayıt ol</h1>
-              <p className="auth-lead">
-                Sadece kullanıcı adı seçin. Size özel bir API anahtarı oluşturulur — şifre veya e-posta gerekmez.
-              </p>
+      <main className="auth-shell">
+        <AuthBrand
+          title="Anahtar ile kayıt"
+          subtitle="Kullanıcı adını seç, sana özel bir API anahtarı oluşturulsun. Şifre yok, e-posta yok."
+        />
 
-              <form className="auth-form" onSubmit={handleSubmit}>
-                {error && <p className="auth-error" role="alert">{error}</p>}
-
-                <div className="auth-field">
-                  <label htmlFor="register-username">Kullanıcı adı</label>
-                  <input
-                    id="register-username"
-                    type="text"
-                    autoComplete="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="kullanici_adi"
-                    minLength={3}
-                    maxLength={32}
-                    pattern="[a-zA-Z0-9_]+"
-                    required
-                  />
+        <div className="auth-panel">
+          <div className="auth-card">
+            {issuedKey ? (
+              <ApiKeyReveal apiKey={issuedKey} onContinue={handleKeySaved} />
+            ) : (
+              <>
+                <div className="auth-card-logo">
+                  <span className="auth-card-logo-mark">
+                    <Logo size={28} />
+                  </span>
                 </div>
 
-                <div className="auth-terms">
-                  <label className="auth-terms-label">
+                <h1>Kayıt ol</h1>
+                <p className="auth-lead">
+                  Sadece <strong>kullanıcı adı</strong> yeterli. Sistem otomatik olarak güvenli bir
+                  API anahtarı üretir ve SQL veritabanında hashler.
+                </p>
+
+                <div className="auth-key-badge">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 2 4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6l-8-4Z" stroke="currentColor" strokeWidth="1.75" />
+                  </svg>
+                  Anahtar tabanlı — şifre gerekmez
+                </div>
+
+                <form className="auth-form" onSubmit={handleSubmit}>
+                  {error && <p className="auth-error" role="alert">{error}</p>}
+
+                  <div className="auth-field">
+                    <label htmlFor="register-username">Kullanıcı adı</label>
                     <input
-                      type="checkbox"
-                      checked={acceptedTerms}
-                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      id="register-username"
+                      type="text"
+                      autoComplete="username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="kullanici_adi"
+                      minLength={3}
+                      maxLength={32}
+                      pattern="[a-zA-Z0-9_]+"
                       required
                     />
-                    <span>
-                      <button
-                        type="button"
-                        className="auth-terms-link"
-                        onClick={() => setShowTerms((v) => !v)}
-                      >
-                        Kullanım şartlarını
-                      </button>
-                      {' '}okudum ve kabul ediyorum.
-                    </span>
-                  </label>
+                  </div>
 
-                  {showTerms && (
-                    <div className="auth-terms-box" role="region" aria-label="Kullanım şartları">
-                      <pre>{TERMS_TEXT}</pre>
-                    </div>
-                  )}
-                </div>
+                  <div className="auth-terms">
+                    <label className="auth-terms-label">
+                      <input
+                        type="checkbox"
+                        checked={acceptedTerms}
+                        onChange={(e) => setAcceptedTerms(e.target.checked)}
+                        required
+                      />
+                      <span>
+                        <button
+                          type="button"
+                          className="auth-terms-link"
+                          onClick={() => setShowTerms((v) => !v)}
+                        >
+                          Kullanım şartlarını
+                        </button>
+                        {' '}okudum ve kabul ediyorum.
+                      </span>
+                    </label>
 
-                <button type="submit" className="btn auth-submit" disabled={loading || !acceptedTerms}>
-                  {loading ? 'Anahtar oluşturuluyor…' : 'Anahtar oluştur'}
-                </button>
-              </form>
+                    {showTerms && (
+                      <div className="auth-terms-box" role="region" aria-label="Kullanım şartları">
+                        <pre>{TERMS_TEXT}</pre>
+                      </div>
+                    )}
+                  </div>
 
-              <p className="auth-footer">
-                Zaten hesabın var mı? <Link to="/giris">API anahtarı ile giriş</Link>
-              </p>
-            </>
-          )}
+                  <button type="submit" className="btn btn-dark auth-submit" disabled={loading || !acceptedTerms}>
+                    {loading ? 'Anahtar oluşturuluyor…' : 'API anahtarı oluştur'}
+                  </button>
+                </form>
+
+                <p className="auth-footer">
+                  Zaten hesabın var mı? <Link to="/giris">Anahtar ile giriş yap</Link>
+                </p>
+              </>
+            )}
+          </div>
         </div>
       </main>
     </div>

@@ -28,18 +28,13 @@
   color: #000000;
 }
 
-.logo-mark {
+.logo-img {
+  display: block;
   width: 38px;
   height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #ffffff;
-  color: #000000;
-  border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 10px;
   flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .logo-text {
