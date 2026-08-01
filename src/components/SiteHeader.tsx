@@ -10,11 +10,11 @@ const SiteHeader = () => {
   return (
     <header className="site-header">
       <div className="container header-inner">
-        <Link to="/" className="logo">
+        <Link to={user ? '/panel' : '/'} className="logo">
           VeriPanel
         </Link>
 
-        {isHome && (
+        {isHome && !user && (
           <nav className="nav" aria-label="Ana menü">
             <a href="#sorgu">Sorgu</a>
             <a href="#ozellikler">Özellikler</a>
@@ -26,7 +26,7 @@ const SiteHeader = () => {
         <div className="header-actions">
           {user ? (
             <>
-              <span className="header-user">@{user.username}</span>
+              <Link to="/panel" className="header-user">@{user.username}</Link>
               <button type="button" className="btn btn-ghost header-auth-btn" onClick={logout}>
                 Çıkış
               </button>

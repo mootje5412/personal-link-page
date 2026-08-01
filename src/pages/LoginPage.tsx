@@ -14,7 +14,7 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false)
   const [showKey, setShowKey] = useState(false)
 
-  if (user) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/panel" replace />
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -23,7 +23,7 @@ const LoginPage = () => {
     try {
       const data = await login(apiKey.trim())
       loginSuccess(data.user, data.token)
-      navigate('/')
+      navigate('/panel')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Giriş başarısız.')
     } finally {
@@ -44,8 +44,7 @@ const LoginPage = () => {
           <div className="auth-card">
             <h1>Giriş yap</h1>
             <p className="auth-lead">
-              <strong>API anahtarını</strong> gir. Anahtarın scrypt ile hashlenmiş hali SQL
-              veritabanında güvenle saklanır.
+              <strong>API anahtarını</strong> gir. Anahtarın şifreli olarak güvenle saklanır.
             </p>
 
             <div className="auth-key-badge">

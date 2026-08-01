@@ -8,6 +8,8 @@ import {
   createUser,
   findUserByUsername,
   findUsersByKeyPrefix,
+  getAnalyticsSummary,
+  recordSearch,
   toPublicUser,
 } from './db.js'
 import {
@@ -25,6 +27,23 @@ const PORT = process.env.PORT || 3001
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-change-in-production'
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/
+const SEARCH_TYPES = new Set(['tc', 'isim', 'adres', 'telefon', 'aile'])
+
+function authMiddleware(req, res, next) {
+  const header = req.headers.authorization
+  if (!header?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Oturum gerekli.' })
+  }
+
+  try {
+    const token = header.slice(7)
+    const payload = jwt.verify(token, JWT_SECRET)
+    req.authUser = { id: payload.sub, username: payload.username }
+    return next()
+  } catch {
+    return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş oturum.' })
+  }
+}
 
 if (JWT_SECRET === 'dev-only-change-in-production' && process.env.NODE_ENV === 'production') {
   console.error('JWT_SECRET must be set in production.')
@@ -177,6 +196,52 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   } catch (err) {
     console.error('Login error:', err)
     return res.status(500).json({ error: 'Giriş sırasında hata oluştu.' })
+  }
+})
+
+app.get('/api/analytics/summary', authMiddleware, (req, res) => {
+  try {
+    const summary = getAnalyticsSummary(req.authUser.id)
+    return res.json(summary)
+  } catch (err) {
+    console.error('Analytics error:', err)
+    return res.status(500).json({ error: 'Analitik verileri alınamadı.' })
+  }
+})
+
+app.post('/api/search', authMiddleware, (req, res) => {
+  try {
+    const { searchType, query } = req.body ?? {}
+    const type = String(searchType ?? '').trim().toLowerCase()
+    const trimmedQuery = String(query ?? '').trim()
+
+    if (!SEARCH_TYPES.has(type)) {
+      return res.status(400).json({ error: 'Geçersiz sorgu türü.' })
+    }
+
+    if (!trimmedQuery || trimmedQuery.length > 120) {
+      return res.status(400).json({ error: 'Geçerli bir sorgu girin.' })
+    }
+
+    const preview = trimmedQuery.length > 48 ? `${trimmedQuery.slice(0, 48)}…` : trimmedQuery
+    recordSearch({
+      userId: req.authUser.id,
+      searchType: type,
+      queryPreview: preview,
+    })
+
+    return res.json({
+      ok: true,
+      message: 'Sorgu kaydedildi.',
+      result: {
+        type,
+        query: preview,
+        durationMs: Math.floor(Math.random() * 400) + 120,
+      },
+    })
+  } catch (err) {
+    console.error('Search error:', err)
+    return res.status(500).json({ error: 'Sorgu sırasında hata oluştu.' })
   }
 })
 

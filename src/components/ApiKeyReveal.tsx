@@ -30,8 +30,8 @@ const ApiKeyReveal = ({ apiKey, onContinue }: ApiKeyRevealProps) => {
 
       <h2 id="api-key-title">API anahtarınız hazır</h2>
       <p className="api-key-warning">
-        Bu anahtar <strong>yalnızca bir kez</strong> gösterilir. Veritabanında şifreli
-        saklanır — kaybederseniz yeni hesap oluşturmanız gerekir.
+        Bu anahtar <strong>yalnızca bir kez</strong> gösterilir. Güvenli şekilde saklanır —
+        kaybederseniz yeni hesap oluşturmanız gerekir.
       </p>
 
       <div className="api-key-box">
@@ -48,7 +48,7 @@ const ApiKeyReveal = ({ apiKey, onContinue }: ApiKeyRevealProps) => {
       </ul>
 
       <button type="button" className="btn auth-submit" onClick={onContinue}>
-        Anahtarı kaydettim, devam et
+        Anahtarı kaydettim, panele git
       </button>
     </div>
   )

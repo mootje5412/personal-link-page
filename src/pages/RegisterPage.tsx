@@ -14,7 +14,7 @@ VeriPanel Kullanım Şartları v1.0
 2. Platform yalnızca yasal ve yetkili amaçlarla kullanılmalıdır.
 3. Sorgu limitleri paketinize göre uygulanır.
 4. Kötüye kullanım tespit edildiğinde hesap askıya alınabilir.
-5. API anahtarları scrypt algoritması ile hashlenerek SQL veritabanında saklanır. Düz metin asla tutulmaz.
+5. API anahtarları güvenli şekilde şifrelenerek saklanır. Düz metin asla tutulmaz.
 6. Anahtarınızı kaybederseniz kurtarma mümkün değildir — yeni hesap oluşturmanız gerekir.
 `.trim()
 
@@ -29,7 +29,7 @@ const RegisterPage = () => {
   const [issuedKey, setIssuedKey] = useState<string | null>(null)
   const [pendingSession, setPendingSession] = useState<{ user: Parameters<typeof loginSuccess>[0]; token: string } | null>(null)
 
-  if (user) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/panel" replace />
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -56,7 +56,7 @@ const RegisterPage = () => {
     if (pendingSession) {
       loginSuccess(pendingSession.user, pendingSession.token)
     }
-    navigate('/')
+    navigate('/panel')
   }
 
   return (
@@ -77,7 +77,7 @@ const RegisterPage = () => {
                 <h1>Kayıt ol</h1>
                 <p className="auth-lead">
                   Sadece <strong>kullanıcı adı</strong> yeterli. Sistem otomatik olarak güvenli bir
-                  API anahtarı üretir ve SQL veritabanında hashler.
+                  API anahtarı üretir ve şifreli olarak saklar.
                 </p>
 
                 <div className="auth-key-badge">
