@@ -1680,13 +1680,21 @@ def build_index_background() -> None:
         INDEX_READY.set()
 
 
-def wait_for_index() -> None:
-    if not INDEX_READY.wait(timeout=None):
-        raise HTTPException(status_code=503, detail="Index is still building, try again in a few minutes")
+def index_not_ready_detail() -> str:
     if INDEX_BUILDING.is_set():
-        raise HTTPException(status_code=503, detail="Index rebuild in progress, try again in a few minutes")
+        return "Veritabanı indeksleniyor, birkaç dakika sonra tekrar deneyin."
+    return "Veritabanı henüz hazır değil, birkaç dakika sonra tekrar deneyin."
+
+
+def ensure_index_ready() -> None:
+    if INDEX_BUILDING.is_set() or not INDEX_READY.is_set():
+        raise HTTPException(status_code=503, detail=index_not_ready_detail())
     if INDEX_ERROR and not (index_usable() and count_records() > 0):
         raise HTTPException(status_code=500, detail=INDEX_ERROR)
+
+
+def wait_for_index() -> None:
+    ensure_index_ready()
 
 
 def rebuild_index() -> dict:
@@ -2086,6 +2094,8 @@ def api_query(
     if not q.strip():
         raise HTTPException(status_code=400, detail="Geçerli bir sorgu girin")
 
+    ensure_index_ready()
+
     try:
         results, query = search_by_type(type, q)
     except ValueError as error:
@@ -2101,7 +2111,6 @@ def api_query(
         ok=True,
         ready=INDEX_READY.is_set(),
         success=True,
-        message="Sorgu kaydedildi.",
         query=query,
         found=len(results),
         returned=len(results),
@@ -2133,6 +2142,7 @@ def api_phone(
         )
 
     try:
+        ensure_index_ready()
         results, query = search_phone(q)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
@@ -2234,6 +2244,7 @@ def api(
         )
 
     try:
+        ensure_index_ready()
         results, query = search(q)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

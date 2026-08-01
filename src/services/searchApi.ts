@@ -27,6 +27,7 @@ export type QuerySearchResponse = {
 
 const API_BASE = '/phone-api'
 const API_KEY = 'z2GFltjwp4rgccrOJdtc'
+const REQUEST_TIMEOUT_MS = 15000
 
 export async function queryDatabase(
   searchType: SearchType,
@@ -38,7 +39,22 @@ export async function queryDatabase(
     key: API_KEY,
   })
 
-  const res = await fetch(`${API_BASE}/api/query?${params.toString()}`)
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}/api/query?${params.toString()}`, {
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Sorgu zaman aşımına uğradı. Veritabanı indeksleniyor olabilir — birkaç dakika sonra tekrar deneyin.')
+    }
+    throw new Error('Arama sunucusuna bağlanılamadı.')
+  } finally {
+    window.clearTimeout(timeout)
+  }
 
   let data: QuerySearchResponse & { detail?: string }
   try {
@@ -60,5 +76,5 @@ export function formatSearchMessage(data: QuerySearchResponse): string {
       ? `${data.found} sonuç bulundu`
       : 'Sonuç bulunamadı'
 
-  return `${resultPart} · Sorgu kaydedildi · ${data.ms}ms`
+  return `${resultPart} · ${data.ms}ms`
 }

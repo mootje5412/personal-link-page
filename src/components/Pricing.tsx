@@ -6,20 +6,20 @@ const plans = [
     name: 'Başlangıç',
     price: '59',
     note: 'Denemek için ideal',
-    items: ['200 sorgu / gün', 'TC kimlik & isim', 'Temel destek', 'Web panel erişimi'],
+    items: ['200 sorgu / gün', 'Telefon sorgusu', 'Temel destek', 'Web panel erişimi'],
   },
   {
     name: 'Standart',
     price: '119',
     note: 'En popüler paket',
-    items: ['1.000 sorgu / gün', 'Tüm sorgu türleri', 'Öncelikli destek', 'API erişimi'],
+    items: ['1.000 sorgu / gün', 'Telefon sorgusu', 'Öncelikli destek', 'API erişimi'],
     featured: true,
   },
   {
     name: 'Pro',
     price: '199',
     note: 'Yoğun kullanım için',
-    items: ['5.000 sorgu / gün', 'Tüm sorgu türleri', '7/24 VIP destek', 'API + toplu sorgu'],
+    items: ['5.000 sorgu / gün', 'Telefon sorgusu', '7/24 VIP destek', 'API + toplu sorgu'],
   },
 ]
 
