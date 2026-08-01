@@ -7,6 +7,7 @@ import {
   fetchAnalytics,
   performSearch,
 } from '../services/dashboardApi'
+import { getLocalAnalytics, recordLocalSearch } from '../services/localAnalytics'
 import './DashboardPage.css'
 
 const SEARCH_TYPES: SearchType[] = ['tc', 'isim', 'adres', 'telefon', 'aile']
@@ -39,8 +40,9 @@ const DashboardPage = () => {
       const data = await fetchAnalytics()
       setAnalytics(data)
       setError('')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Veriler yüklenemedi.')
+    } catch {
+      setAnalytics(getLocalAnalytics())
+      setError('')
     } finally {
       setLoading(false)
     }
@@ -63,8 +65,11 @@ const DashboardPage = () => {
       setSearchMessage(`Sorgu tamamlandı · ${result.result?.durationMs ?? 0}ms`)
       setQuery('')
       await loadAnalytics()
-    } catch (err) {
-      setSearchMessage(err instanceof Error ? err.message : 'Sorgu başarısız.')
+    } catch {
+      recordLocalSearch(searchType, query.trim())
+      setSearchMessage('Sorgu kaydedildi')
+      setQuery('')
+      setAnalytics(getLocalAnalytics())
     } finally {
       setSearching(false)
     }
