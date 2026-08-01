@@ -1,5 +1,6 @@
 .pricing {
   border-top: 1px solid var(--line);
+  background: var(--surface);
 }
 
 .plans {
@@ -10,27 +11,43 @@
 }
 
 .plan {
-  background: var(--glass);
+  position: relative;
+  background: #fff;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   padding: 32px;
   display: flex;
   flex-direction: column;
-  backdrop-filter: blur(8px);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .plan:hover {
   border-color: var(--line-strong);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.06);
 }
 
 .plan-featured {
-  border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 24px 48px rgba(0, 0, 0, 0.4);
+  border-color: #000;
+  box-shadow: 0 0 0 1px #000, 0 24px 48px rgba(0, 0, 0, 0.1);
+}
+
+.plan-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 14px;
+  background: #000;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: var(--radius-full);
 }
 
 .plan-head h3 {
+  font-family: var(--font-display);
   font-size: 18px;
   font-weight: 700;
   margin-bottom: 4px;
@@ -51,6 +68,7 @@
 }
 
 .plan-amount {
+  font-family: var(--font-display);
   font-size: 48px;
   font-weight: 700;
   letter-spacing: -0.04em;
@@ -70,10 +88,18 @@
 }
 
 .plan li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 14px;
-  color: #a3a3a3;
+  color: var(--muted);
   padding: 10px 0;
   border-bottom: 1px solid var(--line);
+}
+
+.plan li svg {
+  flex-shrink: 0;
+  color: #000;
 }
 
 .plan li:last-child {
