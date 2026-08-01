@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import { SEARCH_TYPE_LABELS, SearchType } from '../services/dashboardApi'
 import './Sidebar.css'
 
 type SidebarProps = {
@@ -10,10 +11,12 @@ type SidebarProps = {
   username: string
 }
 
-const navItems = [
-  { to: '/panel', label: 'Genel Bakış', end: true },
-  { to: '/panel#sorgu', label: 'Yeni Sorgu', hash: true },
-  { to: '/panel#gecmis', label: 'Geçmiş', hash: true },
+const searchItems: Array<{ type: SearchType; label: string }> = [
+  { type: 'tc', label: SEARCH_TYPE_LABELS.tc },
+  { type: 'isim', label: SEARCH_TYPE_LABELS.isim },
+  { type: 'adres', label: SEARCH_TYPE_LABELS.adres },
+  { type: 'telefon', label: 'Telefon Sorgu' },
+  { type: 'aile', label: SEARCH_TYPE_LABELS.aile },
 ]
 
 const Sidebar = ({
@@ -26,11 +29,12 @@ const Sidebar = ({
 }: SidebarProps) => {
   const location = useLocation()
 
-  function isActive(path: string) {
-    if (path === '/panel') {
-      return location.pathname === '/panel' && !location.hash
-    }
-    return location.pathname === '/panel' && location.hash === path.replace('/panel', '')
+  function isDashboardActive() {
+    return location.pathname === '/panel' && !location.pathname.startsWith('/panel/sorgu')
+  }
+
+  function isSearchActive(type: SearchType) {
+    return location.pathname === `/panel/sorgu/${type}`
   }
 
   return (
@@ -72,11 +76,21 @@ const Sidebar = ({
         </div>
 
         <nav className="sidebar-nav">
-          {navItems.map((item) => (
+          <Link
+            to="/panel"
+            className={`sidebar-link ${isDashboardActive() ? 'active' : ''}`}
+            onClick={onCloseMobile}
+          >
+            <span className="sidebar-link-label">Panel</span>
+          </Link>
+
+          {!collapsed && <p className="sidebar-section-label">Sorgular</p>}
+
+          {searchItems.map((item) => (
             <Link
-              key={item.label}
-              to={item.to}
-              className={`sidebar-link ${isActive(item.to) ? 'active' : ''}`}
+              key={item.type}
+              to={`/panel/sorgu/${item.type}`}
+              className={`sidebar-link sidebar-search-link ${isSearchActive(item.type) ? 'active' : ''}`}
               onClick={onCloseMobile}
             >
               <span className="sidebar-link-label">{item.label}</span>
@@ -85,9 +99,6 @@ const Sidebar = ({
         </nav>
 
         <div className="sidebar-footer">
-          <Link to="/" className="sidebar-link" onClick={onCloseMobile}>
-            <span className="sidebar-link-label">Ana sayfa</span>
-          </Link>
           <button type="button" className="sidebar-link sidebar-logout" onClick={onLogout}>
             <span className="sidebar-link-label">Çıkış</span>
           </button>

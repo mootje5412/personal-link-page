@@ -6,6 +6,7 @@ import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
+import SearchPage from './pages/SearchPage'
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
             }
           >
             <Route index element={<DashboardPage />} />
+            <Route path="sorgu/:type" element={<SearchPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
