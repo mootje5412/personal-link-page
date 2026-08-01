@@ -1,0 +1,75 @@
+Checking 1191 meaningful 5-letter usernames with 20 workers...
+
+AVAILABLE @boost
+AVAILABLE @couch
+[100/1191] available=2 taken=0
+AVAILABLE @dirty
+AVAILABLE @floor
+AVAILABLE @found
+[200/1191] available=5 taken=0
+AVAILABLE @gloss
+AVAILABLE @grasp
+AVAILABLE @label
+AVAILABLE @melon
+[400/1191] available=9 taken=0
+AVAILABLE @orbit
+AVAILABLE @ovary
+AVAILABLE @panel
+[500/1191] available=12 taken=0
+AVAILABLE @roomy
+[600/1191] available=13 taken=0
+AVAILABLE @scorn
+AVAILABLE @showy
+[700/1191] available=15 taken=0
+AVAILABLE @snoop
+AVAILABLE @sound
+AVAILABLE @sprig
+[800/1191] available=18 taken=0
+AVAILABLE @sworn
+AVAILABLE @table
+[900/1191] available=20 taken=0
+AVAILABLE @throb
+AVAILABLE @total
+[1000/1191] available=22 taken=0
+AVAILABLE @twice
+AVAILABLE @unity
+[1100/1191] available=24 taken=0
+AVAILABLE @waxen
+AVAILABLE @wordy
+
+============================================================
+Done in 31.7s
+Available: 26
+Taken: 1165
+Errors: 0
+============================================================
+
+AVAILABLE 5-LETTER NAMES:
+@boost
+@couch
+@dirty
+@floor
+@found
+@gloss
+@grasp
+@label
+@melon
+@orbit
+@ovary
+@panel
+@roomy
+@scorn
+@showy
+@snoop
+@sound
+@sprig
+@sworn
+@table
+@throb
+@total
+@twice
+@unity
+@waxen
+@wordy
+
+Saved to available_5letter_meaningful.txt
