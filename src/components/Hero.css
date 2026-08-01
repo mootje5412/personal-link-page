@@ -1,9 +1,9 @@
 .hero {
   position: relative;
-  padding: 64px 0 96px;
+  padding: 80px 0 104px;
   overflow: hidden;
   border-bottom: 1px solid var(--line);
-  background: var(--bg);
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
 }
 
 .hero-bg {

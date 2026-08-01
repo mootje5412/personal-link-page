@@ -11,6 +11,13 @@ type SearchType = {
 
 const searchTypes: SearchType[] = [
   {
+    id: 'telefon',
+    title: 'Telefon',
+    desc: 'GSM numarası ile numara sahibinin bilgilerini anında sorgula.',
+    placeholder: '05XX XXX XX XX',
+    tag: 'GSM',
+  },
+  {
     id: 'tc',
     title: 'TC Kimlik',
     desc: '11 haneli kimlik numarası ile tam kişi bilgilerine ulaşın.',
@@ -30,13 +37,6 @@ const searchTypes: SearchType[] = [
     desc: 'İl, ilçe veya mahalle bazında kayıtlı kişileri listeleyin.',
     placeholder: 'Kadıköy, İstanbul',
     tag: 'Konum',
-  },
-  {
-    id: 'telefon',
-    title: 'Telefon',
-    desc: 'GSM numarası ile numara sahibinin bilgilerini sorgulayın.',
-    placeholder: '05XX XXX XX XX',
-    tag: 'GSM',
   },
   {
     id: 'aile',

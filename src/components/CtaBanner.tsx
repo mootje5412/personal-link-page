@@ -7,12 +7,12 @@ const CtaBanner = () => {
     <section className="cta-banner">
       <div className="container cta-inner">
         <div className="cta-copy">
-          <span className="section-label">Başlayın</span>
-          <h2>VeriPanel&apos;e hemen katılın</h2>
-          <p>Binlerce kullanıcı gibi siz de dakikalar içinde sorgulamaya başlayın.</p>
+          <span className="section-label">Hazır mısın?</span>
+          <h2>Dakikalar içinde panele geç</h2>
+          <p>Kayıt ol, API anahtarını al ve telefon sorgusuna hemen başla.</p>
         </div>
         <div className="cta-actions">
-          <Link to="/kayit" className="btn">
+          <Link to="/kayit" className="btn btn-white">
             Ücretsiz kayıt
             <IconArrow />
           </Link>

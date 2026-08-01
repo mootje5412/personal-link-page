@@ -18,6 +18,7 @@ const SiteHeader = () => {
           <nav className="nav" aria-label="Ana menü">
             <a href="#sorgu">Sorgu</a>
             <a href="#ozellikler">Özellikler</a>
+            <a href="#yukselt">Yükselt</a>
             <a href="#nasil-calisir">Nasıl Çalışır</a>
             <a href="#fiyatlar">Fiyatlar</a>
           </nav>

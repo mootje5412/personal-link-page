@@ -1,6 +1,6 @@
 .search-demo {
   position: relative;
-  background: var(--bg-elevated);
+  background: #ffffff;
   overflow: hidden;
 }
 
@@ -38,11 +38,12 @@
   flex-direction: column;
   gap: 24px;
   min-height: 280px;
-  transition: background 0.3s ease;
+  transition: background 0.25s ease, transform 0.25s ease;
 }
 
 .search-card:hover {
   background: var(--surface);
+  transform: translateY(-2px);
 }
 
 .search-card-top {

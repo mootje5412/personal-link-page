@@ -13,6 +13,7 @@ const Footer = () => {
           <div className="footer-links">
             <a href="#sorgu">Sorgu Türleri</a>
             <a href="#ozellikler">Özellikler</a>
+            <a href="#yukselt">Yükselt</a>
             <a href="#fiyatlar">Fiyatlar</a>
             <Link to="/giris">Giriş</Link>
           </div>
