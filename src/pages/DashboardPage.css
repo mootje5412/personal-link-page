@@ -283,15 +283,32 @@
 
 @media (max-width: 520px) {
   .dashboard-stats {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
   }
 
-  .dashboard-search-row {
-    flex-direction: column;
+  .dashboard-stat-card {
+    padding: 16px 14px;
   }
 
-  .dashboard-search-row .btn {
-    width: 100%;
+  .dashboard-stat-value {
+    font-size: 22px;
+  }
+
+  .dashboard-stat-value--status {
+    font-size: 16px;
+  }
+
+  .dashboard-welcome h1 {
+    font-size: 26px;
+  }
+
+  .dashboard-subtitle {
+    font-size: 15px;
+  }
+
+  .dashboard-panel {
+    padding: 18px 14px;
   }
 
   .dashboard-recent-list li {

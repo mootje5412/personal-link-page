@@ -57,7 +57,6 @@ const SearchPage = () => {
               placeholder="05xxxxxxxxx"
               maxLength={120}
               required
-              autoFocus
             />
             <button type="submit" className="btn" disabled={searching || !query.trim()}>
               {searching ? 'Sorgulanıyor…' : 'Sorgula'}
@@ -70,7 +69,31 @@ const SearchPage = () => {
       {results.length > 0 && (
         <section className="search-results" aria-label="Arama sonuçları">
           <h2>Sonuçlar ({results.length})</h2>
-          <div className="search-results-table-wrap">
+
+          <div className="search-results-mobile">
+            {results.map((row, index) => (
+              <article key={`${row.phone}-${row.identity_number}-${index}`} className="search-result-row">
+                <div className="search-result-cell">
+                  <span>E-posta</span>
+                  <strong>{row.email || '—'}</strong>
+                </div>
+                <div className="search-result-cell">
+                  <span>Telefon</span>
+                  <strong>{row.phone || '—'}</strong>
+                </div>
+                <div className="search-result-cell">
+                  <span>İsim</span>
+                  <strong>{row.full_name || '—'}</strong>
+                </div>
+                <div className="search-result-cell">
+                  <span>Numara</span>
+                  <strong>{row.identity_number || '—'}</strong>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="search-results-table-wrap search-results-table-wrap--desktop">
             <table className="search-results-table">
               <thead>
                 <tr>

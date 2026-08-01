@@ -1,13 +1,13 @@
 .search-page {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
   max-width: 100%;
 }
 
 .search-page-head h1 {
   font-family: var(--font-display);
-  font-size: clamp(28px, 4vw, 36px);
+  font-size: clamp(24px, 6vw, 36px);
   font-weight: 700;
   letter-spacing: -0.04em;
   margin-bottom: 8px;
@@ -31,7 +31,7 @@
 .search-page-panel {
   border: 1px solid var(--line);
   border-radius: 18px;
-  padding: 24px;
+  padding: 20px 16px;
   background: #ffffff;
   box-shadow: var(--shadow-sm);
 }
@@ -57,7 +57,7 @@
   padding: 14px 16px;
   border: 1px solid var(--line-strong);
   border-radius: 12px;
-  font-size: 15px;
+  font-size: 16px;
   background: var(--surface);
 }
 
@@ -69,19 +69,59 @@
 
 .search-page-row .btn {
   flex-shrink: 0;
+  min-height: 48px;
 }
 
 .search-page-msg {
   margin-top: 12px;
   font-size: 13px;
   color: var(--muted);
+  line-height: 1.5;
 }
 
 .search-results h2 {
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   margin-bottom: 12px;
+}
+
+.search-results-mobile {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.search-result-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.search-result-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.search-result-cell span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.search-result-cell strong {
+  font-size: 14px;
+  font-weight: 600;
+  word-break: break-word;
 }
 
 .search-results-table-wrap {
@@ -127,12 +167,26 @@
   background: #fafafa;
 }
 
-@media (max-width: 520px) {
+@media (max-width: 900px) {
+  .search-results-mobile {
+    display: flex;
+  }
+
+  .search-results-table-wrap--desktop {
+    display: none;
+  }
+
   .search-page-row {
     flex-direction: column;
   }
 
   .search-page-row .btn {
     width: 100%;
+  }
+}
+
+@media (min-width: 901px) {
+  .search-page-panel {
+    padding: 24px;
   }
 }
