@@ -79,6 +79,16 @@
   line-height: 1.5;
 }
 
+.search-page-indexing {
+  padding: 12px 14px;
+  border: 1px solid #f0d9a8;
+  border-radius: 12px;
+  background: #fff8eb;
+  color: #8a5a00;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .search-results h2 {
   font-family: var(--font-display);
   font-size: 18px;

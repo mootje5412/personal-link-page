@@ -15,7 +15,7 @@ const steps = [
   {
     num: '03',
     title: 'Sorgulamaya başlayın',
-    desc: 'TC, isim, adres veya telefon — anında sonuç alın.',
+    desc: 'Telefon numarası gir — anında sonuç al.',
   },
 ]
 

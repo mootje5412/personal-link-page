@@ -26,7 +26,7 @@ const tiers = [
 ]
 
 const perks = [
-  'Telefon sorgusu dahil tüm modüller',
+  'Telefon sorgusu modülü',
   'Daha yüksek günlük sorgu limiti',
   'Öncelikli sunucu yanıt süresi',
   'Panel ve API erişimi',

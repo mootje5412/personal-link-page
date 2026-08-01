@@ -1,18 +1,26 @@
 import { FormEvent, useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import { useDatabaseStats } from '../context/DatabaseStatsContext'
+import { databaseStatusLabel } from '../services/databaseApi'
 import { recordLocalSearch } from '../services/localAnalytics'
 import { formatSearchMessage, queryDatabase, SearchResult } from '../services/searchApi'
 import './SearchPage.css'
 
 const SearchPage = () => {
+  const { database, loading: databaseLoading } = useDatabaseStats()
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [message, setMessage] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
 
+  const indexBusy = databaseLoading || database?.index_building || database?.status !== 'ready'
+  const indexStatus = databaseLoading
+    ? 'Veritabanı durumu kontrol ediliyor…'
+    : databaseStatusLabel(database?.status ?? 'starting', database?.index_building ?? false)
+
   async function handleSearch(e: FormEvent) {
     e.preventDefault()
-    if (!query.trim()) return
+    if (!query.trim() || indexBusy) return
 
     setSearching(true)
     setMessage('')
@@ -42,6 +50,12 @@ const SearchPage = () => {
         </p>
       </header>
 
+      {indexBusy && (
+        <p className="search-page-indexing" role="status">
+          Veritabanı durumu: {indexStatus}. İndeks hazır olunca sorgu yapabilirsin.
+        </p>
+      )}
+
       <section className="search-page-panel">
         <form className="search-page-form" onSubmit={handleSearch}>
           <label className="search-page-field" htmlFor="search-query">
@@ -57,8 +71,9 @@ const SearchPage = () => {
               placeholder="05xxxxxxxxx"
               maxLength={120}
               required
+              disabled={indexBusy}
             />
-            <button type="submit" className="btn" disabled={searching || !query.trim()}>
+            <button type="submit" className="btn" disabled={searching || !query.trim() || indexBusy}>
               {searching ? 'Sorgulanıyor…' : 'Sorgula'}
             </button>
           </div>

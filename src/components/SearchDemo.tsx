@@ -1,58 +1,5 @@
-import { SearchTypeIcon, type SearchIconId } from './icons/SearchIcons'
+import { SearchTypeIcon } from './icons/SearchIcons'
 import './SearchDemo.css'
-
-type SearchType = {
-  id: SearchIconId
-  title: string
-  desc: string
-  placeholder: string
-  tag: string
-}
-
-const searchTypes: SearchType[] = [
-  {
-    id: 'telefon',
-    title: 'Telefon',
-    desc: 'GSM numarası ile numara sahibinin bilgilerini anında sorgula.',
-    placeholder: '05XX XXX XX XX',
-    tag: 'GSM',
-  },
-  {
-    id: 'tc',
-    title: 'TC Kimlik',
-    desc: '11 haneli kimlik numarası ile tam kişi bilgilerine ulaşın.',
-    placeholder: '12345678901',
-    tag: 'Kimlik',
-  },
-  {
-    id: 'isim',
-    title: 'İsim Soyisim',
-    desc: 'Ad ve soyad ile kişi araması yapın, TC ve iletişim bilgilerini görün.',
-    placeholder: 'Ahmet Yılmaz',
-    tag: 'Kişi',
-  },
-  {
-    id: 'adres',
-    title: 'Adres',
-    desc: 'İl, ilçe veya mahalle bazında kayıtlı kişileri listeleyin.',
-    placeholder: 'Kadıköy, İstanbul',
-    tag: 'Konum',
-  },
-  {
-    id: 'aile',
-    title: 'Aile',
-    desc: 'TC ile anne, baba, kardeş ve eş bilgilerine erişin.',
-    placeholder: '12345678901',
-    tag: 'Aile',
-  },
-  {
-    id: 'ip',
-    title: 'IP Adresi',
-    desc: 'IP adresi ile konum, ISP ve hostname bilgisi alın.',
-    placeholder: '192.168.1.1',
-    tag: 'Ağ',
-  },
-]
 
 const SearchDemo = () => {
   return (
@@ -60,39 +7,39 @@ const SearchDemo = () => {
       <div className="container">
         <div className="search-demo-top">
           <div className="section-head search-demo-head">
-            <span className="section-label">Sorgu Türleri</span>
-            <h2>Her veri türü için ayrı sorgu modülü</h2>
+            <span className="section-label">Telefon Sorgusu</span>
+            <h2>GSM numarası ile anında kişi bilgisi</h2>
             <p>
-              TC kimlikten telefon numarasına — ihtiyacınız olan her sorgu tipi
-              VeriPanel&apos;de hazır ve optimize edilmiş şekilde sunulur.
+              VeriPanel şu an telefon sorgusuna odaklı. Numara gir, veritabanında
+              anında arama yap — isim, e-posta ve kimlik bilgilerini gör.
             </p>
           </div>
         </div>
 
-        <div className="search-grid">
-          {searchTypes.map((type, index) => (
-            <article key={type.id} className="search-card">
-              <div className="search-card-top">
-                <div className="search-card-icon-wrap">
-                  <SearchTypeIcon id={type.id} />
-                </div>
-                <span className="search-card-tag">{type.tag}</span>
+        <div className="search-grid search-grid--single">
+          <article className="search-card">
+            <div className="search-card-top">
+              <div className="search-card-icon-wrap">
+                <SearchTypeIcon id="telefon" />
               </div>
+              <span className="search-card-tag">GSM</span>
+            </div>
 
-              <div className="search-card-body">
-                <span className="search-card-index">{String(index + 1).padStart(2, '0')}</span>
-                <h3>{type.title}</h3>
-                <p className="search-card-desc">{type.desc}</p>
-              </div>
+            <div className="search-card-body">
+              <span className="search-card-index">01</span>
+              <h3>Telefon</h3>
+              <p className="search-card-desc">
+                GSM numarası ile numara sahibinin bilgilerini anında sorgula.
+              </p>
+            </div>
 
-              <div className="search-card-footer">
-                <div className="search-card-input">
-                  <span className="search-card-input-label">Örnek sorgu</span>
-                  <code>{type.placeholder}</code>
-                </div>
+            <div className="search-card-footer">
+              <div className="search-card-input">
+                <span className="search-card-input-label">Örnek sorgu</span>
+                <code>05XX XXX XX XX</code>
               </div>
-            </article>
-          ))}
+            </div>
+          </article>
         </div>
       </div>
     </section>

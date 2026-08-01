@@ -18,13 +18,13 @@ const Hero = () => {
           </div>
 
           <h1>
-            Telefon ve veri
+            Telefon sorgusu
             <em> tek panelde</em>
           </h1>
 
           <p className="hero-lead">
-            Telefon, TC kimlik, isim ve adres — hızlı sorgu, temiz panel,
-            anında sonuç. Kayıt ol, anahtarını al, hemen başla.
+            GSM numarası ile hızlı sorgu, temiz panel, anında sonuç.
+            Kayıt ol, anahtarını al, hemen başla.
           </p>
 
           <div className="hero-actions">
@@ -32,7 +32,7 @@ const Hero = () => {
               Hemen başla
               <IconArrow />
             </Link>
-            <a href="#sorgu" className="btn btn-ghost">Sorgu türlerini gör</a>
+            <a href="#sorgu" className="btn btn-ghost">Telefon sorgusunu gör</a>
           </div>
 
           <dl className="hero-metrics">
@@ -58,10 +58,8 @@ const Hero = () => {
               <span className="hero-panel-live">Canlı</span>
             </header>
 
-            <div className="hero-panel-tabs" role="tablist" aria-label="Sorgu türleri">
+            <div className="hero-panel-tabs" role="tablist" aria-label="Sorgu türü">
               <span className="hero-tab active" role="tab" aria-selected="true">Telefon</span>
-              <span className="hero-tab" role="tab" aria-selected="false">TC Kimlik</span>
-              <span className="hero-tab" role="tab" aria-selected="false">İsim</span>
             </div>
 
             <div className="hero-panel-search">
