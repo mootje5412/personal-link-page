@@ -5,6 +5,7 @@ import AuthBrand from '../components/AuthBrand'
 import ApiKeyReveal from '../components/ApiKeyReveal'
 import { useAuth } from '../context/AuthContext'
 import { register } from '../services/authApi'
+import { validateUsername } from '../services/validation'
 import './AuthPages.css'
 
 const TERMS_TEXT = `
@@ -37,6 +38,12 @@ const RegisterPage = () => {
 
     if (!acceptedTerms) {
       setError('Devam etmek için kullanım şartlarını kabul etmelisiniz.')
+      return
+    }
+
+    const usernameError = validateUsername(username)
+    if (usernameError) {
+      setError(usernameError)
       return
     }
 
@@ -87,7 +94,7 @@ const RegisterPage = () => {
                   Anahtar tabanlı — şifre gerekmez
                 </div>
 
-                <form className="auth-form" onSubmit={handleSubmit}>
+                <form className="auth-form" noValidate onSubmit={handleSubmit}>
                   {error && <p className="auth-error" role="alert">{error}</p>}
 
                   <div className="auth-field">
@@ -97,13 +104,13 @@ const RegisterPage = () => {
                       type="text"
                       autoComplete="username"
                       value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))}
                       placeholder="kullanici_adi"
                       minLength={3}
                       maxLength={32}
-                      pattern="[a-zA-Z0-9_]+"
                       required
                     />
+                    <p className="auth-field-hint">3-32 karakter · harf, rakam ve _</p>
                   </div>
 
                   <div className="auth-terms">

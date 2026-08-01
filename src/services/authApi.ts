@@ -1,3 +1,5 @@
+import { parseApiResponse } from './validation'
+
 export type AuthUser = {
   id: number
   username: string
@@ -19,14 +21,6 @@ export type RegisterResponse = AuthResponse & {
 const TOKEN_KEY = 'veripanel_token'
 const USER_KEY = 'veripanel_user'
 
-async function parseJson<T>(res: Response): Promise<T> {
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error((data as { error?: string }).error ?? 'Bir hata oluştu.')
-  }
-  return data as T
-}
-
 export async function register(username: string, acceptedTerms: boolean): Promise<RegisterResponse> {
   const res = await fetch('/api/auth/register', {
     method: 'POST',
@@ -37,7 +31,8 @@ export async function register(username: string, acceptedTerms: boolean): Promis
       termsVersion: '1.0',
     }),
   })
-  return parseJson<RegisterResponse>(res)
+
+  return parseApiResponse<RegisterResponse>(res)
 }
 
 export async function login(apiKey: string): Promise<AuthResponse> {
@@ -46,7 +41,8 @@ export async function login(apiKey: string): Promise<AuthResponse> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ apiKey: apiKey.trim() }),
   })
-  return parseJson<AuthResponse>(res)
+
+  return parseApiResponse<AuthResponse>(res)
 }
 
 export function saveSession({ user, token }: AuthResponse) {

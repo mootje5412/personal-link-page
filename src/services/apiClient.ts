@@ -1,4 +1,5 @@
 import { getStoredToken } from './authApi'
+import { parseApiResponse } from './validation'
 
 export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const token = getStoredToken()
@@ -13,11 +14,5 @@ export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}
   }
 
   const res = await fetch(input, { ...init, headers })
-  const data = await res.json().catch(() => ({}))
-
-  if (!res.ok) {
-    throw new Error((data as { error?: string }).error ?? 'Bir hata oluştu.')
-  }
-
-  return data
+  return parseApiResponse(res)
 }
