@@ -2,6 +2,8 @@ export type AuthUser = {
   id: number
   username: string
   email: string | null
+  keyPrefix?: string
+  createdAt?: string
 }
 
 export type AuthResponse = {
@@ -9,8 +11,19 @@ export type AuthResponse = {
   token: string
 }
 
-const TOKEN_KEY = 'apex_token'
-const USER_KEY = 'apex_user'
+export type RegisterResponse = AuthResponse & {
+  apiKey: string
+  message?: string
+}
+
+export type TermsInfo = {
+  version: string
+  title: string
+  summary: string
+}
+
+const TOKEN_KEY = 'veripanel_token'
+const USER_KEY = 'veripanel_user'
 
 async function parseJson<T>(res: Response): Promise<T> {
   const data = await res.json()
@@ -20,12 +33,21 @@ async function parseJson<T>(res: Response): Promise<T> {
   return data as T
 }
 
+export async function fetchTerms(): Promise<TermsInfo> {
+  const res = await fetch('/api/auth/terms')
+  return parseJson<TermsInfo>(res)
+}
+
 export async function register(
   username: string,
-  password: string,
+  acceptedTerms: boolean,
   email?: string
-): Promise<AuthResponse> {
-  const body: Record<string, string> = { username, password }
+): Promise<RegisterResponse> {
+  const body: Record<string, string | boolean> = {
+    username,
+    acceptedTerms,
+    termsVersion: '1.0',
+  }
   if (email?.trim()) body.email = email.trim()
 
   const res = await fetch('/api/auth/register', {
@@ -33,14 +55,14 @@ export async function register(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  return parseJson<AuthResponse>(res)
+  return parseJson<RegisterResponse>(res)
 }
 
-export async function login(username: string, password: string): Promise<AuthResponse> {
+export async function login(apiKey: string): Promise<AuthResponse> {
   const res = await fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ apiKey: apiKey.trim() }),
   })
   return parseJson<AuthResponse>(res)
 }
