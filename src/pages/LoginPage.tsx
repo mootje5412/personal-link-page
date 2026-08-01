@@ -4,6 +4,7 @@ import SiteHeader from '../components/SiteHeader'
 import AuthBrand from '../components/AuthBrand'
 import { useAuth } from '../context/AuthContext'
 import { login } from '../services/authApi'
+import { validateApiKey } from '../services/validation'
 import './AuthPages.css'
 
 const LoginPage = () => {
@@ -19,6 +20,13 @@ const LoginPage = () => {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
+
+    const keyError = validateApiKey(apiKey)
+    if (keyError) {
+      setError(keyError)
+      return
+    }
+
     setLoading(true)
     try {
       const data = await login(apiKey.trim())
@@ -55,7 +63,7 @@ const LoginPage = () => {
               Sadece API anahtarı — şifre yok
             </div>
 
-            <form className="auth-form" onSubmit={handleSubmit}>
+            <form className="auth-form" noValidate onSubmit={handleSubmit}>
               {error && <p className="auth-error" role="alert">{error}</p>}
 
               <div className="auth-field">
@@ -66,7 +74,12 @@ const LoginPage = () => {
                     type={showKey ? 'text' : 'password'}
                     autoComplete="off"
                     value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
+                    onChange={(e) => setApiKey(e.target.value.trimStart())}
+                    onPaste={(e) => {
+                      e.preventDefault()
+                      const pasted = e.clipboardData.getData('text').trim()
+                      setApiKey(pasted)
+                    }}
                     placeholder="vp_xxxxxxxxxxxxxxxx"
                     spellCheck={false}
                     required
