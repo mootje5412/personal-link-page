@@ -26,9 +26,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
-  color: #000;
+  background: var(--gradient);
+  color: #fff;
   border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
 }
 
 .footer-desc {
@@ -49,12 +50,12 @@
 }
 
 .footer-links a:hover {
-  color: var(--text-light);
+  color: var(--accent-light);
 }
 
 .footer-copy {
   font-size: 13px;
-  color: #525252;
+  color: #64748b;
   padding-top: 32px;
   border-top: 1px solid var(--line-dark);
 }

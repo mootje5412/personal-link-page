@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import Logo from './Logo'
 import './SiteHeader.css'
 
 const SiteHeader = () => {
@@ -12,9 +13,7 @@ const SiteHeader = () => {
       <div className="container header-inner">
         <Link to="/" className="logo">
           <span className="logo-mark">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M4 7h16M4 12h10M4 17h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
+            <Logo size={22} />
           </span>
           VeriPanel
         </Link>

@@ -15,6 +15,11 @@
   gap: 6px;
   padding: 40px 32px;
   border-right: 1px solid var(--line-dark);
+  transition: background 0.2s ease;
+}
+
+.stat-card:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .stat-card:last-child {
@@ -27,6 +32,10 @@
   font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 1;
+  background: linear-gradient(135deg, #fff 0%, var(--accent-light) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .stat-label {

@@ -10,17 +10,34 @@
   justify-content: space-between;
   gap: 40px;
   padding: 56px 64px;
-  background: var(--bg-dark);
+  background: var(--gradient-dark);
   color: var(--text-light);
   border-radius: var(--radius-xl);
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.cta-inner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-glow);
+  pointer-events: none;
+}
+
+.cta-copy,
+.cta-actions {
+  position: relative;
+  z-index: 1;
 }
 
 .cta-copy .section-label {
-  color: var(--muted-light);
+  color: var(--accent-light);
 }
 
 .cta-copy .section-label::before {
-  background: var(--muted-light);
+  background: linear-gradient(90deg, var(--accent-light), var(--primary-light));
 }
 
 .cta-copy h2 {
@@ -47,10 +64,13 @@
 .cta-actions .btn-ghost {
   color: var(--text-light);
   border-color: var(--line-dark);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .cta-actions .btn-ghost:hover {
-  background: var(--surface-dark);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
 }
 
 @media (max-width: 768px) {

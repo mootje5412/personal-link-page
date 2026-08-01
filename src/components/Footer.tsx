@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import Logo from './Logo'
 import './Footer.css'
 
 const Footer = () => {
@@ -9,9 +10,7 @@ const Footer = () => {
           <div className="footer-brand">
             <p className="footer-name">
               <span className="footer-logo-mark">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M4 7h16M4 12h10M4 17h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                </svg>
+                <Logo size={20} />
               </span>
               VeriPanel
             </p>

@@ -1,3 +1,4 @@
+import Logo from './Logo'
 import { Link } from 'react-router-dom'
 import { IconArrow } from './icons/SearchIcons'
 import './Hero.css'
@@ -55,7 +56,9 @@ const Hero = () => {
           <div className="hero-panel">
             <header className="hero-panel-header">
               <div className="hero-panel-brand">
-                <span className="hero-panel-logo" />
+                <span className="hero-panel-logo">
+                  <Logo size={16} />
+                </span>
                 VeriPanel
               </div>
               <span className="hero-panel-live">Canlı</span>

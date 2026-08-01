@@ -3,9 +3,9 @@
   top: 0;
   z-index: 100;
   padding: 14px 0;
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-bottom: 1px solid var(--line);
 }
 
@@ -25,26 +25,29 @@
   font-weight: 700;
   font-size: 16px;
   letter-spacing: -0.03em;
+  color: var(--text);
 }
 
 .logo-mark {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000;
+  background: var(--gradient);
   color: #fff;
-  border-radius: 9px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
 }
 
 .nav {
   display: flex;
   gap: 2px;
   padding: 4px;
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.8);
   border: 1px solid var(--line);
   border-radius: var(--radius-full);
+  box-shadow: var(--shadow-sm);
 }
 
 .nav a {
@@ -57,23 +60,24 @@
 }
 
 .nav a:hover {
-  color: var(--text);
-  background: #fff;
+  color: var(--primary-dark);
+  background: var(--gradient-soft);
 }
 
 .header-cta {
   font-size: 13px;
   font-weight: 600;
   padding: 10px 20px;
-  background: #000;
+  background: var(--gradient);
   color: #fff;
   border-radius: var(--radius-full);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
 }
 
 .header-cta:hover {
   transform: scale(1.03);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-glow);
 }
 
 .header-auth-group {
@@ -81,9 +85,10 @@
   align-items: center;
   gap: 4px;
   padding: 4px;
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--line);
   border-radius: var(--radius-full);
+  box-shadow: var(--shadow-sm);
 }
 
 .header-login {
@@ -96,7 +101,7 @@
   letter-spacing: -0.01em;
   color: var(--text);
   border-radius: var(--radius-full);
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .header-login-icon {
@@ -105,7 +110,8 @@
 }
 
 .header-login:hover {
-  background: #fff;
+  background: var(--gradient-soft);
+  color: var(--primary-dark);
 }
 
 .header-login:hover .header-login-icon {

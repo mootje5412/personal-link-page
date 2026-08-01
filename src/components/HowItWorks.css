@@ -7,9 +7,7 @@
 .how-bg {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.04), transparent 40%),
-    radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.03), transparent 35%);
+  background: var(--gradient-glow);
   pointer-events: none;
 }
 
@@ -66,17 +64,18 @@
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: #000;
-  background: #fff;
+  color: #fff;
+  background: var(--gradient);
   border-radius: 12px;
   flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.35);
 }
 
 .step-line {
   flex: 1;
-  height: 1px;
+  height: 2px;
   margin-left: 16px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.2), transparent);
+  background: linear-gradient(90deg, rgba(129, 140, 248, 0.5), transparent);
 }
 
 .step-content h3 {

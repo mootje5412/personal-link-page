@@ -11,7 +11,7 @@
 
 .plan {
   position: relative;
-  background: #fff;
+  background: var(--bg-elevated);
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
   padding: 36px 32px;
@@ -21,15 +21,30 @@
 }
 
 .plan:hover {
-  border-color: var(--line-strong);
+  border-color: rgba(79, 70, 229, 0.2);
   box-shadow: var(--shadow-md);
 }
 
 .plan-featured {
-  border-color: #000;
-  background: var(--bg-dark);
+  border: none;
+  background: var(--gradient-dark);
   color: var(--text-light);
   box-shadow: var(--shadow-lg);
+  position: relative;
+}
+
+.plan-featured::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-xl);
+  padding: 2px;
+  background: var(--gradient);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 .plan-badge {
@@ -37,13 +52,14 @@
   top: -13px;
   left: 32px;
   padding: 5px 12px;
-  background: #fff;
-  color: #000;
+  background: var(--gradient);
+  color: #fff;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   border-radius: var(--radius-full);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
 }
 
 .plan-head h3 {
@@ -85,6 +101,13 @@
   line-height: 1;
 }
 
+.plan-featured .plan-amount {
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 .plan-currency {
   font-size: 15px;
   color: var(--muted);
@@ -112,31 +135,32 @@
 }
 
 .plan-featured .plan li {
-  color: #ccc;
+  color: #cbd5e1;
 }
 
 .plan li svg {
   flex-shrink: 0;
   margin-top: 2px;
-  color: var(--text);
+  color: var(--primary);
 }
 
 .plan-featured .plan li svg {
-  color: #fff;
+  color: var(--accent-light);
 }
 
 .plan-btn {
   width: 100%;
 }
 
-.plan-featured .btn-outline {
-  color: #000;
-  background: #fff;
-  border-color: #fff;
+.plan-featured .btn {
+  background: var(--gradient);
 }
 
-.plan-featured .btn-outline:hover {
-  background: #f0f0f0;
+.plan-featured .btn-outline {
+  color: var(--primary-dark);
+  background: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.15);
 }
 
 @media (max-width: 768px) {
