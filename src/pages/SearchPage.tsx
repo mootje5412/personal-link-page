@@ -1,13 +1,8 @@
 import { FormEvent, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
-import {
-  SEARCH_TYPE_LABELS,
-  SearchType,
-  performSearch,
-} from '../services/dashboardApi'
+import { SEARCH_TYPE_LABELS, SearchType } from '../services/dashboardApi'
 import { recordLocalSearch } from '../services/localAnalytics'
-import { PhoneSearchResult, searchPhoneNumber } from '../services/phoneApi'
-import { isApiUnavailableError } from '../services/validation'
+import { formatSearchMessage, queryDatabase, SearchResult } from '../services/searchApi'
 import './SearchPage.css'
 
 const VALID_TYPES: SearchType[] = ['tc', 'isim', 'adres', 'telefon', 'aile']
@@ -26,14 +21,13 @@ const SearchPage = () => {
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [message, setMessage] = useState('')
-  const [phoneResults, setPhoneResults] = useState<PhoneSearchResult[]>([])
+  const [results, setResults] = useState<SearchResult[]>([])
 
   if (!searchType) {
     return <Navigate to="/panel" replace />
   }
 
   const activeType = searchType
-  const isPhoneSearch = activeType === 'telefon'
 
   async function handleSearch(e: FormEvent) {
     e.preventDefault()
@@ -41,42 +35,15 @@ const SearchPage = () => {
 
     setSearching(true)
     setMessage('')
-    setPhoneResults([])
+    setResults([])
 
     try {
-      if (isPhoneSearch) {
-        const data = await searchPhoneNumber(query.trim())
-        setPhoneResults(data.results ?? [])
-        setMessage(
-          data.found > 0
-            ? `${data.found} sonuç bulundu · ${data.ms}ms`
-            : 'Sonuç bulunamadı'
-        )
-        recordLocalSearch('telefon', query.trim())
-      } else {
-        const result = await performSearch(activeType, query.trim()) as {
-          message?: string
-          result?: { durationMs?: number }
-        }
-        setMessage(
-          result.message
-            ?? `Sorgu tamamlandı · ${result.result?.durationMs ?? 0}ms`
-        )
-      }
+      const data = await queryDatabase(activeType, query.trim())
+      setResults(data.results ?? [])
+      setMessage(formatSearchMessage(data))
+      recordLocalSearch(activeType, query.trim())
       setQuery('')
     } catch (err) {
-      if (isPhoneSearch) {
-        setMessage(err instanceof Error ? err.message : 'Telefon sorgusu başarısız.')
-        return
-      }
-
-      if (isApiUnavailableError(err)) {
-        recordLocalSearch(activeType, query.trim())
-        setMessage('Sorgu geçmişe eklendi. Bu sorgu türü henüz aktif değil.')
-        setQuery('')
-        return
-      }
-
       setMessage(err instanceof Error ? err.message : 'Sorgu başarısız.')
     } finally {
       setSearching(false)
@@ -87,9 +54,9 @@ const SearchPage = () => {
     <div className="search-page">
       <header className="search-page-head">
         <p className="search-page-label">{SEARCH_TYPE_LABELS[activeType]} sorgusu</p>
-        <h1>{isPhoneSearch ? 'Telefon Sorgu' : SEARCH_TYPE_LABELS[activeType]}</h1>
+        <h1>{SEARCH_TYPE_LABELS[activeType]}</h1>
         <p className="search-page-lead">
-          {isPhoneSearch
+          {activeType === 'telefon'
             ? 'Telefon numarası gir — tüm kayıtlar arasında hızlı arama yapılır.'
             : `${SEARCH_TYPE_LABELS[activeType]} bilgisi ile arama yap.`}
         </p>
@@ -98,13 +65,13 @@ const SearchPage = () => {
       <section className="search-page-panel">
         <form className="search-page-form" onSubmit={handleSearch}>
           <label className="search-page-field" htmlFor="search-query">
-            {isPhoneSearch ? 'Telefon numarası' : 'Sorgu'}
+            {activeType === 'telefon' ? 'Telefon numarası' : 'Sorgu'}
           </label>
           <div className="search-page-row">
             <input
               id="search-query"
-              type={isPhoneSearch ? 'tel' : 'text'}
-              inputMode={activeType === 'tc' || isPhoneSearch ? 'numeric' : 'text'}
+              type={activeType === 'telefon' || activeType === 'tc' ? 'tel' : 'text'}
+              inputMode={activeType === 'tc' || activeType === 'telefon' ? 'numeric' : 'text'}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={PLACEHOLDERS[activeType]}
@@ -120,12 +87,12 @@ const SearchPage = () => {
         </form>
       </section>
 
-      {isPhoneSearch && phoneResults.length > 0 && (
+      {results.length > 0 && (
         <section className="search-results" aria-label="Arama sonuçları">
           <h2>Sonuçlar</h2>
           <ul className="search-results-list">
-            {phoneResults.map((row, index) => (
-              <li key={`${row.phone}-${index}`} className="search-result-card">
+            {results.map((row, index) => (
+              <li key={`${row.phone}-${row.identity_number}-${index}`} className="search-result-card">
                 <p className="search-result-name">{row.full_name || '—'}</p>
                 <dl className="search-result-fields">
                   {row.phone && (

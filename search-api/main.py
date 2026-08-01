@@ -28,6 +28,7 @@ AUTO_WATCH = os.environ.get("AUTO_WATCH", "1") == "1"
 WATCH_INTERVAL = max(10, int(os.environ.get("WATCH_INTERVAL", "30")))
 API_USAGE = {
     "phone": "/api/phone?q=905xxxxxxxxx&key=YOUR_KEY",
+    "query": "/api/query?type=telefon&q=905xxxxxxxxx&key=YOUR_KEY",
     "status": "/api/phone",
     "database": "/api/database?key=YOUR_KEY",
 }
@@ -1911,6 +1912,103 @@ def search(q: str | None = None) -> tuple[list[dict], dict]:
     return results, parsed
 
 
+RESULT_SELECT = """
+    SELECT
+        first_name, last_name, phone, email, identity_number,
+        city, country, notes, extra_json
+    FROM people
+"""
+
+
+def fetch_matching_results(where_sql: str, params: list) -> list[dict]:
+    wait_for_index()
+    with connect_index() as conn:
+        ensure_index_schema_if_needed(conn)
+        rows = conn.execute(f"{RESULT_SELECT} WHERE {where_sql}", params).fetchall()
+    return [format_result(row) for row in rows]
+
+
+def search_tc(q: str) -> tuple[list[dict], dict]:
+    digits = phone_digits(q)
+    if not digits or not looks_like_tc(digits):
+        raise ValueError("Geçerli bir TC kimlik numarası girin")
+
+    query = {"type": "tc", "identity_number": digits, "q": q}
+    results = fetch_matching_results(
+        f"(identity_number_n LIKE ? OR {IDENTITY_DIGITS_SQL} LIKE ?)",
+        [f"%{norm_text(digits)}%", f"%{digits}%"],
+    )
+    return results, query
+
+
+def search_name(q: str) -> tuple[list[dict], dict]:
+    text = re.sub(r"\s+", " ", q.strip())
+    if not text:
+        raise ValueError("Geçerli bir isim girin")
+
+    parts = text.split(" ")
+    if len(parts) == 1:
+        needle = norm_text(parts[0])
+        query = {"type": "isim", "name": text, "q": text}
+        results = fetch_matching_results(
+            "(first_name_n LIKE ? OR last_name_n LIKE ? OR (first_name_n || ' ' || last_name_n) LIKE ?)",
+            [f"%{needle}%", f"%{needle}%", f"%{needle}%"],
+        )
+        return results, query
+
+    first_name = norm_text(parts[0])
+    last_name = norm_text(" ".join(parts[1:]))
+    query = {"type": "isim", "first_name": parts[0], "last_name": " ".join(parts[1:]), "q": text}
+    results = fetch_matching_results(
+        "first_name_n LIKE ? AND last_name_n LIKE ?",
+        [f"%{first_name}%", f"%{last_name}%"],
+    )
+    return results, query
+
+
+def search_address(q: str) -> tuple[list[dict], dict]:
+    text = re.sub(r"\s+", " ", q.strip())
+    if not text:
+        raise ValueError("Geçerli bir adres girin")
+
+    needle = norm_text(text)
+    query = {"type": "adres", "q": text}
+    results = fetch_matching_results(
+        "(city LIKE ? OR country LIKE ? OR notes LIKE ? OR extra_json LIKE ?)",
+        [f"%{needle}%", f"%{needle}%", f"%{needle}%", f"%{needle}%"],
+    )
+    return results, query
+
+
+def search_family(q: str) -> tuple[list[dict], dict]:
+    text = re.sub(r"\s+", " ", q.strip())
+    if not text:
+        raise ValueError("Geçerli bir aile bilgisi girin")
+
+    needle = norm_text(text)
+    query = {"type": "aile", "q": text}
+    results = fetch_matching_results(
+        "(first_name_n LIKE ? OR last_name_n LIKE ? OR notes LIKE ? OR extra_json LIKE ?)",
+        [f"%{needle}%", f"%{needle}%", f"%{needle}%", f"%{needle}%"],
+    )
+    return results, query
+
+
+def search_by_type(search_type: str, q: str) -> tuple[list[dict], dict]:
+    kind = search_type.strip().lower()
+    if kind == "telefon":
+        return search_phone(q)
+    if kind == "tc":
+        return search_tc(q)
+    if kind == "isim":
+        return search_name(q)
+    if kind == "adres":
+        return search_address(q)
+    if kind == "aile":
+        return search_family(q)
+    raise ValueError("Geçersiz sorgu türü")
+
+
 def search_phone(q: str) -> tuple[list[dict], dict]:
     digits = phone_digits(q)
     if not digits or not looks_like_phone_digits(digits):
@@ -1944,12 +2042,10 @@ def public_database_payload(stats: dict) -> dict:
         status = "starting"
 
     return {
-        "files": stats.get("files", 0),
         "total_lines": stats.get("total_lines"),
         "total_data_lines": stats.get("total_data_lines"),
         "total_size_mb": stats.get("total_size_mb", 0),
         "indexed_records": stats.get("indexed_records", 0),
-        "pending_files": stats.get("pending_files", 0),
         "index_ready": stats.get("index_ready", False),
         "index_building": stats.get("index_building", False),
         "auto_watch": stats.get("auto_watch", AUTO_WATCH),
@@ -1975,6 +2071,41 @@ def api_stats(
     started = time.perf_counter()
     return raw_json(
         stats=public_stats_payload(collect_stats(count_lines=count_lines)),
+        ms=round((time.perf_counter() - started) * 1000, 2),
+    )
+
+
+@app.get("/api/query")
+def api_query(
+    q: str = Query(..., description="Sorgu metni"),
+    type: str = Query(default="telefon", description="Sorgu türü: telefon, tc, isim, adres, aile"),
+    _: None = Depends(verify_api_key),
+) -> Response:
+    started = time.perf_counter()
+
+    if not q.strip():
+        raise HTTPException(status_code=400, detail="Geçerli bir sorgu girin")
+
+    try:
+        results, query = search_by_type(type, q)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except HTTPException:
+        raise
+    except sqlite3.Error as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+    return raw_json(
+        ok=True,
+        ready=INDEX_READY.is_set(),
+        success=True,
+        message="Sorgu kaydedildi.",
+        query=query,
+        found=len(results),
+        returned=len(results),
+        results=results,
         ms=round((time.perf_counter() - started) * 1000, 2),
     )
 

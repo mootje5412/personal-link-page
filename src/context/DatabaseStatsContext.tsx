@@ -41,7 +41,7 @@ export function DatabaseStatsProvider({ children }: { children: ReactNode }) {
   }, [reload])
 
   useEffect(() => {
-    if (!database?.index_building && !(database?.pending_files ?? 0)) {
+    if (!database?.index_building) {
       return
     }
 
@@ -50,7 +50,7 @@ export function DatabaseStatsProvider({ children }: { children: ReactNode }) {
     }, 5000)
 
     return () => window.clearInterval(timer)
-  }, [database?.index_building, database?.pending_files, reload])
+  }, [database?.index_building, reload])
 
   const value = useMemo(
     () => ({ database, loading, error, reload }),

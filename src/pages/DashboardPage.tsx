@@ -75,25 +75,19 @@ const DashboardPage = () => {
       <section className="dashboard-panel dashboard-database" aria-label="Veritabanı durumu">
         <h2>Veritabanı</h2>
         <p className="dashboard-panel-lead">
-          Sunucudaki veri dosyalarının satır sayısı ve indeks durumu. Yeni dosya eklendiğinde otomatik indekslenir.
+          Sunucudaki toplam veri satırı ve indeks durumu.
         </p>
         <div className="dashboard-stats dashboard-stats--database">
-          <article className="dashboard-stat-card">
-            <span className="dashboard-stat-label">Dosya sayısı</span>
+          <article className="dashboard-stat-card dashboard-stat-card--highlight">
+            <span className="dashboard-stat-label">Veri satırı</span>
             <strong className="dashboard-stat-value">
-              {databaseLoading ? '—' : formatCount(database?.files ?? 0)}
+              {databaseLoading ? '—' : formatCount(database?.total_data_lines)}
             </strong>
           </article>
           <article className="dashboard-stat-card">
             <span className="dashboard-stat-label">Toplam satır</span>
             <strong className="dashboard-stat-value">
               {databaseLoading ? '—' : formatCount(database?.total_lines)}
-            </strong>
-          </article>
-          <article className="dashboard-stat-card dashboard-stat-card--highlight">
-            <span className="dashboard-stat-label">Veri satırı</span>
-            <strong className="dashboard-stat-value">
-              {databaseLoading ? '—' : formatCount(database?.total_data_lines)}
             </strong>
           </article>
           <article className="dashboard-stat-card">
@@ -111,12 +105,6 @@ const DashboardPage = () => {
             </strong>
           </article>
         </div>
-        {!databaseLoading && database && database.pending_files > 0 && (
-          <p className="dashboard-search-msg">
-            {database.pending_files} dosya indeks bekliyor
-            {database.auto_watch ? ' — otomatik izleme açık' : ''}.
-          </p>
-        )}
       </section>
 
       <section className="dashboard-stats" aria-label="Sorgu analitiği">
