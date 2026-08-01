@@ -1,3 +1,4 @@
+import { IconRefresh, IconShield, IconZap } from './icons/SearchIcons'
 import ScrollStack from './ScrollStack'
 import './Features.css'
 
@@ -11,9 +12,9 @@ const searchTypes = [
 ]
 
 const highlights = [
-  { title: 'Hızlı', desc: 'Saniyeler içinde sonuç' },
-  { title: 'Güvenli', desc: 'SSL şifreli bağlantı' },
-  { title: 'Güncel', desc: 'Sürekli güncellenen veri' },
+  { icon: IconZap, title: 'Hızlı', desc: 'Ortalama yanıt süresi 1 saniyenin altında' },
+  { icon: IconShield, title: 'Güvenli', desc: 'Uçtan uca SSL şifreli bağlantı' },
+  { icon: IconRefresh, title: 'Güncel', desc: 'Sürekli güncellenen veri tabanı' },
 ]
 
 const Features = () => {
@@ -22,8 +23,11 @@ const Features = () => {
       <div className="container features-layout">
         <div className="features-head-sticky">
           <span className="section-label">Özellikler</span>
-          <h2>Tüm sorgu türleri tek panelde</h2>
-          <p>VeriPanel&apos;de ihtiyacınız olan her türlü veri sorgusunu yapabilirsiniz.</p>
+          <h2>Profesyonel sorgu altyapısı</h2>
+          <p>
+            Her sorgu türü optimize edilmiş motorlarla çalışır. Tek arayüzden
+            tüm verilere erişin.
+          </p>
         </div>
 
         <ScrollStack items={searchTypes} />
@@ -31,10 +35,15 @@ const Features = () => {
 
       <div className="container">
         <div className="highlights">
-          {highlights.map((item) => (
-            <div key={item.title} className="highlight">
-              <strong>{item.title}</strong>
-              <span>{item.desc}</span>
+          {highlights.map(({ icon: Icon, title, desc }) => (
+            <div key={title} className="highlight">
+              <div className="highlight-icon">
+                <Icon />
+              </div>
+              <div className="highlight-text">
+                <strong>{title}</strong>
+                <span>{desc}</span>
+              </div>
             </div>
           ))}
         </div>

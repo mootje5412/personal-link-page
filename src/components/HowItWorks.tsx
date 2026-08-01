@@ -4,37 +4,44 @@ import './HowItWorks.css'
 const steps = [
   {
     num: '01',
-    title: 'Kayıt ol',
-    desc: 'Kullanıcı adı ve şifre ile saniyeler içinde hesap oluşturun.',
+    title: 'Hesap oluştur',
+    desc: 'Kullanıcı adı ve şifre ile kayıt olun. E-posta isteğe bağlıdır.',
   },
   {
     num: '02',
-    title: 'Paket seç',
-    desc: 'İhtiyacınıza uygun günlük sorgu limitine sahip paketi seçin.',
+    title: 'Paketinizi seçin',
+    desc: 'Günlük sorgu limitinize uygun planı seçin ve panelinize erişin.',
   },
   {
     num: '03',
-    title: 'Sorgula',
-    desc: 'TC, isim, adres veya telefon ile anında sonuç alın.',
+    title: 'Sorgulamaya başlayın',
+    desc: 'TC, isim, adres veya telefon — anında sonuç alın.',
   },
 ]
 
 const HowItWorks = () => {
   return (
     <section id="nasil-calisir" className="section section-dark how-it-works">
+      <div className="how-bg" aria-hidden="true" />
+
       <div className="container">
         <div className="section-head how-head">
           <span className="section-label">Nasıl Çalışır</span>
-          <h2>3 adımda başlayın</h2>
-          <p>VeriPanel&apos;e kaydolun, paketinizi seçin ve hemen sorgulamaya başlayın.</p>
+          <h2>Dakikalar içinde hazır</h2>
+          <p>Üç basit adımda kayıt olun ve sorgulamaya başlayın.</p>
         </div>
 
-        <div className="steps-grid">
-          {steps.map((step) => (
+        <div className="steps-track">
+          {steps.map((step, index) => (
             <article key={step.num} className="step-card">
-              <span className="step-num">{step.num}</span>
-              <h3>{step.title}</h3>
-              <p>{step.desc}</p>
+              <div className="step-marker">
+                <span className="step-num">{step.num}</span>
+                {index < steps.length - 1 && <span className="step-line" aria-hidden="true" />}
+              </div>
+              <div className="step-content">
+                <h3>{step.title}</h3>
+                <p>{step.desc}</p>
+              </div>
             </article>
           ))}
         </div>

@@ -1,7 +1,7 @@
 :root {
   --stack-base: 112px;
   --stack-card-h: 148px;
-  --stack-gap: 56px;
+  --stack-gap: 48px;
 }
 
 .scroll-stack {
@@ -19,48 +19,44 @@
   position: sticky;
   display: flex;
   align-items: flex-start;
-  gap: 24px;
+  gap: 28px;
   min-height: var(--stack-card-h);
-  padding: 36px 40px;
+  padding: 32px 36px;
   background: #fff;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
   transform-origin: top center;
   will-change: transform, opacity;
-  transition: transform 0.15s ease-out, opacity 0.15s ease-out, border-color 0.2s, box-shadow 0.2s;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
-}
-
-.scroll-stack-card:last-child {
-  margin-bottom: 0;
+  transition: transform 0.15s ease-out, opacity 0.15s ease-out, box-shadow 0.2s;
+  box-shadow: var(--shadow-md);
 }
 
 .stack-index {
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
-  color: var(--muted);
-  letter-spacing: 0.05em;
+  color: var(--muted-light);
+  letter-spacing: 0.1em;
   flex-shrink: 0;
   padding-top: 4px;
 }
 
 .stack-content h3 {
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.03em;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .stack-content p {
-  font-size: 16px;
+  font-size: 15px;
   color: var(--muted);
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .scroll-stack-end {
-  height: 35vh;
+  height: 30vh;
   pointer-events: none;
 }
 
@@ -68,24 +64,20 @@
   :root {
     --stack-base: 88px;
     --stack-card-h: 128px;
-    --stack-gap: 40px;
+    --stack-gap: 32px;
   }
 
   .scroll-stack-card {
-    padding: 28px 26px;
-    gap: 18px;
+    padding: 24px;
+    gap: 20px;
   }
 
   .stack-content h3 {
-    font-size: 19px;
-  }
-
-  .stack-content p {
-    font-size: 15px;
+    font-size: 18px;
   }
 
   .scroll-stack-end {
-    height: 25vh;
+    height: 20vh;
   }
 }
 

@@ -1,5 +1,21 @@
 .how-it-works {
-  padding: 96px 0;
+  position: relative;
+  padding: 112px 0;
+  overflow: hidden;
+}
+
+.how-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.04), transparent 40%),
+    radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.03), transparent 35%);
+  pointer-events: none;
+}
+
+.how-it-works .container {
+  position: relative;
+  z-index: 1;
 }
 
 .how-head {
@@ -9,49 +25,69 @@
   margin-right: auto;
 }
 
+.how-head .section-label {
+  justify-content: center;
+}
+
+.how-head .section-label::before {
+  display: none;
+}
+
 .how-head p {
   margin: 0 auto;
 }
 
-.steps-grid {
+.steps-track {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-bottom: 48px;
+  gap: 24px;
+  margin-bottom: 56px;
 }
 
 .step-card {
-  padding: 36px 32px;
-  background: var(--surface-dark);
-  border: 1px solid var(--line-dark);
-  border-radius: var(--radius-lg);
-  transition: border-color 0.25s ease, transform 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
-.step-card:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
+.step-marker {
+  position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .step-num {
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  color: var(--muted-light);
-  letter-spacing: 0.08em;
-  margin-bottom: 20px;
+  letter-spacing: 0.04em;
+  color: #000;
+  background: #fff;
+  border-radius: 12px;
+  flex-shrink: 0;
 }
 
-.step-card h3 {
+.step-line {
+  flex: 1;
+  height: 1px;
+  margin-left: 16px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.2), transparent);
+}
+
+.step-content h3 {
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.03em;
   margin-bottom: 10px;
 }
 
-.step-card p {
+.step-content p {
   font-size: 15px;
   color: var(--muted-light);
   line-height: 1.65;
@@ -64,15 +100,15 @@
 
 @media (max-width: 768px) {
   .how-it-works {
-    padding: 64px 0;
+    padding: 72px 0;
   }
 
-  .steps-grid {
+  .steps-track {
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 32px;
   }
 
-  .step-card {
-    padding: 28px 24px;
+  .step-line {
+    display: none;
   }
 }

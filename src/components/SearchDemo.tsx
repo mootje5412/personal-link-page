@@ -1,53 +1,56 @@
+import { SearchTypeIcon, type SearchIconId } from './icons/SearchIcons'
 import './SearchDemo.css'
 
-const searchTypes = [
+type SearchType = {
+  id: SearchIconId
+  title: string
+  desc: string
+  placeholder: string
+  tag: string
+}
+
+const searchTypes: SearchType[] = [
   {
     id: 'tc',
-    icon: '🪪',
     title: 'TC Kimlik',
-    desc: '11 haneli kimlik numarası ile kişi bilgilerine ulaşın.',
+    desc: '11 haneli kimlik numarası ile tam kişi bilgilerine ulaşın.',
     placeholder: '12345678901',
-    example: 'Ad, soyad, doğum yeri, anne-baba adı',
+    tag: 'Kimlik',
   },
   {
     id: 'isim',
-    icon: '👤',
     title: 'İsim Soyisim',
-    desc: 'Ad ve soyad ile kişi araması yapın.',
+    desc: 'Ad ve soyad ile kişi araması yapın, TC ve iletişim bilgilerini görün.',
     placeholder: 'Ahmet Yılmaz',
-    example: 'TC, adres, telefon bilgileri',
+    tag: 'Kişi',
   },
   {
     id: 'adres',
-    icon: '📍',
     title: 'Adres',
-    desc: 'Adres bilgisi ile kayıtlı kişileri bulun.',
+    desc: 'İl, ilçe veya mahalle bazında kayıtlı kişileri listeleyin.',
     placeholder: 'Kadıköy, İstanbul',
-    example: 'Bölgedeki kayıtlı kişiler',
+    tag: 'Konum',
   },
   {
     id: 'telefon',
-    icon: '📱',
     title: 'Telefon',
-    desc: 'Telefon numarası ile sahibini sorgulayın.',
+    desc: 'GSM numarası ile numara sahibinin bilgilerini sorgulayın.',
     placeholder: '05XX XXX XX XX',
-    example: 'İsim, TC, adres bilgisi',
+    tag: 'GSM',
   },
   {
     id: 'aile',
-    icon: '👨‍👩‍👧',
     title: 'Aile',
-    desc: 'TC ile anne, baba ve kardeş bilgilerini görün.',
+    desc: 'TC ile anne, baba, kardeş ve eş bilgilerine erişin.',
     placeholder: '12345678901',
-    example: 'Aile bireyleri listesi',
+    tag: 'Aile',
   },
   {
     id: 'ip',
-    icon: '🌐',
     title: 'IP Adresi',
-    desc: 'IP adresi ile konum ve sağlayıcı bilgisi alın.',
+    desc: 'IP adresi ile konum, ISP ve hostname bilgisi alın.',
     placeholder: '192.168.1.1',
-    example: 'Konum, ISP, hostname',
+    tag: 'Ağ',
   },
 ]
 
@@ -55,22 +58,39 @@ const SearchDemo = () => {
   return (
     <section id="sorgu" className="section search-demo">
       <div className="container">
-        <div className="section-head search-demo-head">
-          <span className="section-label">Sorgu Türleri</span>
-          <h2>Ne arayabilirsiniz?</h2>
-          <p>VeriPanel ile TC kimlik, isim, adres, telefon ve daha birçok veri türünü saniyeler içinde sorgulayın.</p>
+        <div className="search-demo-top">
+          <div className="section-head search-demo-head">
+            <span className="section-label">Sorgu Türleri</span>
+            <h2>Her veri türü için ayrı sorgu modülü</h2>
+            <p>
+              TC kimlikten telefon numarasına — ihtiyacınız olan her sorgu tipi
+              VeriPanel&apos;de hazır ve optimize edilmiş şekilde sunulur.
+            </p>
+          </div>
         </div>
 
         <div className="search-grid">
-          {searchTypes.map((type) => (
+          {searchTypes.map((type, index) => (
             <article key={type.id} className="search-card">
-              <div className="search-card-icon">{type.icon}</div>
-              <h3>{type.title}</h3>
-              <p className="search-card-desc">{type.desc}</p>
-              <div className="search-card-input">
-                <span>{type.placeholder}</span>
+              <div className="search-card-top">
+                <div className="search-card-icon-wrap">
+                  <SearchTypeIcon id={type.id} />
+                </div>
+                <span className="search-card-tag">{type.tag}</span>
               </div>
-              <p className="search-card-example">{type.example}</p>
+
+              <div className="search-card-body">
+                <span className="search-card-index">{String(index + 1).padStart(2, '0')}</span>
+                <h3>{type.title}</h3>
+                <p className="search-card-desc">{type.desc}</p>
+              </div>
+
+              <div className="search-card-footer">
+                <div className="search-card-input">
+                  <span className="search-card-input-label">Örnek sorgu</span>
+                  <code>{type.placeholder}</code>
+                </div>
+              </div>
             </article>
           ))}
         </div>

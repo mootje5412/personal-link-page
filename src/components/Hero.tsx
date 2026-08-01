@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { IconArrow } from './icons/SearchIcons'
 import './Hero.css'
 
 const Hero = () => {
@@ -6,86 +7,101 @@ const Hero = () => {
     <section className="hero">
       <div className="hero-bg" aria-hidden="true">
         <div className="hero-grid" />
-        <div className="hero-glow" />
+        <div className="hero-noise" />
       </div>
 
       <div className="container hero-layout">
         <div className="hero-copy">
-          <div className="hero-badge">
-            <span className="hero-badge-dot" />
-            Türkiye&apos;nin veri sorgulama paneli
+          <div className="hero-eyebrow">
+            <span className="hero-status" />
+            Canlı · Türkiye geneli veri paneli
           </div>
 
           <h1>
-            Her türlü veriyi
-            <span className="hero-accent"> anında sorgula</span>
+            Veriyi sorgulamanın
+            <em> en hızlı yolu</em>
           </h1>
 
           <p className="hero-lead">
-            TC kimlik, isim, adres, telefon, aile bilgisi ve daha fazlası — tek panelde, saniyeler içinde sonuç al.
+            TC kimlik, isim, adres, telefon ve aile bilgisi — tüm sorgular tek
+            panelde, milisaniyeler içinde sonuçlanır.
           </p>
 
           <div className="hero-actions">
-            <Link to="/kayit" className="btn">Hemen başla</Link>
-            <a href="#sorgu" className="btn btn-ghost">Paneli incele</a>
+            <Link to="/kayit" className="btn">
+              Hemen başla
+              <IconArrow />
+            </Link>
+            <a href="#sorgu" className="btn btn-ghost">Sorgu türlerini gör</a>
           </div>
 
-          <div className="hero-trust">
-            <div className="hero-trust-item">
-              <strong>50K+</strong>
-              <span>Günlük sorgu</span>
+          <dl className="hero-metrics">
+            <div className="hero-metric">
+              <dt>50K+</dt>
+              <dd>Günlük sorgu</dd>
             </div>
-            <div className="hero-trust-divider" />
-            <div className="hero-trust-item">
-              <strong>99.9%</strong>
-              <span>Uptime</span>
+            <div className="hero-metric">
+              <dt>99.9%</dt>
+              <dd>Uptime</dd>
             </div>
-            <div className="hero-trust-divider" />
-            <div className="hero-trust-item">
-              <strong>7/24</strong>
-              <span>Aktif panel</span>
+            <div className="hero-metric">
+              <dt>&lt;1sn</dt>
+              <dd>Yanıt süresi</dd>
             </div>
-          </div>
+          </dl>
         </div>
 
-        <div className="hero-visual" aria-hidden="true">
+        <div className="hero-visual">
           <div className="hero-panel">
-            <div className="hero-panel-bar">
-              <span className="hero-panel-dot" />
-              <span className="hero-panel-dot" />
-              <span className="hero-panel-dot" />
-              <span className="hero-panel-title">VeriPanel — Sorgu</span>
+            <header className="hero-panel-header">
+              <div className="hero-panel-brand">
+                <span className="hero-panel-logo" />
+                VeriPanel
+              </div>
+              <span className="hero-panel-live">Canlı</span>
+            </header>
+
+            <div className="hero-panel-tabs" role="tablist" aria-label="Sorgu türleri">
+              <span className="hero-tab active" role="tab" aria-selected="true">TC Kimlik</span>
+              <span className="hero-tab" role="tab" aria-selected="false">İsim</span>
+              <span className="hero-tab" role="tab" aria-selected="false">Adres</span>
             </div>
-            <div className="hero-panel-body">
-              <div className="hero-search-tabs">
-                <span className="hero-tab active">TC Kimlik</span>
-                <span className="hero-tab">İsim</span>
-                <span className="hero-tab">Adres</span>
+
+            <div className="hero-panel-search">
+              <label className="hero-search-label">Kimlik numarası</label>
+              <div className="hero-search-row">
+                <input readOnly value="12345678901" aria-label="TC Kimlik numarası" />
+                <button type="button" className="hero-search-btn">Sorgula</button>
               </div>
-              <div className="hero-search-input">
-                <span>12345678901</span>
-                <button type="button" className="hero-search-btn">Ara</button>
+            </div>
+
+            <div className="hero-panel-results">
+              <div className="hero-results-head">
+                <span>Sonuç</span>
+                <span className="hero-results-time">0.4sn</span>
               </div>
-              <div className="hero-result">
-                <div className="hero-result-row">
-                  <span className="hero-result-label">Ad Soyad</span>
-                  <span className="hero-result-value">Ahmet Yılmaz</span>
+              <dl className="hero-result-list">
+                <div className="hero-result-item">
+                  <dt>Ad Soyad</dt>
+                  <dd>Ahmet Yılmaz</dd>
                 </div>
-                <div className="hero-result-row">
-                  <span className="hero-result-label">Doğum Yeri</span>
-                  <span className="hero-result-value">İstanbul</span>
+                <div className="hero-result-item">
+                  <dt>Doğum Yeri</dt>
+                  <dd>İstanbul</dd>
                 </div>
-                <div className="hero-result-row">
-                  <span className="hero-result-label">Adres</span>
-                  <span className="hero-result-value">Kadıköy, İstanbul</span>
+                <div className="hero-result-item">
+                  <dt>Adres</dt>
+                  <dd>Kadıköy, İstanbul</dd>
                 </div>
-                <div className="hero-result-row">
-                  <span className="hero-result-label">Anne Adı</span>
-                  <span className="hero-result-value">Fatma Yılmaz</span>
+                <div className="hero-result-item">
+                  <dt>Anne Adı</dt>
+                  <dd>Fatma Yılmaz</dd>
                 </div>
-              </div>
+              </dl>
             </div>
           </div>
+
+          <div className="hero-panel-shadow" aria-hidden="true" />
         </div>
       </div>
     </section>
