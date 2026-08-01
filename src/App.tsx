@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import DashboardLayout from './components/DashboardLayout'
@@ -6,7 +6,12 @@ import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
-import SearchPage from './pages/SearchPage'
+import { LegacySearchRedirect } from './pages/SearchPage'
+
+function LegacySearchRedirectWrapper() {
+  const { type } = useParams<{ type: string }>()
+  return <LegacySearchRedirect type={type} />
+}
 
 function App() {
   return (
@@ -25,7 +30,7 @@ function App() {
             }
           >
             <Route index element={<DashboardPage />} />
-            <Route path="sorgu/:type" element={<SearchPage />} />
+            <Route path="sorgu/:type" element={<LegacySearchRedirectWrapper />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

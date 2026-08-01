@@ -1,33 +1,14 @@
 import { FormEvent, useState } from 'react'
-import { Navigate, useParams } from 'react-router-dom'
-import { SEARCH_TYPE_LABELS, SearchType } from '../services/dashboardApi'
+import { Navigate } from 'react-router-dom'
 import { recordLocalSearch } from '../services/localAnalytics'
 import { formatSearchMessage, queryDatabase, SearchResult } from '../services/searchApi'
 import './SearchPage.css'
 
-const VALID_TYPES: SearchType[] = ['tc', 'isim', 'adres', 'telefon', 'aile']
-
-const PLACEHOLDERS: Record<SearchType, string> = {
-  tc: '12345678901',
-  isim: 'Ahmet Yılmaz',
-  adres: 'Kadıköy, İstanbul',
-  telefon: '05xxxxxxxxx',
-  aile: 'Anne / baba adı',
-}
-
 const SearchPage = () => {
-  const { type } = useParams<{ type: string }>()
-  const searchType = VALID_TYPES.includes(type as SearchType) ? (type as SearchType) : null
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [message, setMessage] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
-
-  if (!searchType) {
-    return <Navigate to="/panel" replace />
-  }
-
-  const activeType = searchType
 
   async function handleSearch(e: FormEvent) {
     e.preventDefault()
@@ -38,14 +19,14 @@ const SearchPage = () => {
     setResults([])
 
     try {
-      const data = await queryDatabase(activeType, query.trim())
+      const data = await queryDatabase('telefon', query.trim())
       const searchedQuery = query.trim()
       setResults(data.results ?? [])
       setMessage(formatSearchMessage(data))
-      recordLocalSearch(activeType, searchedQuery)
+      recordLocalSearch('telefon', searchedQuery)
       setQuery('')
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Sorgu başarısız.')
+      setMessage(err instanceof Error ? err.message : 'Telefon sorgusu başarısız.')
     } finally {
       setSearching(false)
     }
@@ -54,28 +35,26 @@ const SearchPage = () => {
   return (
     <div className="search-page">
       <header className="search-page-head">
-        <p className="search-page-label">{SEARCH_TYPE_LABELS[activeType]} sorgusu</p>
-        <h1>{SEARCH_TYPE_LABELS[activeType]}</h1>
+        <p className="search-page-label">Telefon sorgusu</p>
+        <h1>Telefon Sorgu</h1>
         <p className="search-page-lead">
-          {activeType === 'telefon'
-            ? 'Telefon numarası gir — tüm kayıtlar arasında hızlı arama yapılır.'
-            : `${SEARCH_TYPE_LABELS[activeType]} bilgisi ile arama yap.`}
+          Telefon numarası gir — veritabanında anında arama yapılır.
         </p>
       </header>
 
       <section className="search-page-panel">
         <form className="search-page-form" onSubmit={handleSearch}>
           <label className="search-page-field" htmlFor="search-query">
-            {activeType === 'telefon' ? 'Telefon numarası' : 'Sorgu'}
+            Telefon numarası
           </label>
           <div className="search-page-row">
             <input
               id="search-query"
-              type={activeType === 'telefon' || activeType === 'tc' ? 'tel' : 'text'}
-              inputMode={activeType === 'tc' || activeType === 'telefon' ? 'numeric' : 'text'}
+              type="tel"
+              inputMode="numeric"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={PLACEHOLDERS[activeType]}
+              placeholder="05xxxxxxxxx"
               maxLength={120}
               required
               autoFocus
@@ -90,50 +69,44 @@ const SearchPage = () => {
 
       {results.length > 0 && (
         <section className="search-results" aria-label="Arama sonuçları">
-          <h2>Sonuçlar</h2>
-          <ul className="search-results-list">
-            {results.map((row, index) => (
-              <li key={`${row.phone}-${row.identity_number}-${index}`} className="search-result-card">
-                <p className="search-result-name">{row.full_name || '—'}</p>
-                <dl className="search-result-fields">
-                  {row.phone && (
-                    <div>
-                      <dt>Telefon</dt>
-                      <dd>{row.phone}</dd>
-                    </div>
-                  )}
-                  {row.identity_number && (
-                    <div>
-                      <dt>TC</dt>
-                      <dd>{row.identity_number}</dd>
-                    </div>
-                  )}
-                  {row.email && (
-                    <div>
-                      <dt>E-posta</dt>
-                      <dd>{row.email}</dd>
-                    </div>
-                  )}
-                  {(row.city || row.country) && (
-                    <div>
-                      <dt>Konum</dt>
-                      <dd>{[row.city, row.country].filter(Boolean).join(', ')}</dd>
-                    </div>
-                  )}
-                  {row.notes && (
-                    <div>
-                      <dt>Not</dt>
-                      <dd>{row.notes}</dd>
-                    </div>
-                  )}
-                </dl>
-              </li>
-            ))}
-          </ul>
+          <h2>Sonuçlar ({results.length})</h2>
+          <div className="search-results-table-wrap">
+            <table className="search-results-table">
+              <thead>
+                <tr>
+                  <th>E-posta</th>
+                  <th>Telefon</th>
+                  <th>İsim</th>
+                  <th>Numara</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((row, index) => (
+                  <tr key={`${row.phone}-${row.identity_number}-${index}`}>
+                    <td>{row.email || '—'}</td>
+                    <td>{row.phone || '—'}</td>
+                    <td>{row.full_name || '—'}</td>
+                    <td>{row.identity_number || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
     </div>
   )
+}
+
+export function SearchPageRoute() {
+  return <SearchPage />
+}
+
+export function LegacySearchRedirect({ type }: { type: string | undefined }) {
+  if (type && type !== 'telefon') {
+    return <Navigate to="/panel/sorgu/telefon" replace />
+  }
+  return <SearchPage />
 }
 
 export default SearchPage

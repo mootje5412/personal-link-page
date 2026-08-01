@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useDatabaseStats } from '../context/DatabaseStatsContext'
 import {
   AnalyticsSummary,
   SEARCH_TYPE_LABELS,
   SearchType,
-  fetchAnalytics,
 } from '../services/dashboardApi'
 import { databaseStatusLabel, formatCount } from '../services/databaseApi'
 import { getLocalAnalytics } from '../services/localAnalytics'
@@ -26,36 +26,37 @@ function formatDate(value: string) {
 
 const DashboardPage = () => {
   const { user } = useAuth()
+  const location = useLocation()
   const { database, loading: databaseLoading, error: databaseError } = useDatabaseStats()
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
 
-  const loadAnalytics = useCallback(async () => {
-    try {
-      const data = await fetchAnalytics()
-      setAnalytics(data)
-      setError('')
-    } catch {
-      setAnalytics(getLocalAnalytics())
-      setError('')
-    } finally {
-      setLoading(false)
-    }
+  const loadAnalytics = useCallback(() => {
+    setAnalytics(getLocalAnalytics())
   }, [])
 
   useEffect(() => {
     loadAnalytics()
+  }, [loadAnalytics, location.pathname])
+
+  useEffect(() => {
+    const onRecorded = () => loadAnalytics()
+    window.addEventListener('veripanel:search-recorded', onRecorded)
+    window.addEventListener('focus', onRecorded)
+    return () => {
+      window.removeEventListener('veripanel:search-recorded', onRecorded)
+      window.removeEventListener('focus', onRecorded)
+    }
   }, [loadAnalytics])
 
   const displayName = user?.username ?? 'Kullanıcı'
+  const stats = analytics
 
   return (
     <div className="dashboard-page">
       <header className="dashboard-welcome">
         <h1>Hoş geldin, {displayName}</h1>
         <p className="dashboard-subtitle">
-          Sorgu geçmişin ve kullanım istatistiklerin burada. Sol menüden bir sorgu türü seç.
+          Sorgu geçmişin ve kullanım istatistiklerin burada. Sol menüden telefon sorgusu yap.
         </p>
         {!databaseLoading && database?.total_data_lines != null && (
           <p className="dashboard-data-summary">
@@ -69,7 +70,6 @@ const DashboardPage = () => {
         )}
       </header>
 
-      {error && <p className="dashboard-error" role="alert">{error}</p>}
       {databaseError && <p className="dashboard-error" role="alert">{databaseError}</p>}
 
       <section className="dashboard-panel dashboard-database" aria-label="Veritabanı durumu">
@@ -110,30 +110,30 @@ const DashboardPage = () => {
       <section className="dashboard-stats" aria-label="Sorgu analitiği">
         <article className="dashboard-stat-card">
           <span className="dashboard-stat-label">Toplam sorgu</span>
-          <strong className="dashboard-stat-value">{loading ? '—' : analytics?.total ?? 0}</strong>
+          <strong className="dashboard-stat-value">{stats?.total ?? 0}</strong>
         </article>
         <article className="dashboard-stat-card">
           <span className="dashboard-stat-label">Bugün</span>
-          <strong className="dashboard-stat-value">{loading ? '—' : analytics?.today ?? 0}</strong>
+          <strong className="dashboard-stat-value">{stats?.today ?? 0}</strong>
         </article>
         <article className="dashboard-stat-card">
           <span className="dashboard-stat-label">Bu hafta</span>
-          <strong className="dashboard-stat-value">{loading ? '—' : analytics?.week ?? 0}</strong>
+          <strong className="dashboard-stat-value">{stats?.week ?? 0}</strong>
         </article>
         <article className="dashboard-stat-card">
           <span className="dashboard-stat-label">Bu ay</span>
-          <strong className="dashboard-stat-value">{loading ? '—' : analytics?.month ?? 0}</strong>
+          <strong className="dashboard-stat-value">{stats?.month ?? 0}</strong>
         </article>
       </section>
 
       <section className="dashboard-panel">
         <h2>Son sorgular</h2>
-        {!loading && analytics?.recent.length === 0 && (
-          <p className="dashboard-empty">Henüz sorgu yok. Sol menüden bir sorgu başlat.</p>
+        {stats?.recent.length === 0 && (
+          <p className="dashboard-empty">Henüz sorgu yok. Sol menüden telefon sorgusu başlat.</p>
         )}
 
         <ul className="dashboard-recent-list">
-          {(analytics?.recent ?? []).map((item, index) => (
+          {(stats?.recent ?? []).map((item, index) => (
             <li key={`${item.createdAt}-${index}`}>
               <div>
                 <span className="dashboard-recent-type">
@@ -146,20 +146,6 @@ const DashboardPage = () => {
           ))}
         </ul>
       </section>
-
-      {analytics && analytics.byType.length > 0 && (
-        <section className="dashboard-panel dashboard-breakdown">
-          <h2>Türe göre dağılım</h2>
-          <div className="dashboard-breakdown-grid">
-            {analytics.byType.map((item) => (
-              <div key={item.type} className="dashboard-breakdown-item">
-                <span>{SEARCH_TYPE_LABELS[item.type as SearchType] ?? item.type}</span>
-                <strong>{item.count}</strong>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   )
 }
