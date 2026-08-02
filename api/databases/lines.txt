@@ -1,3 +1,0 @@
-05551234567 Ahmet Yilmaz ahmet.yilmaz@example.com
-05321112233 Deniz Aksoy deniz@example.com
-05443334455 Selin Polat selin@example.com
