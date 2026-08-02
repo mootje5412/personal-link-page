@@ -4,15 +4,15 @@ import './MobileNav.css'
 const MobileNav = () => {
   const location = useLocation()
   const onPanel = location.pathname === '/panel'
-  const onSearch = location.pathname === '/panel/sorgu/telefon'
+  const onSearch = location.pathname.startsWith('/panel/sorgu/telefon')
 
   return (
     <nav className="mobile-nav" aria-label="Mobil menü">
       <Link to="/panel" className={`mobile-nav-link ${onPanel ? 'active' : ''}`}>
-        Panel
+        Gösterge Paneli
       </Link>
       <Link to="/panel/sorgu/telefon" className={`mobile-nav-link ${onSearch ? 'active' : ''}`}>
-        Telefon Sorgu
+        Telefon Sorgusu
       </Link>
     </nav>
   )

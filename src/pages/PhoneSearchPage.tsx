@@ -6,14 +6,16 @@ import { recordLocalSearch } from '../services/localAnalytics'
 import { formatSearchMessage, queryDatabase, SearchResult } from '../services/searchApi'
 import './DashboardPage.css'
 
-const DashboardPage = () => {
+const PhoneSearchPage = () => {
   const { database, loading: databaseLoading } = useDatabaseStats()
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
   const [message, setMessage] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
 
-  const indexBusy = databaseLoading || database?.index_building || database?.status !== 'ready'
+  const indexBusy =
+    databaseLoading ||
+    (database?.status === 'starting' && (database?.indexed_records ?? 0) === 0)
   const indexStatus = databaseLoading
     ? 'Veritabanı durumu kontrol ediliyor…'
     : databaseStatusLabel(database?.status ?? 'starting', database?.index_building ?? false)
@@ -40,6 +42,12 @@ const DashboardPage = () => {
 
   return (
     <div className="dashboard-search">
+      <header className="dashboard-search-head">
+        <p className="dashboard-search-kicker">Sorgu</p>
+        <h1>Telefon sorgusu</h1>
+        <p className="dashboard-search-intro">Telefon numarası gir — veritabanında anında arama yapılır.</p>
+      </header>
+
       <form className="dashboard-search-form" onSubmit={handleSearch}>
         <label className="dashboard-search-label" htmlFor="dashboard-search-input">
           Telefon numarası
@@ -56,7 +64,6 @@ const DashboardPage = () => {
             maxLength={120}
             required
             disabled={indexBusy}
-            autoFocus
           />
           <button type="submit" className="btn" disabled={searching || !query.trim() || indexBusy}>
             {searching ? 'Sorgulanıyor…' : 'Sorgula'}
@@ -79,4 +86,4 @@ const DashboardPage = () => {
   )
 }
 
-export default DashboardPage
+export default PhoneSearchPage

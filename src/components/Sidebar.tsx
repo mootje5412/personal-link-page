@@ -10,6 +10,13 @@ type SidebarProps = {
   username: string
 }
 
+const SEARCH_LINKS = [
+  { to: '/panel/sorgu/telefon', label: 'Telefon Sorgusu' },
+  { to: '/panel/sorgu/tc', label: 'TC Kimlik Sorgusu' },
+  { to: '/panel/sorgu/ad', label: 'Ad Sorgusu' },
+  { to: '/panel/sorgu/soyad', label: 'Soyad Sorgusu' },
+]
+
 const Sidebar = ({
   collapsed,
   mobileOpen,
@@ -24,8 +31,8 @@ const Sidebar = ({
     return location.pathname === '/panel'
   }
 
-  function isPhoneSearchActive() {
-    return location.pathname === '/panel/sorgu/telefon'
+  function isSearchActive(path: string) {
+    return location.pathname === path
   }
 
   return (
@@ -61,7 +68,7 @@ const Sidebar = ({
           {!collapsed && (
             <div className="sidebar-user-meta">
               <span className="sidebar-user-name">{username}</span>
-              <span className="sidebar-user-role">Panel</span>
+              <span className="sidebar-user-role">Üye</span>
             </div>
           )}
         </div>
@@ -72,18 +79,21 @@ const Sidebar = ({
             className={`sidebar-link ${isDashboardActive() ? 'active' : ''}`}
             onClick={onCloseMobile}
           >
-            <span className="sidebar-link-label">Panel</span>
+            <span className="sidebar-link-label">Gösterge Paneli</span>
           </Link>
 
           {!collapsed && <p className="sidebar-section-label">Sorgu</p>}
 
-          <Link
-            to="/panel/sorgu/telefon"
-            className={`sidebar-link sidebar-search-link ${isPhoneSearchActive() ? 'active' : ''}`}
-            onClick={onCloseMobile}
-          >
-            <span className="sidebar-link-label">Telefon Sorgu</span>
-          </Link>
+          {SEARCH_LINKS.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={`sidebar-link sidebar-search-link ${isSearchActive(item.to) ? 'active' : ''}`}
+              onClick={onCloseMobile}
+            >
+              <span className="sidebar-link-label">{item.label}</span>
+            </Link>
+          ))}
         </nav>
 
         <div className="sidebar-footer">
