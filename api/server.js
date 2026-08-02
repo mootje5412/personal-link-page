@@ -1,8 +1,7 @@
 import express from 'express'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { getDatabaseStats, searchDatabases, clearCache } from './lib/searchEngine.js'
-import { getLineStats } from './lib/stats.js'
+import { getDatabaseStats, getLineStats, searchDatabases, clearCache } from './lib/searchEngine.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT_DIR = __dirname

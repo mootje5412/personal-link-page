@@ -1,13 +1,19 @@
 import { listDatabaseFiles, resolveDatabasePath } from './fileWalker.js'
-import { parseFile } from './parsers.js'
+import { indexFile } from './parsers.js'
 
 const cache = {
+  fingerprint: '',
   loadedAt: 0,
   records: [],
-  files: [],
+  stats: {
+    total_lines: 0,
+    total_data_lines: 0,
+    indexed_records: 0,
+    status: 'ready',
+  },
 }
 
-const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS || 30000)
+const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS || 300000)
 
 function digitsOnly(value) {
   return String(value ?? '').replace(/\D/g, '')
@@ -32,31 +38,65 @@ function recordMatches(record, needles) {
   return false
 }
 
-export function loadAllRecords(rootDir = process.cwd(), force = false) {
-  const now = Date.now()
-  if (!force && cache.records.length > 0 && now - cache.loadedAt < CACHE_TTL_MS) {
-    return cache
-  }
+function buildFingerprint(rootDir) {
+  return listDatabaseFiles(rootDir)
+    .map((file) => `${file.path}:${file.modified_at}:${file.size_bytes}`)
+    .join('|')
+}
 
+function rebuildIndex(rootDir) {
   const files = listDatabaseFiles(rootDir)
   const records = []
-  const fileStats = []
+  let total_lines = 0
+  let total_data_lines = 0
 
   for (const file of files) {
     try {
       const fullPath = resolveDatabasePath(file.path, rootDir)
-      const parsed = parseFile(fullPath)
-      records.push(...parsed)
-      fileStats.push({ ...file, records: parsed.length, status: 'ok' })
-    } catch (error) {
-      fileStats.push({ ...file, records: 0, status: 'error', error: error.message })
+      const indexed = indexFile(fullPath)
+      records.push(...indexed.records)
+      total_lines += indexed.total_lines
+      total_data_lines += indexed.total_data_lines
+    } catch {
+      // skip unreadable files
     }
   }
 
-  cache.loadedAt = now
+  cache.fingerprint = buildFingerprint(rootDir)
+  cache.loadedAt = Date.now()
   cache.records = records
-  cache.files = fileStats
+  cache.stats = {
+    total_lines,
+    total_data_lines,
+    indexed_records: records.length,
+    status: 'ready',
+  }
+
   return cache
+}
+
+export function loadAllRecords(rootDir = process.cwd(), force = false) {
+  const fingerprint = buildFingerprint(rootDir)
+  const now = Date.now()
+  const cacheValid =
+    !force &&
+    cache.fingerprint === fingerprint &&
+    cache.loadedAt > 0 &&
+    now - cache.loadedAt < CACHE_TTL_MS
+
+  if (!cacheValid) {
+    rebuildIndex(rootDir)
+  }
+
+  return cache
+}
+
+export function getLineStats(rootDir = process.cwd()) {
+  const { stats } = loadAllRecords(rootDir)
+  return {
+    ok: true,
+    stats,
+  }
 }
 
 export function searchDatabases(query, options = {}) {
@@ -73,7 +113,7 @@ export function searchDatabases(query, options = {}) {
     }
   }
 
-  const { records, files } = loadAllRecords(rootDir)
+  const { records } = loadAllRecords(rootDir)
   const needles = buildNeedles(trimmed)
   const matches = []
 
@@ -96,16 +136,22 @@ export function searchDatabases(query, options = {}) {
 }
 
 export function getDatabaseStats(rootDir = process.cwd()) {
-  const { records } = loadAllRecords(rootDir)
+  const { stats } = loadAllRecords(rootDir)
   return {
     ok: true,
-    total_records: records.length,
-    status: 'ready',
+    total_records: stats.indexed_records,
+    status: stats.status,
   }
 }
 
 export function clearCache() {
+  cache.fingerprint = ''
   cache.loadedAt = 0
   cache.records = []
-  cache.files = []
+  cache.stats = {
+    total_lines: 0,
+    total_data_lines: 0,
+    indexed_records: 0,
+    status: 'ready',
+  }
 }
