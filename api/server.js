@@ -1,7 +1,7 @@
 import express from 'express'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { getDatabaseStats, getLineStats, searchDatabases, clearCache } from './lib/searchEngine.js'
+import { getDatabaseStats, getLineStats, searchDatabases, clearCache, startAutoRescan } from './lib/searchEngine.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT_DIR = __dirname
@@ -85,4 +85,12 @@ app.use((_req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Search API listening on http://0.0.0.0:${PORT}`)
+  setImmediate(() => {
+    const started = performance.now()
+    const stats = getLineStats(ROOT_DIR)
+    console.log(
+      `Index warmed in ${Math.round(performance.now() - started)}ms (${stats.stats.indexed_records} records)`,
+    )
+  })
+  startAutoRescan(ROOT_DIR)
 })

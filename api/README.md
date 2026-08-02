@@ -7,10 +7,10 @@ Node.js API that searches all files inside the `databases/` folder.
 - `.json`
 - `.jsonl` / `.ndjson`
 - `.csv` / `.tsv`
-- `.txt`
+- `.txt` / `.log` / `.dat` / `.sql` / `.xml` / `.yaml` / `.yml`
 - `.xlsx` / `.xls`
 
-Drop files into `databases/` (subfolders allowed). The API indexes and searches them.
+Drop files into `databases/` (subfolders allowed). The API scans every supported file automatically every 15 seconds.
 
 ## Endpoints
 

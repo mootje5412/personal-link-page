@@ -109,15 +109,35 @@ export function normalizeRecord(record, sourceFile, rowIndex) {
   }
 }
 
-export function indexFile(filePath) {
-  const ext = path.extname(filePath).toLowerCase()
+function extractJsonRecords(parsed) {
+  if (Array.isArray(parsed)) return parsed
+
+  if (!parsed || typeof parsed !== 'object') {
+    return [{ value: parsed }]
+  }
+
+  for (const key of ['data', 'results', 'records', 'items', 'rows', 'users', 'people', 'contacts']) {
+    if (Array.isArray(parsed[key])) return parsed[key]
+  }
+
+  for (const value of Object.values(parsed)) {
+    if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
+      return value
+    }
+  }
+
+  return [parsed]
+}
+
+export function indexFile(filePath, fileType) {
+  const ext = fileType || path.extname(filePath).toLowerCase()
   const relative = path.basename(filePath)
 
   if (ext === '.json') {
     const raw = fs.readFileSync(filePath, 'utf8')
     const lineStats = countTextLines(raw)
     const parsed = JSON.parse(raw)
-    const items = Array.isArray(parsed) ? parsed : [parsed]
+    const items = extractJsonRecords(parsed)
     return {
       records: items.map((item, index) => normalizeRecord(item, relative, index + 1)),
       total_lines: lineStats.total_lines,
@@ -156,7 +176,7 @@ export function indexFile(filePath) {
     }
   }
 
-  if (ext === '.txt') {
+  if (ext === '.txt' || ext === '.log' || ext === '.dat' || ext === '.sql' || ext === '.xml' || ext === '.yaml' || ext === '.yml') {
     const raw = fs.readFileSync(filePath, 'utf8')
     const lineStats = countTextLines(raw)
     const lines = raw.split(/\r?\n/).filter((line) => line.trim())

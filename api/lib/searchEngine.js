@@ -53,12 +53,14 @@ function rebuildIndex(rootDir) {
   for (const file of files) {
     try {
       const fullPath = resolveDatabasePath(file.path, rootDir)
-      const indexed = indexFile(fullPath)
-      records.push(...indexed.records)
+      const indexed = indexFile(fullPath, file.extension)
+      for (const record of indexed.records) {
+        records.push(record)
+      }
       total_lines += indexed.total_lines
       total_data_lines += indexed.total_data_lines
-    } catch {
-      // skip unreadable files
+    } catch (error) {
+      console.error(`Failed to index ${file.path}: ${error.message}`)
     }
   }
 
@@ -154,4 +156,15 @@ export function clearCache() {
     indexed_records: 0,
     status: 'ready',
   }
+}
+
+export function startAutoRescan(rootDir = process.cwd(), intervalMs = Number(process.env.RESCAN_MS || 15000)) {
+  setInterval(() => {
+    const fingerprint = buildFingerprint(rootDir)
+    if (fingerprint !== cache.fingerprint) {
+      console.log('Database files changed, rebuilding index...')
+      rebuildIndex(rootDir)
+      console.log(`Index rebuilt: ${cache.stats.indexed_records} records`)
+    }
+  }, intervalMs).unref()
 }
