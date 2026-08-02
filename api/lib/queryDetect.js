@@ -24,47 +24,28 @@ export function detectSearchType(query) {
   return 'ad'
 }
 
+const BOT_SEARCH_OPTIONS = {
+  limit: 100,
+  stopAfterLimit: true,
+}
+
 export function searchWithAutoType(query, options = {}) {
   const trimmed = String(query ?? '').trim()
+  const searchOptions = { ...BOT_SEARCH_OPTIONS, ...options }
   const primaryType = detectSearchType(trimmed)
-  const attempts = [primaryType]
 
-  if (primaryType === 'ad') {
-    attempts.push('soyad')
-    const parts = trimmed.split(/\s+/).filter(Boolean)
-    if (parts.length > 1) {
-      attempts.push({ type: 'ad', query: parts[0] })
-      attempts.push({ type: 'soyad', query: parts[parts.length - 1] })
-    }
+  const primary = searchDatabases(trimmed, { ...searchOptions, type: primaryType })
+  if (!primary.ok) return primary
+  if (primary.found > 0 || primaryType !== 'ad') return primary
+
+  const parts = trimmed.split(/\s+/).filter(Boolean)
+  if (parts.length > 1) {
+    const byAd = searchDatabases(parts[0], { ...searchOptions, type: 'ad' })
+    if (byAd.ok && byAd.found > 0) return byAd
+
+    const bySoyad = searchDatabases(parts[parts.length - 1], { ...searchOptions, type: 'soyad' })
+    if (bySoyad.ok && bySoyad.found > 0) return bySoyad
   }
 
-  let lastResult = null
-
-  for (const attempt of attempts) {
-    const type = typeof attempt === 'string' ? attempt : attempt.type
-    const attemptQuery = typeof attempt === 'string' ? trimmed : attempt.query
-    const result = searchDatabases(attemptQuery, { ...options, type })
-
-    if (!result.ok) return result
-
-    lastResult = {
-      ...result,
-      detected_type: type,
-    }
-
-    if (result.found > 0) {
-      return lastResult
-    }
-  }
-
-  return (
-    lastResult ?? {
-      ok: false,
-      error: 'Sorgu boş olamaz',
-      type: primaryType,
-      found: 0,
-      returned: 0,
-      results: [],
-    }
-  )
+  return searchDatabases(trimmed, { ...searchOptions, type: 'soyad' })
 }

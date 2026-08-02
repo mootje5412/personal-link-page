@@ -143,7 +143,12 @@ export function getLineStats(rootDir = process.cwd()) {
 }
 
 export function searchDatabases(query, options = {}) {
-  const { limit = 50, rootDir = process.cwd(), type = 'telefon' } = options
+  const {
+    limit = 50,
+    stopAfterLimit = false,
+    rootDir = process.cwd(),
+    type = 'telefon',
+  } = options
   const trimmed = String(query ?? '').trim()
   const searchType = normalizeSearchType(type)
   const validationError = validateQuery(searchType, trimmed)
@@ -154,6 +159,7 @@ export function searchDatabases(query, options = {}) {
       error: 'Query parameter q is required',
       type: searchType,
       found: 0,
+      foundExact: true,
       returned: 0,
       results: [],
     }
@@ -165,6 +171,7 @@ export function searchDatabases(query, options = {}) {
       error: validationError,
       type: searchType,
       found: 0,
+      foundExact: true,
       returned: 0,
       results: [],
     }
@@ -173,22 +180,31 @@ export function searchDatabases(query, options = {}) {
   const { records } = loadAllRecords(rootDir)
   const matches = []
   let totalFound = 0
+  let foundExact = true
 
   for (const record of records) {
     if (!recordMatchesType(record, searchType, trimmed)) continue
     totalFound += 1
-    if (matches.length >= limit) continue
-    matches.push({
-      row: record.row_index,
-      ...formatClearResult(record.fields),
-    })
+
+    if (matches.length < limit) {
+      matches.push({
+        row: record.row_index,
+        ...formatClearResult(record.fields),
+      })
+    }
+
+    if (stopAfterLimit && matches.length >= limit) {
+      foundExact = false
+      break
+    }
   }
 
   return {
     ok: true,
     type: searchType,
     query: trimmed,
-    found: totalFound,
+    found: foundExact ? totalFound : matches.length,
+    foundExact,
     returned: matches.length,
     results: matches,
   }
