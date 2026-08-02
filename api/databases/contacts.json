@@ -1,0 +1,23 @@
+[
+  {
+    "first_name": "Ahmet",
+    "last_name": "Yilmaz",
+    "phone": "05551234567",
+    "email": "ahmet.yilmaz@example.com",
+    "city": "Istanbul"
+  },
+  {
+    "first_name": "Ayse",
+    "last_name": "Demir",
+    "phone": "05321234567",
+    "email": "ayse.demir@example.com",
+    "city": "Ankara"
+  },
+  {
+    "first_name": "Mehmet",
+    "last_name": "Kaya",
+    "phone": "05441234567",
+    "email": "mehmet.kaya@example.com",
+    "city": "Izmir"
+  }
+]
