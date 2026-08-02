@@ -15,57 +15,117 @@ function phoneHref(value) {
   return `tel:${digits}`
 }
 
-function displayAd(result) {
-  if (result.ad) return result.ad
-  if (result.isim) return result.isim.split(/\s+/)[0] ?? '—'
-  return '—'
+const FIELD_LABELS = {
+  isim: 'İsim',
+  ad: 'Ad',
+  soyad: 'Soyad',
+  telefon: 'Telefon',
+  telefon_sifirli: 'Telefon (0)',
+  telefon_uluslararasi: 'Telefon (+90)',
+  email: 'E-posta',
+  tc: 'TC Kimlik',
+  sehir: 'Şehir',
+  ilce: 'İlçe',
+  ulke: 'Ülke',
+  adres: 'Adres',
+  posta_kodu: 'Posta Kodu',
+  sirket: 'Şirket',
+  username: 'Kullanıcı Adı',
+  website: 'Web Sitesi',
 }
 
-function displaySoyad(result) {
-  if (result.soyad) return result.soyad
-  if (result.isim) {
-    const parts = result.isim.split(/\s+/)
-    if (parts.length > 1) return parts.slice(1).join(' ')
+const BASE_TABLE_COLUMN_KEYS = [
+  'isim',
+  'ad',
+  'soyad',
+  'telefon',
+  'telefon_sifirli',
+  'telefon_uluslararasi',
+  'email',
+  'tc',
+  'sehir',
+  'ilce',
+  'ulke',
+  'adres',
+  'posta_kodu',
+  'sirket',
+  'username',
+  'website',
+]
+
+function getResultCellValue(result, columnKey) {
+  if (columnKey.startsWith('diger:')) {
+    const extraKey = columnKey.slice(6)
+    return result.diger?.[extraKey] ?? ''
   }
-  return '—'
+  const value = result[columnKey]
+  return typeof value === 'string' ? value : ''
 }
 
-function renderResultRow(result) {
-  const ad = displayAd(result)
-  const soyad = displaySoyad(result)
-  const href = result.telefon ? phoneHref(result.telefon_sifirli ?? result.telefon) : ''
+function getResultTableColumns(results) {
+  const columns = []
+  const seen = new Set()
 
-  const adCell = ad !== '—'
-    ? `<span class="cell-primary">${escapeHtml(ad)}</span>`
-    : `<span class="cell-empty">—</span>`
-
-  const soyadCell = soyad !== '—'
-    ? `<span class="cell-primary">${escapeHtml(soyad)}</span>`
-    : `<span class="cell-empty">—</span>`
-
-  let tcCell = `<span class="cell-empty">—</span>`
-  if (result.tc) {
-    const sub = result.isim ? `<span class="cell-sub">${escapeHtml(result.isim)}</span>` : ''
-    tcCell = `<div class="cell-stack"><span class="cell-tc">${escapeHtml(result.tc)}</span>${sub}</div>`
+  for (const key of BASE_TABLE_COLUMN_KEYS) {
+    const hasValue = results.some((result) => getResultCellValue(result, key))
+    if (!hasValue) continue
+    columns.push({ key, label: FIELD_LABELS[key] ?? key })
+    seen.add(key)
   }
 
-  let phoneCell = `<span class="cell-empty">—</span>`
-  if (result.telefon) {
+  const extraKeys = new Set()
+  for (const result of results) {
+    if (!result.diger) continue
+    for (const key of Object.keys(result.diger)) {
+      extraKeys.add(key)
+    }
+  }
+
+  for (const key of [...extraKeys].sort()) {
+    const columnKey = `diger:${key}`
+    if (seen.has(columnKey)) continue
+    columns.push({ key: columnKey, label: key.replace(/_/g, ' ') })
+  }
+
+  return columns
+}
+
+function renderCell(columnKey, value, result) {
+  if (!value) return `<span class="cell-empty">—</span>`
+
+  if (columnKey === 'telefon') {
+    const href = phoneHref(result.telefon_sifirli ?? result.telefon ?? value)
     const main = href
-      ? `<a class="cell-link" href="${escapeHtml(href)}">${escapeHtml(result.telefon)}</a>`
-      : `<span class="cell-primary">${escapeHtml(result.telefon)}</span>`
-    const sub = result.telefon_uluslararasi
-      ? `<span class="cell-sub">${escapeHtml(result.telefon_uluslararasi)}</span>`
-      : ''
-    phoneCell = `<div class="cell-stack">${main}${sub}</div>`
+      ? `<a class="cell-link" href="${escapeHtml(href)}">${escapeHtml(value)}</a>`
+      : `<span class="cell-primary">${escapeHtml(value)}</span>`
+    return `<div class="cell-stack">${main}</div>`
   }
 
-  return `<tr>
-    <td data-label="Ad">${adCell}</td>
-    <td data-label="Soyad">${soyadCell}</td>
-    <td data-label="TC Kimlik">${tcCell}</td>
-    <td data-label="Telefon">${phoneCell}</td>
-  </tr>`
+  if (columnKey === 'email') {
+    return `<a class="cell-link" href="mailto:${escapeHtml(value)}">${escapeHtml(value)}</a>`
+  }
+
+  if (columnKey === 'website') {
+    const href = String(value).startsWith('http') ? String(value) : `https://${value}`
+    return `<a class="cell-link" href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${escapeHtml(value)}</a>`
+  }
+
+  if (columnKey === 'tc' || columnKey === 'telefon_sifirli') {
+    return `<span class="cell-mono">${escapeHtml(value)}</span>`
+  }
+
+  return `<span class="cell-primary">${escapeHtml(value)}</span>`
+}
+
+function renderResultRow(result, columns) {
+  const cells = columns
+    .map((column) => {
+      const value = getResultCellValue(result, column.key)
+      return `<td data-label="${escapeHtml(column.label)}">${renderCell(column.key, value, result)}</td>`
+    })
+    .join('')
+
+  return `<tr>${cells}</tr>`
 }
 
 function renderResultsTable(results) {
@@ -73,20 +133,15 @@ function renderResultsTable(results) {
     return `<div class="empty">Sonuç bulunamadı.</div>`
   }
 
-  const rows = results.map((row) => renderResultRow(row)).join('')
+  const columns = getResultTableColumns(results)
+  const header = columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')
+  const rows = results.map((row) => renderResultRow(row, columns)).join('')
 
   return `<div class="panel">
-    <div class="toolbar"><strong>${results.length}</strong> kayıt gösteriliyor</div>
+    <div class="toolbar"><strong>${results.length}</strong> kayıt · <strong>${columns.length}</strong> alan</div>
     <div class="table-wrap">
       <table class="results-table">
-        <thead>
-          <tr>
-            <th>Ad</th>
-            <th>Soyad</th>
-            <th>TC Kimlik</th>
-            <th>Telefon</th>
-          </tr>
-        </thead>
+        <thead><tr>${header}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -162,7 +217,7 @@ function pageShell(title, body) {
     .table-wrap { overflow-x: auto; }
     .results-table {
       width: 100%;
-      min-width: 640px;
+      min-width: max-content;
       border-collapse: collapse;
       font-size: 14px;
     }
@@ -180,16 +235,19 @@ function pageShell(title, body) {
     .results-table th:last-child { border-right: 0; }
     .results-table td {
       padding: 22px 20px;
+      min-width: 120px;
+      max-width: 280px;
       border-top: 1px solid #e8edf3;
       border-right: 1px solid #e8edf3;
       font-weight: 500;
-      vertical-align: middle;
+      vertical-align: top;
+      word-break: break-word;
     }
     .results-table td:last-child { border-right: 0; }
     .cell-stack { display: flex; flex-direction: column; gap: 6px; }
     .cell-primary { font-size: 15px; font-weight: 600; color: #0f172a; }
     .cell-sub { font-size: 12px; color: #64748b; }
-    .cell-tc { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; font-weight: 600; }
+    .cell-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; font-weight: 600; }
     .cell-link { color: #2563eb; font-weight: 600; text-decoration: none; }
     .cell-link:hover { text-decoration: underline; }
     .cell-empty { color: #94a3b8; }
@@ -210,33 +268,14 @@ function pageShell(title, body) {
       border: 1px solid #ffc9c9;
     }
     @media (max-width: 640px) {
-      .results-table { min-width: 0; }
-      .results-table thead { display: none; }
-      .results-table tbody tr {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px 12px;
-        padding: 14px;
-        border-top: 1px solid #eee;
+      .results-table th,
+      .results-table td {
+        padding: 14px 16px;
+        font-size: 13px;
       }
       .results-table td {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        padding: 0;
-        border: 0;
-      }
-      .results-table td::before {
-        content: attr(data-label);
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        color: #666;
-      }
-      .results-table td[data-label="TC Kimlik"],
-      .results-table td[data-label="Telefon"] {
-        grid-column: 1 / -1;
+        min-width: 100px;
+        max-width: 220px;
       }
     }
   </style>

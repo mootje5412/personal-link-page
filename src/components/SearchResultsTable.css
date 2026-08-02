@@ -25,11 +25,12 @@
 
 .search-results-table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .search-results-table {
   width: 100%;
-  min-width: 640px;
+  min-width: max-content;
   border-collapse: collapse;
   font-family: var(--font-body);
   font-size: 14px;
@@ -57,11 +58,14 @@
 
 .search-results-table td {
   padding: 22px 20px;
+  min-width: 120px;
+  max-width: 280px;
   border-top: 1px solid #e8edf3;
   border-right: 1px solid #e8edf3;
   font-weight: 500;
-  vertical-align: middle;
+  vertical-align: top;
   line-height: 1.45;
+  word-break: break-word;
 }
 
 .search-results-table td:last-child {
@@ -85,16 +89,11 @@
   color: #0f172a;
 }
 
-.search-results-cell-sub {
-  font-size: 12px;
-  font-weight: 500;
-  color: #64748b;
-}
-
 .search-results-link {
   color: #2563eb;
   font-weight: 600;
   text-decoration: none;
+  word-break: break-word;
 }
 
 .search-results-link:hover {
@@ -102,9 +101,9 @@
   text-underline-offset: 2px;
 }
 
-.search-results-tc {
+.search-results-mono {
   font-family: var(--font-mono);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -115,43 +114,14 @@
 }
 
 @media (max-width: 720px) {
-  .search-results-table {
-    min-width: 0;
-  }
-
-  .search-results-table thead {
-    display: none;
-  }
-
-  .search-results-table tbody tr {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px 14px;
-    padding: 18px;
-    border-top: 1px solid #e8edf3;
-  }
-
-  .search-results-table tbody tr:first-child {
-    border-top: 0;
+  .search-results-table th,
+  .search-results-table td {
+    padding: 14px 16px;
+    font-size: 13px;
   }
 
   .search-results-table td {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 0;
-    border: 0;
-  }
-
-  .search-results-table td::before {
-    content: attr(data-label);
-    font-size: 11px;
-    font-weight: 700;
-    color: #64748b;
-  }
-
-  .search-results-table td[data-label='TC Kimlik'],
-  .search-results-table td[data-label='Telefon'] {
-    grid-column: 1 / -1;
+    min-width: 100px;
+    max-width: 220px;
   }
 }

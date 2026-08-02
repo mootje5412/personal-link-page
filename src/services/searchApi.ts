@@ -90,8 +90,12 @@ export function formatSearchMessage(data: QuerySearchResponse): string {
 }
 
 export const RESULT_FIELD_LABELS: Record<string, string> = {
+  isim: 'İsim',
   ad: 'Ad',
   soyad: 'Soyad',
+  telefon: 'Telefon',
+  telefon_sifirli: 'Telefon (0)',
+  telefon_uluslararasi: 'Telefon (+90)',
   email: 'E-posta',
   tc: 'TC Kimlik',
   sehir: 'Şehir',
@@ -102,6 +106,72 @@ export const RESULT_FIELD_LABELS: Record<string, string> = {
   sirket: 'Şirket',
   username: 'Kullanıcı Adı',
   website: 'Web Sitesi',
+}
+
+export type ResultTableColumn = {
+  key: string
+  label: string
+}
+
+const BASE_TABLE_COLUMN_KEYS = [
+  'isim',
+  'ad',
+  'soyad',
+  'telefon',
+  'telefon_sifirli',
+  'telefon_uluslararasi',
+  'email',
+  'tc',
+  'sehir',
+  'ilce',
+  'ulke',
+  'adres',
+  'posta_kodu',
+  'sirket',
+  'username',
+  'website',
+] as const
+
+export function getResultCellValue(result: SearchResult, columnKey: string): string {
+  if (columnKey.startsWith('diger:')) {
+    const extraKey = columnKey.slice(6)
+    return result.diger?.[extraKey] ?? ''
+  }
+
+  const value = result[columnKey as keyof SearchResult]
+  if (typeof value === 'string') return value
+  return ''
+}
+
+export function getResultTableColumns(results: SearchResult[]): ResultTableColumn[] {
+  const columns: ResultTableColumn[] = []
+  const seen = new Set<string>()
+
+  for (const key of BASE_TABLE_COLUMN_KEYS) {
+    const hasValue = results.some((result) => getResultCellValue(result, key))
+    if (!hasValue) continue
+    columns.push({ key, label: RESULT_FIELD_LABELS[key] ?? key })
+    seen.add(key)
+  }
+
+  const extraKeys = new Set<string>()
+  for (const result of results) {
+    if (!result.diger) continue
+    for (const key of Object.keys(result.diger)) {
+      extraKeys.add(key)
+    }
+  }
+
+  for (const key of [...extraKeys].sort()) {
+    const columnKey = `diger:${key}`
+    if (seen.has(columnKey)) continue
+    columns.push({
+      key: columnKey,
+      label: key.replace(/_/g, ' '),
+    })
+  }
+
+  return columns
 }
 
 export const RESULT_FIELD_ORDER = [
