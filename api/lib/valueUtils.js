@@ -1,3 +1,5 @@
+import { formatTurkishPhone, looksLikePhoneValue } from './phoneUtils.js'
+
 export function normalizeHeader(value, index = 0) {
   const cleaned = String(value ?? '')
     .trim()
@@ -29,20 +31,24 @@ const PHONE_ALIASES = new Set([
   'telefon_no',
   'phone_number',
   'phone_number_n',
+  'cell',
+  'cellphone',
+  'contact_phone',
+  'mobile_phone',
+  'phone1',
+  'phone2',
 ])
 
-export function maybeFormatPhone(key, value) {
-  if (!value || !PHONE_ALIASES.has(normalizeHeader(key))) return value
+export function isPhoneKey(key) {
+  const normalized = normalizeHeader(key)
+  if (PHONE_ALIASES.has(normalized)) return true
+  return /(?:^|_)(phone|telefon|gsm|mobile|cep|tel)(?:_|$|\d)/.test(normalized)
+}
 
-  const digits = value.replace(/\D/g, '')
-  if (digits.length === 10 && digits.startsWith('5')) {
-    return `0${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8)}`
-  }
-  if (digits.length === 11 && digits.startsWith('0')) {
-    return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7, 9)} ${digits.slice(9)}`
-  }
-  if (digits.length === 12 && digits.startsWith('90')) {
-    return `+90 ${digits.slice(2, 5)} ${digits.slice(5, 8)} ${digits.slice(8, 10)} ${digits.slice(10)}`
+export function maybeFormatPhone(key, value) {
+  if (!value) return value
+  if (isPhoneKey(key) || looksLikePhoneValue(value)) {
+    return formatTurkishPhone(value)
   }
   return value
 }

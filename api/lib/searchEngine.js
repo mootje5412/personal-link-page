@@ -1,6 +1,7 @@
 import { listDatabaseFiles, resolveDatabasePath } from './fileWalker.js'
 import { indexFile } from './parsers.js'
 import { formatClearResult } from './clearFields.js'
+import { buildPhoneSearchVariants, digitsOnly } from './phoneUtils.js'
 
 const cache = {
   fingerprint: '',
@@ -16,24 +17,29 @@ const cache = {
 
 const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS || 300000)
 
-function digitsOnly(value) {
-  return String(value ?? '').replace(/\D/g, '')
-}
-
 function buildNeedles(query) {
   const trimmed = query.trim()
   const lower = trimmed.toLowerCase()
+  const needles = new Set([lower])
+
   const digits = digitsOnly(trimmed)
-  const needles = [lower]
-  if (digits.length >= 3) needles.push(digits)
-  return [...new Set(needles.filter(Boolean))]
+  if (digits.length >= 3) {
+    needles.add(digits)
+    for (const variant of buildPhoneSearchVariants(trimmed)) {
+      needles.add(variant)
+    }
+  }
+
+  return [...needles].filter(Boolean)
 }
 
 function recordMatches(record, needles) {
   for (const needle of needles) {
     if (record.text.includes(needle)) return true
+    if (record.phone_text?.includes(needle)) return true
     for (const value of Object.values(record.fields)) {
-      if (digitsOnly(value).includes(needle)) return true
+      const valueDigits = digitsOnly(value)
+      if (valueDigits.includes(needle)) return true
     }
   }
   return false

@@ -1,4 +1,5 @@
 import { isNoiseKey, maybeFormatPhone, normalizeHeader, prettifyExtraKey } from './valueUtils.js'
+import { formatTurkishPhone, looksLikePhoneValue } from './phoneUtils.js'
 
 const FIELD_GROUPS = [
   ['isim', ['isim', 'name', 'full_name', 'ad_soyad', 'adsoyad', 'name_surname'], null],
@@ -31,8 +32,7 @@ function cleanValue(value) {
 }
 
 function looksLikePhone(value) {
-  const digits = value.replace(/\D/g, '')
-  return digits.length >= 10
+  return looksLikePhoneValue(value)
 }
 
 function looksLikeEmail(value) {
@@ -131,7 +131,7 @@ export function formatClearResult(fields) {
   for (const [label, aliases, validator] of FIELD_GROUPS) {
     const value = findValue(lookup, aliases)
     if (!value || !validateValue(validator, value)) continue
-    result[label] = label === 'telefon' ? maybeFormatPhone('telefon', value) : value
+    result[label] = label === 'telefon' ? formatTurkishPhone(value) : value
     markUsed(used, lookup, aliases)
   }
 
@@ -140,8 +140,18 @@ export function formatClearResult(fields) {
     const value = findByPatterns(lookup, patterns)
     const validator = label === 'telefon' ? 'phone' : label === 'email' ? 'email' : null
     if (!value || !validateValue(validator, value)) continue
-    result[label] = label === 'telefon' ? maybeFormatPhone('telefon', value) : value
+    result[label] = label === 'telefon' ? formatTurkishPhone(value) : value
     markPatternUsed(used, lookup, patterns)
+  }
+
+  if (!result.telefon) {
+    for (const [key, value] of lookup.entries()) {
+      if (used.has(key)) continue
+      if (!looksLikePhoneValue(value)) continue
+      result.telefon = formatTurkishPhone(value)
+      used.add(key)
+      break
+    }
   }
 
   const combinedName = buildName(lookup)

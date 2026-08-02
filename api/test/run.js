@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { formatClearResult } from '../lib/clearFields.js'
 import { parseDelimitedFile } from '../lib/csvParser.js'
+import { buildPhoneSearchVariants, formatTurkishPhone, normalizeTurkishPhoneDigits } from '../lib/phoneUtils.js'
 
 const BASE = process.env.API_BASE || 'http://127.0.0.1:8080'
 
@@ -67,13 +68,33 @@ function testNestedJsonFields() {
   })
 
   assert.equal(formatted.isim, 'Burak GUL')
-  assert.equal(formatted.telefon, '+90 543 443 04 68')
+  assert.equal(formatted.telefon, '0543 443 04 68')
   assert.equal(formatted.sehir, 'Ankara')
   assert.equal(formatted.ulke, 'Turkey')
   assert.equal(formatted.adres, 'Altay Eryaman')
   assert.ok(!formatted.diger?.addresses_0_geolocation_latitude)
   assert.ok(!formatted.diger?.company_catchphrase)
   console.log('✓ nested json field cleanup')
+}
+
+function testPhoneNormalization() {
+  assert.equal(normalizeTurkishPhoneDigits('+90 (543) 443-04-68'), '5434430468')
+  assert.equal(normalizeTurkishPhoneDigits('05434430468'), '5434430468')
+  assert.equal(formatTurkishPhone('905434430468'), '0543 443 04 68')
+  assert.ok(buildPhoneSearchVariants('0543 443 04 68').includes('5434430468'))
+  assert.ok(buildPhoneSearchVariants('0543 443 04 68').includes('905434430468'))
+  console.log('✓ phone normalization')
+}
+
+function testPhoneInUnknownColumn() {
+  const formatted = formatClearResult({
+    contact: '0532 111 22 33',
+    ad_soyad: 'Deniz Aksoy',
+  })
+
+  assert.equal(formatted.telefon, '0532 111 22 33')
+  assert.equal(formatted.isim, 'Deniz Aksoy')
+  console.log('✓ phone detected in unknown column')
 }
 
 async function testApi() {
@@ -106,6 +127,8 @@ async function run() {
   testPipeCsv()
   testClearFields()
   testNestedJsonFields()
+  testPhoneNormalization()
+  testPhoneInUnknownColumn()
   await testApi()
   console.log('\nAll tests passed.')
 }
