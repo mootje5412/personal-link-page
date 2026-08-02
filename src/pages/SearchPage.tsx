@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import SearchResultCard from '../components/SearchResultCard'
+import SearchResultsTable from '../components/SearchResultsTable'
 import { useDatabaseStats } from '../context/DatabaseStatsContext'
 import { databaseStatusLabel } from '../services/databaseApi'
 import { recordLocalSearch } from '../services/localAnalytics'
@@ -84,15 +84,7 @@ const SearchPage = () => {
       {results.length > 0 && (
         <section className="search-results" aria-label="Arama sonuçları">
           <h2>Sonuçlar ({results.length})</h2>
-          <div className="search-results-list">
-            {results.map((row, index) => (
-              <SearchResultCard
-                key={`${row.telefon ?? ''}-${row.email ?? ''}-${row.row ?? index}`}
-                result={row}
-                index={index}
-              />
-            ))}
-          </div>
+          <SearchResultsTable results={results} />
         </section>
       )}
     </div>

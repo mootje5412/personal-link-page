@@ -1,0 +1,100 @@
+.search-results-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.search-results-table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.search-results-table thead {
+  background: #fafafa;
+  border-bottom: 1px solid var(--line);
+}
+
+.search-results-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.search-results-table td {
+  padding: 14px 16px;
+  border-top: 1px solid var(--line);
+  font-weight: 500;
+  word-break: break-word;
+  vertical-align: middle;
+}
+
+.search-results-table tbody tr:hover {
+  background: #fafafa;
+}
+
+.search-results-phone {
+  color: #000000;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.search-results-phone:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .search-results-table {
+    min-width: 0;
+  }
+
+  .search-results-table thead {
+    display: none;
+  }
+
+  .search-results-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    padding: 14px 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .search-results-table tbody tr:first-child {
+    border-top: 0;
+  }
+
+  .search-results-table td {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+  }
+
+  .search-results-table td::before {
+    content: attr(data-label);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .search-results-table td[data-label='TC Kimlik'] {
+    grid-column: 1 / -1;
+  }
+
+  .search-results-table td[data-label='Telefon'] {
+    grid-column: 1 / -1;
+  }
+}

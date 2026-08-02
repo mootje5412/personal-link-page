@@ -1,37 +1,3 @@
-const FIELD_LABELS = {
-  isim: 'İsim',
-  telefon: 'Telefon',
-  telefon_sifirli: 'Telefon (0)',
-  telefon_uluslararasi: 'Telefon (+90)',
-  email: 'E-posta',
-  tc: 'TC Kimlik',
-  sehir: 'Şehir',
-  ilce: 'İlçe',
-  ulke: 'Ülke',
-  adres: 'Adres',
-  posta_kodu: 'Posta Kodu',
-  sirket: 'Şirket',
-  username: 'Kullanıcı Adı',
-  website: 'Web Sitesi',
-}
-
-const FIELD_ORDER = [
-  'isim',
-  'telefon',
-  'telefon_sifirli',
-  'telefon_uluslararasi',
-  'email',
-  'tc',
-  'sehir',
-  'ilce',
-  'ulke',
-  'adres',
-  'posta_kodu',
-  'sirket',
-  'username',
-  'website',
-]
-
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -49,41 +15,57 @@ function phoneHref(value) {
   return `tel:${digits}`
 }
 
-function renderField(label, value) {
-  const safe = escapeHtml(value)
-  if (label === 'Telefon' || label === 'Telefon (0)' || label === 'Telefon (+90)') {
-    const href = phoneHref(value)
-    if (href) {
-      return `<div class="field"><dt>${label}</dt><dd><a href="${href}">${safe}</a></dd></div>`
-    }
-  }
-  if (label === 'E-posta') {
-    return `<div class="field"><dt>${label}</dt><dd><a href="mailto:${safe}">${safe}</a></dd></div>`
-  }
-  if (label === 'Web Sitesi') {
-    const href = String(value).startsWith('http') ? String(value) : `https://${value}`
-    return `<div class="field"><dt>${label}</dt><dd><a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${safe}</a></dd></div>`
-  }
-  return `<div class="field"><dt>${label}</dt><dd>${safe}</dd></div>`
+function displayAd(result) {
+  if (result.ad) return result.ad
+  if (result.isim) return result.isim.split(/\s+/)[0] ?? '—'
+  return '—'
 }
 
-function renderResultCard(result, index) {
-  const fields = FIELD_ORDER
-    .filter((key) => result[key])
-    .map((key) => renderField(FIELD_LABELS[key], result[key]))
-    .join('')
+function displaySoyad(result) {
+  if (result.soyad) return result.soyad
+  if (result.isim) {
+    const parts = result.isim.split(/\s+/)
+    if (parts.length > 1) return parts.slice(1).join(' ')
+  }
+  return '—'
+}
 
-  let extras = ''
-  if (result.diger && typeof result.diger === 'object') {
-    const extraFields = Object.entries(result.diger)
-      .map(([key, value]) => renderField(key.replace(/_/g, ' '), value))
-      .join('')
-    if (extraFields) {
-      extras = `<details class="extras"><summary>Diğer bilgiler</summary><dl>${extraFields}</dl></details>`
-    }
+function renderResultRow(result, index) {
+  const phone = result.telefon ?? '—'
+  const href = result.telefon ? phoneHref(result.telefon_sifirli ?? result.telefon) : ''
+  const phoneCell =
+    href && result.telefon
+      ? `<a href="${escapeHtml(href)}">${escapeHtml(phone)}</a>`
+      : escapeHtml(phone)
+
+  return `<tr>
+    <td data-label="Ad">${escapeHtml(displayAd(result))}</td>
+    <td data-label="Soyad">${escapeHtml(displaySoyad(result))}</td>
+    <td data-label="TC Kimlik">${escapeHtml(result.tc ?? '—')}</td>
+    <td data-label="Telefon">${phoneCell}</td>
+  </tr>`
+}
+
+function renderResultsTable(results) {
+  if (!results.length) {
+    return `<div class="empty">Sonuç bulunamadı.</div>`
   }
 
-  return `<article class="card"><div class="card-head"><span class="card-no">#${index + 1}</span><h2>${escapeHtml(result.isim || 'Kayıt')}</h2></div><dl class="fields">${fields}</dl>${extras}</article>`
+  const rows = results.map((row, index) => renderResultRow(row, index)).join('')
+
+  return `<div class="table-wrap">
+    <table class="results-table">
+      <thead>
+        <tr>
+          <th>Ad</th>
+          <th>Soyad</th>
+          <th>TC Kimlik</th>
+          <th>Telefon</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`
 }
 
 function pageShell(title, body) {
@@ -138,61 +120,40 @@ function pageShell(title, body) {
       color: #666;
       margin-bottom: 16px;
     }
-    .card {
-      background: #fff;
+    .table-wrap {
+      overflow-x: auto;
       border: 1px solid #e5e5e5;
-      border-radius: 18px;
-      overflow: hidden;
-      margin-bottom: 12px;
+      border-radius: 16px;
+      background: #fff;
       box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
-    .card-head {
-      padding: 16px;
-      border-bottom: 1px solid #eee;
+    .results-table {
+      width: 100%;
+      min-width: 520px;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .results-table thead {
       background: #fafafa;
+      border-bottom: 1px solid #eee;
     }
-    .card-no {
-      display: inline-block;
+    .results-table th {
+      padding: 12px 14px;
+      text-align: left;
       font-size: 11px;
       font-weight: 700;
-      color: #666;
-      margin-bottom: 4px;
-    }
-    .card-head h2 {
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      word-break: break-word;
-    }
-    .fields, .extras dl { display: flex; flex-direction: column; }
-    .field {
-      display: grid;
-      grid-template-columns: 34% 1fr;
-      gap: 10px;
-      padding: 12px 16px;
-      border-top: 1px solid #eee;
-      align-items: start;
-    }
-    .field dt {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
       letter-spacing: 0.05em;
+      text-transform: uppercase;
       color: #666;
+      white-space: nowrap;
     }
-    .field dd {
-      font-size: 15px;
+    .results-table td {
+      padding: 14px;
+      border-top: 1px solid #eee;
       font-weight: 500;
       word-break: break-word;
     }
-    .field a { color: #000; text-decoration: underline; }
-    .extras summary {
-      padding: 14px 16px;
-      font-size: 14px;
-      font-weight: 600;
-      color: #666;
-      cursor: pointer;
-    }
+    .results-table a { color: #000; text-decoration: underline; }
     .empty {
       padding: 20px;
       text-align: center;
@@ -209,8 +170,35 @@ function pageShell(title, body) {
       color: #a40000;
       border: 1px solid #ffc9c9;
     }
-    @media (max-width: 380px) {
-      .field { grid-template-columns: 1fr; gap: 4px; }
+    @media (max-width: 640px) {
+      .results-table { min-width: 0; }
+      .results-table thead { display: none; }
+      .results-table tbody tr {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 12px;
+        padding: 14px;
+        border-top: 1px solid #eee;
+      }
+      .results-table td {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 0;
+        border: 0;
+      }
+      .results-table td::before {
+        content: attr(data-label);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #666;
+      }
+      .results-table td[data-label="TC Kimlik"],
+      .results-table td[data-label="Telefon"] {
+        grid-column: 1 / -1;
+      }
     }
   </style>
 </head>
@@ -249,7 +237,7 @@ export function renderSearchPage(query, result) {
 
   const cards =
     result.results.length > 0
-      ? result.results.map((row, index) => renderResultCard(row, index)).join('')
+      ? renderResultsTable(result.results)
       : `<div class="empty">Sonuç bulunamadı.</div>`
 
   const summary =
