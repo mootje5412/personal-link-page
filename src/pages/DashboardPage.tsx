@@ -72,7 +72,6 @@ const DashboardPage = () => {
 
       {results.length > 0 && (
         <section className="dashboard-results" aria-label="Arama sonuçları">
-          <h2 className="dashboard-results-title">Sonuçlar ({results.length})</h2>
           <SearchResultsTable results={results} />
         </section>
       )}

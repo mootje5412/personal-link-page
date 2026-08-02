@@ -1,58 +1,120 @@
+.search-results-panel {
+  border: 1px solid #dfe3ea;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.search-results-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #dfe3ea;
+  background: #ffffff;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.search-results-toolbar strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+
 .search-results-table-wrap {
   overflow-x: auto;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: #ffffff;
-  box-shadow: var(--shadow-sm);
 }
 
 .search-results-table {
   width: 100%;
-  min-width: 520px;
+  min-width: 640px;
   border-collapse: collapse;
+  font-family: var(--font-body);
   font-size: 14px;
+  color: #0f172a;
 }
 
 .search-results-table thead {
-  background: #fafafa;
-  border-bottom: 1px solid var(--line);
+  background: #f1f5f9;
 }
 
 .search-results-table th {
-  padding: 12px 16px;
+  padding: 16px 20px;
   text-align: left;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
+  color: #0f172a;
   white-space: nowrap;
+  border-right: 1px solid #dfe3ea;
+  border-bottom: 1px solid #dfe3ea;
+}
+
+.search-results-table th:last-child {
+  border-right: 0;
 }
 
 .search-results-table td {
-  padding: 14px 16px;
-  border-top: 1px solid var(--line);
+  padding: 22px 20px;
+  border-top: 1px solid #e8edf3;
+  border-right: 1px solid #e8edf3;
   font-weight: 500;
-  word-break: break-word;
   vertical-align: middle;
+  line-height: 1.45;
+}
+
+.search-results-table td:last-child {
+  border-right: 0;
 }
 
 .search-results-table tbody tr:hover {
-  background: #fafafa;
+  background: #fafbfd;
 }
 
-.search-results-phone {
-  color: #000000;
-  text-decoration: none;
+.search-results-cell-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.search-results-cell-primary {
+  font-size: 15px;
   font-weight: 600;
+  color: #0f172a;
 }
 
-.search-results-phone:hover {
+.search-results-cell-sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.search-results-link {
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.search-results-link:hover {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
-@media (max-width: 640px) {
+.search-results-tc {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.search-results-empty {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+@media (max-width: 720px) {
   .search-results-table {
     min-width: 0;
   }
@@ -64,9 +126,9 @@
   .search-results-table tbody tr {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px 12px;
-    padding: 14px 16px;
-    border-top: 1px solid var(--line);
+    gap: 10px 14px;
+    padding: 18px;
+    border-top: 1px solid #e8edf3;
   }
 
   .search-results-table tbody tr:first-child {
@@ -76,24 +138,19 @@
   .search-results-table td {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     padding: 0;
     border: 0;
   }
 
   .search-results-table td::before {
     content: attr(data-label);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted);
+    color: #64748b;
   }
 
-  .search-results-table td[data-label='TC Kimlik'] {
-    grid-column: 1 / -1;
-  }
-
+  .search-results-table td[data-label='TC Kimlik'],
   .search-results-table td[data-label='Telefon'] {
     grid-column: 1 / -1;
   }

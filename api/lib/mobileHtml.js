@@ -30,18 +30,40 @@ function displaySoyad(result) {
   return '—'
 }
 
-function renderResultRow(result, index) {
-  const phone = result.telefon ?? '—'
+function renderResultRow(result) {
+  const ad = displayAd(result)
+  const soyad = displaySoyad(result)
   const href = result.telefon ? phoneHref(result.telefon_sifirli ?? result.telefon) : ''
-  const phoneCell =
-    href && result.telefon
-      ? `<a href="${escapeHtml(href)}">${escapeHtml(phone)}</a>`
-      : escapeHtml(phone)
+
+  const adCell = ad !== '—'
+    ? `<span class="cell-primary">${escapeHtml(ad)}</span>`
+    : `<span class="cell-empty">—</span>`
+
+  const soyadCell = soyad !== '—'
+    ? `<span class="cell-primary">${escapeHtml(soyad)}</span>`
+    : `<span class="cell-empty">—</span>`
+
+  let tcCell = `<span class="cell-empty">—</span>`
+  if (result.tc) {
+    const sub = result.isim ? `<span class="cell-sub">${escapeHtml(result.isim)}</span>` : ''
+    tcCell = `<div class="cell-stack"><span class="cell-tc">${escapeHtml(result.tc)}</span>${sub}</div>`
+  }
+
+  let phoneCell = `<span class="cell-empty">—</span>`
+  if (result.telefon) {
+    const main = href
+      ? `<a class="cell-link" href="${escapeHtml(href)}">${escapeHtml(result.telefon)}</a>`
+      : `<span class="cell-primary">${escapeHtml(result.telefon)}</span>`
+    const sub = result.telefon_uluslararasi
+      ? `<span class="cell-sub">${escapeHtml(result.telefon_uluslararasi)}</span>`
+      : ''
+    phoneCell = `<div class="cell-stack">${main}${sub}</div>`
+  }
 
   return `<tr>
-    <td data-label="Ad">${escapeHtml(displayAd(result))}</td>
-    <td data-label="Soyad">${escapeHtml(displaySoyad(result))}</td>
-    <td data-label="TC Kimlik">${escapeHtml(result.tc ?? '—')}</td>
+    <td data-label="Ad">${adCell}</td>
+    <td data-label="Soyad">${soyadCell}</td>
+    <td data-label="TC Kimlik">${tcCell}</td>
     <td data-label="Telefon">${phoneCell}</td>
   </tr>`
 }
@@ -51,20 +73,23 @@ function renderResultsTable(results) {
     return `<div class="empty">Sonuç bulunamadı.</div>`
   }
 
-  const rows = results.map((row, index) => renderResultRow(row, index)).join('')
+  const rows = results.map((row) => renderResultRow(row)).join('')
 
-  return `<div class="table-wrap">
-    <table class="results-table">
-      <thead>
-        <tr>
-          <th>Ad</th>
-          <th>Soyad</th>
-          <th>TC Kimlik</th>
-          <th>Telefon</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
+  return `<div class="panel">
+    <div class="toolbar"><strong>${results.length}</strong> kayıt gösteriliyor</div>
+    <div class="table-wrap">
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Ad</th>
+            <th>Soyad</th>
+            <th>TC Kimlik</th>
+            <th>Telefon</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
   </div>`
 }
 
@@ -81,8 +106,8 @@ function pageShell(title, body) {
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f5f5f5;
-      color: #111;
+      background: #eef2f7;
+      color: #0f172a;
       line-height: 1.5;
       padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
     }
@@ -120,40 +145,54 @@ function pageShell(title, body) {
       color: #666;
       margin-bottom: 16px;
     }
-    .table-wrap {
-      overflow-x: auto;
-      border: 1px solid #e5e5e5;
-      border-radius: 16px;
+    .panel {
+      border: 1px solid #dfe3ea;
+      border-radius: 8px;
       background: #fff;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      overflow: hidden;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     }
+    .toolbar {
+      padding: 14px 18px;
+      border-bottom: 1px solid #dfe3ea;
+      font-size: 13px;
+      color: #64748b;
+    }
+    .toolbar strong { color: #0f172a; font-weight: 600; }
+    .table-wrap { overflow-x: auto; }
     .results-table {
       width: 100%;
-      min-width: 520px;
+      min-width: 640px;
       border-collapse: collapse;
       font-size: 14px;
     }
-    .results-table thead {
-      background: #fafafa;
-      border-bottom: 1px solid #eee;
-    }
+    .results-table thead { background: #f1f5f9; }
     .results-table th {
-      padding: 12px 14px;
+      padding: 16px 20px;
       text-align: left;
-      font-size: 11px;
+      font-size: 14px;
       font-weight: 700;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: #666;
+      color: #0f172a;
       white-space: nowrap;
+      border-right: 1px solid #dfe3ea;
+      border-bottom: 1px solid #dfe3ea;
     }
+    .results-table th:last-child { border-right: 0; }
     .results-table td {
-      padding: 14px;
-      border-top: 1px solid #eee;
+      padding: 22px 20px;
+      border-top: 1px solid #e8edf3;
+      border-right: 1px solid #e8edf3;
       font-weight: 500;
-      word-break: break-word;
+      vertical-align: middle;
     }
-    .results-table a { color: #000; text-decoration: underline; }
+    .results-table td:last-child { border-right: 0; }
+    .cell-stack { display: flex; flex-direction: column; gap: 6px; }
+    .cell-primary { font-size: 15px; font-weight: 600; color: #0f172a; }
+    .cell-sub { font-size: 12px; color: #64748b; }
+    .cell-tc { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; font-weight: 600; }
+    .cell-link { color: #2563eb; font-weight: 600; text-decoration: none; }
+    .cell-link:hover { text-decoration: underline; }
+    .cell-empty { color: #94a3b8; }
     .empty {
       padding: 20px;
       text-align: center;

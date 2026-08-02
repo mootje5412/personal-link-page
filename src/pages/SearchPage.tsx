@@ -83,7 +83,6 @@ const SearchPage = () => {
 
       {results.length > 0 && (
         <section className="search-results" aria-label="Arama sonuçları">
-          <h2>Sonuçlar ({results.length})</h2>
           <SearchResultsTable results={results} />
         </section>
       )}
