@@ -9,20 +9,23 @@ export type DatabaseSummary = {
   status: 'ready' | 'indexing' | 'starting'
 }
 
-export type DatabaseResponse = {
+type StatsResponse = {
   ok: boolean
-  database: DatabaseSummary
+  stats: {
+    total_lines: number
+    total_data_lines: number
+    indexed_records: number
+    status: 'ready' | 'indexing' | 'starting'
+  }
   ms: number
 }
 
 const API_BASE = '/phone-api'
-const API_KEY = 'z2GFltjwp4rgccrOJdtc'
 
 export async function fetchDatabaseStats(): Promise<DatabaseSummary> {
-  const params = new URLSearchParams({ key: API_KEY })
-  const res = await fetch(`${API_BASE}/api/database?${params.toString()}`)
+  const res = await fetch(`${API_BASE}/api/stats`)
 
-  let data: DatabaseResponse & { detail?: string }
+  let data: StatsResponse & { detail?: string }
   try {
     data = await res.json()
   } catch {
@@ -33,7 +36,18 @@ export async function fetchDatabaseStats(): Promise<DatabaseSummary> {
     throw new Error(data.detail ?? 'Veritabanı istatistikleri alınamadı.')
   }
 
-  return data.database
+  const status = data.stats.status ?? 'starting'
+
+  return {
+    total_lines: data.stats.total_lines ?? null,
+    total_data_lines: data.stats.total_data_lines ?? null,
+    total_size_mb: 0,
+    indexed_records: data.stats.indexed_records ?? 0,
+    index_ready: status === 'ready',
+    index_building: status === 'indexing',
+    auto_watch: true,
+    status,
+  }
 }
 
 export function formatCount(value: number | null | undefined): string {

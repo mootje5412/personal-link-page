@@ -1,42 +1,44 @@
 import { SearchType } from './dashboardApi'
 
 export type SearchResult = {
-  first_name: string
-  last_name: string
-  full_name: string
-  phone: string
-  email: string
-  identity_number: string
-  city: string
-  country: string
-  notes: string
-  extra?: Record<string, unknown>
+  row?: number
+  isim?: string
+  telefon?: string
+  telefon_sifirli?: string
+  telefon_uluslararasi?: string
+  email?: string
+  tc?: string
+  sehir?: string
+  ilce?: string
+  ulke?: string
+  adres?: string
+  posta_kodu?: string
+  sirket?: string
+  username?: string
+  website?: string
+  diger?: Record<string, string>
 }
 
 export type QuerySearchResponse = {
   ok: boolean
-  success?: boolean
-  message?: string
+  query?: string
   found: number
   returned: number
   results: SearchResult[]
   ms: number
-  ready?: boolean
   detail?: string
 }
 
 const API_BASE = '/phone-api'
-const API_KEY = 'z2GFltjwp4rgccrOJdtc'
-const REQUEST_TIMEOUT_MS = 15000
+const REQUEST_TIMEOUT_MS = 20000
 
 export async function queryDatabase(
-  searchType: SearchType,
+  _searchType: SearchType,
   query: string,
 ): Promise<QuerySearchResponse> {
   const params = new URLSearchParams({
     q: query.trim(),
-    type: searchType,
-    key: API_KEY,
+    limit: '50',
   })
 
   const controller = new AbortController()
@@ -44,19 +46,19 @@ export async function queryDatabase(
 
   let res: Response
   try {
-    res = await fetch(`${API_BASE}/api/query?${params.toString()}`, {
+    res = await fetch(`${API_BASE}/api/search?${params.toString()}`, {
       signal: controller.signal,
     })
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('Sorgu zaman aşımına uğradı. Veritabanı indeksleniyor olabilir — birkaç dakika sonra tekrar deneyin.')
+      throw new Error('Sorgu zaman aşımına uğradı. Birkaç saniye sonra tekrar deneyin.')
     }
     throw new Error('Arama sunucusuna bağlanılamadı.')
   } finally {
     window.clearTimeout(timeout)
   }
 
-  let data: QuerySearchResponse & { detail?: string }
+  let data: QuerySearchResponse & { detail?: string; error?: string }
   try {
     data = await res.json()
   } catch {
@@ -64,17 +66,55 @@ export async function queryDatabase(
   }
 
   if (!res.ok) {
-    throw new Error(data.detail ?? 'Sorgu başarısız.')
+    throw new Error(data.detail ?? data.error ?? 'Sorgu başarısız.')
   }
 
   return data
 }
 
 export function formatSearchMessage(data: QuerySearchResponse): string {
-  const resultPart =
-    data.found > 0
-      ? `${data.found} sonuç bulundu`
-      : 'Sonuç bulunamadı'
+  if (data.found <= 0) {
+    return `Sonuç bulunamadı · ${data.ms}ms`
+  }
 
-  return `${resultPart} · ${data.ms}ms`
+  if (data.returned < data.found) {
+    return `${data.found} sonuç · ${data.returned} gösteriliyor · ${data.ms}ms`
+  }
+
+  return `${data.found} sonuç bulundu · ${data.ms}ms`
+}
+
+export const RESULT_FIELD_LABELS: Record<string, string> = {
+  email: 'E-posta',
+  tc: 'TC Kimlik',
+  sehir: 'Şehir',
+  ilce: 'İlçe',
+  ulke: 'Ülke',
+  adres: 'Adres',
+  posta_kodu: 'Posta Kodu',
+  sirket: 'Şirket',
+  username: 'Kullanıcı Adı',
+  website: 'Web Sitesi',
+}
+
+export const RESULT_FIELD_ORDER = [
+  'email',
+  'tc',
+  'sehir',
+  'ilce',
+  'ulke',
+  'adres',
+  'posta_kodu',
+  'sirket',
+  'username',
+  'website',
+] as const
+
+export function phoneHref(value: string): string {
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return ''
+  if (digits.startsWith('90')) return `tel:+${digits}`
+  if (digits.startsWith('0')) return `tel:+90${digits.slice(1)}`
+  if (digits.length === 10) return `tel:+90${digits}`
+  return `tel:${digits}`
 }

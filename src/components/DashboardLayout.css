@@ -65,16 +65,19 @@
 .dashboard-content {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: 24px;
+  padding-top: 32px;
   padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-@media (max-width: 520px) {
+@media (max-width: 640px) {
   .dashboard-navbar {
-    padding: 14px 16px;
-    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
   }
 
   .dashboard-navbar-user {
@@ -83,7 +86,7 @@
 
   .dashboard-content {
     padding: 16px;
-    align-items: flex-start;
-    padding-top: 32px;
+    padding-top: 20px;
+    align-items: stretch;
   }
 }

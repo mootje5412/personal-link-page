@@ -96,10 +96,10 @@
   margin-bottom: 12px;
 }
 
-.search-results-mobile {
-  display: none;
+.search-results-list {
+  display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .search-result-row {

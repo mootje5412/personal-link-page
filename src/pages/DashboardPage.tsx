@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react'
+import SearchResultCard from '../components/SearchResultCard'
 import { useDatabaseStats } from '../context/DatabaseStatsContext'
 import { databaseStatusLabel } from '../services/databaseApi'
 import { recordLocalSearch } from '../services/localAnalytics'
@@ -27,11 +28,9 @@ const DashboardPage = () => {
 
     try {
       const data = await queryDatabase('telefon', query.trim())
-      const searchedQuery = query.trim()
       setResults(data.results ?? [])
       setMessage(formatSearchMessage(data))
-      recordLocalSearch('telefon', searchedQuery)
-      setQuery('')
+      recordLocalSearch('telefon', query.trim())
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Telefon sorgusu başarısız.')
     } finally {
@@ -49,10 +48,11 @@ const DashboardPage = () => {
           <input
             id="dashboard-search-input"
             type="tel"
-            inputMode="numeric"
+            inputMode="tel"
+            autoComplete="tel"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="05xxxxxxxxx"
+            placeholder="05xx xxx xx xx"
             maxLength={120}
             required
             disabled={indexBusy}
@@ -72,50 +72,15 @@ const DashboardPage = () => {
 
       {results.length > 0 && (
         <section className="dashboard-results" aria-label="Arama sonuçları">
-          <div className="dashboard-results-mobile">
+          <h2 className="dashboard-results-title">Sonuçlar ({results.length})</h2>
+          <div className="dashboard-results-list">
             {results.map((row, index) => (
-              <article key={`${row.phone}-${row.identity_number}-${index}`} className="dashboard-result-row">
-                <div className="dashboard-result-cell">
-                  <span>E-posta</span>
-                  <strong>{row.email || '—'}</strong>
-                </div>
-                <div className="dashboard-result-cell">
-                  <span>Telefon</span>
-                  <strong>{row.phone || '—'}</strong>
-                </div>
-                <div className="dashboard-result-cell">
-                  <span>İsim</span>
-                  <strong>{row.full_name || '—'}</strong>
-                </div>
-                <div className="dashboard-result-cell">
-                  <span>Numara</span>
-                  <strong>{row.identity_number || '—'}</strong>
-                </div>
-              </article>
+              <SearchResultCard
+                key={`${row.telefon ?? ''}-${row.email ?? ''}-${row.row ?? index}`}
+                result={row}
+                index={index}
+              />
             ))}
-          </div>
-
-          <div className="dashboard-results-table-wrap">
-            <table className="dashboard-results-table">
-              <thead>
-                <tr>
-                  <th>E-posta</th>
-                  <th>Telefon</th>
-                  <th>İsim</th>
-                  <th>Numara</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((row, index) => (
-                  <tr key={`${row.phone}-${row.identity_number}-${index}`}>
-                    <td>{row.email || '—'}</td>
-                    <td>{row.phone || '—'}</td>
-                    <td>{row.full_name || '—'}</td>
-                    <td>{row.identity_number || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </section>
       )}
