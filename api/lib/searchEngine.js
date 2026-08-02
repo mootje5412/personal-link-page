@@ -1,7 +1,7 @@
 import { listDatabaseFiles, resolveDatabasePath } from './fileWalker.js'
 import { indexFile } from './parsers.js'
 import { formatClearResult } from './clearFields.js'
-import { buildPhoneSearchVariants, digitsOnly } from './phoneUtils.js'
+import { normalizeSearchType, recordMatchesType, validateQuery } from './searchMatcher.js'
 
 const cache = {
   fingerprint: '',
@@ -46,34 +46,6 @@ function cacheIsFresh(rootDir) {
   if (cache.loadedAt <= 0) return false
   if (Date.now() - cache.loadedAt >= CACHE_TTL_MS) return false
   return cache.fingerprint === buildFingerprint(rootDir)
-}
-
-function buildNeedles(query) {
-  const trimmed = query.trim()
-  const lower = trimmed.toLowerCase()
-  const needles = new Set([lower])
-
-  const digits = digitsOnly(trimmed)
-  if (digits.length >= 3) {
-    needles.add(digits)
-    for (const variant of buildPhoneSearchVariants(trimmed)) {
-      needles.add(variant)
-    }
-  }
-
-  return [...needles].filter(Boolean)
-}
-
-function recordMatches(record, needles) {
-  for (const needle of needles) {
-    if (record.text.includes(needle)) return true
-    if (record.phone_text?.includes(needle)) return true
-    for (const value of Object.values(record.fields)) {
-      const valueDigits = digitsOnly(value)
-      if (valueDigits.includes(needle)) return true
-    }
-  }
-  return false
 }
 
 function buildFingerprint(rootDir) {
@@ -163,13 +135,27 @@ export function getLineStats(rootDir = process.cwd()) {
 }
 
 export function searchDatabases(query, options = {}) {
-  const { limit = 50, rootDir = process.cwd() } = options
+  const { limit = 50, rootDir = process.cwd(), type = 'telefon' } = options
   const trimmed = String(query ?? '').trim()
+  const searchType = normalizeSearchType(type)
+  const validationError = validateQuery(searchType, trimmed)
 
   if (!trimmed) {
     return {
       ok: false,
       error: 'Query parameter q is required',
+      type: searchType,
+      found: 0,
+      returned: 0,
+      results: [],
+    }
+  }
+
+  if (validationError) {
+    return {
+      ok: false,
+      error: validationError,
+      type: searchType,
       found: 0,
       returned: 0,
       results: [],
@@ -177,12 +163,11 @@ export function searchDatabases(query, options = {}) {
   }
 
   const { records } = loadAllRecords(rootDir)
-  const needles = buildNeedles(trimmed)
   const matches = []
   let totalFound = 0
 
   for (const record of records) {
-    if (!recordMatches(record, needles)) continue
+    if (!recordMatchesType(record, searchType, trimmed)) continue
     totalFound += 1
     if (matches.length >= limit) continue
     matches.push({
@@ -193,6 +178,7 @@ export function searchDatabases(query, options = {}) {
 
   return {
     ok: true,
+    type: searchType,
     query: trimmed,
     found: totalFound,
     returned: matches.length,

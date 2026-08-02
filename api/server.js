@@ -61,7 +61,8 @@ app.get('/api/database', (_req, res) => {
 app.get('/api/search', (req, res) => {
   const started = performance.now()
   const limit = Math.min(Number(req.query.limit || 50), 200)
-  const result = searchDatabases(req.query.q, { limit, rootDir: ROOT_DIR })
+  const type = req.query.type
+  const result = searchDatabases(req.query.q, { limit, rootDir: ROOT_DIR, type })
 
   if (!result.ok) {
     if (wantsHtml(req)) {

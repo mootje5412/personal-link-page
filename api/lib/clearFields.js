@@ -4,6 +4,8 @@ import { buildPhoneFormats, formatTurkishPhone, looksLikePhoneValue } from './ph
 const RESULT_ORDER = [
   'row',
   'isim',
+  'ad',
+  'soyad',
   'telefon',
   'email',
   'tc',
@@ -176,6 +178,11 @@ export function formatClearResult(fields) {
     result.isim = combinedName
     markUsed(used, lookup, ['first_name', 'firstname', 'ad', 'last_name', 'lastname', 'soyad', 'surname'])
   }
+
+  const firstName = findValue(lookup, ['first_name', 'firstname', 'ad'])
+  const lastName = findValue(lookup, ['last_name', 'lastname', 'soyad', 'surname'])
+  if (firstName) result.ad = firstName
+  if (lastName) result.soyad = lastName
 
   const extras = {}
   for (const [key, value] of lookup.entries()) {

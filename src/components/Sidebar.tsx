@@ -10,6 +10,13 @@ type SidebarProps = {
   username: string
 }
 
+const SEARCH_LINKS = [
+  { to: '/panel/sorgu/telefon', label: 'Telefon Sorgusu' },
+  { to: '/panel/sorgu/tc', label: 'TC Kimlik Sorgusu' },
+  { to: '/panel/sorgu/ad', label: 'Ad Sorgusu' },
+  { to: '/panel/sorgu/soyad', label: 'Soyad Sorgusu' },
+]
+
 const Sidebar = ({
   collapsed,
   mobileOpen,
@@ -24,8 +31,8 @@ const Sidebar = ({
     return location.pathname === '/panel'
   }
 
-  function isPhoneSearchActive() {
-    return location.pathname === '/panel/sorgu/telefon'
+  function isSearchActive(path: string) {
+    return location.pathname === path
   }
 
   return (
@@ -77,13 +84,16 @@ const Sidebar = ({
 
           {!collapsed && <p className="sidebar-section-label">Sorgu</p>}
 
-          <Link
-            to="/panel/sorgu/telefon"
-            className={`sidebar-link sidebar-search-link ${isPhoneSearchActive() ? 'active' : ''}`}
-            onClick={onCloseMobile}
-          >
-            <span className="sidebar-link-label">Telefon Sorgusu</span>
-          </Link>
+          {SEARCH_LINKS.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={`sidebar-link sidebar-search-link ${isSearchActive(item.to) ? 'active' : ''}`}
+              onClick={onCloseMobile}
+            >
+              <span className="sidebar-link-label">{item.label}</span>
+            </Link>
+          ))}
         </nav>
 
         <div className="sidebar-footer">

@@ -1,6 +1,6 @@
 import { authFetch } from './apiClient'
 
-export type SearchType = 'tc' | 'isim' | 'adres' | 'telefon' | 'aile'
+export type SearchType = 'tc' | 'isim' | 'adres' | 'telefon' | 'aile' | 'ad' | 'soyad'
 
 export type AnalyticsSummary = {
   total: number
@@ -28,4 +28,6 @@ export const SEARCH_TYPE_LABELS: Record<SearchType, string> = {
   adres: 'Adres',
   telefon: 'Telefon',
   aile: 'Aile',
+  ad: 'Ad',
+  soyad: 'Soyad',
 }

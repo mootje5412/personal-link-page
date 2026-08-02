@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import XLSX from 'xlsx'
 import { parseDelimitedFile } from './csvParser.js'
+import { buildRecordSearchIndex } from './recordIndex.js'
 import { extractPhoneDigitsFromFields } from './phoneUtils.js'
 import { cleanCell, maybeFormatPhone, normalizeHeader } from './valueUtils.js'
 
@@ -76,12 +77,15 @@ function cleanRow(row) {
 
 export function normalizeRecord(fields, sourceFile, rowIndex) {
   const phoneDigits = extractPhoneDigitsFromFields(fields)
+  const search = buildRecordSearchIndex(fields)
+
   return {
     source_file: sourceFile,
     row_index: rowIndex,
     fields,
     text: Object.values(fields).join(' ').toLowerCase(),
     phone_text: phoneDigits.join(' '),
+    search,
   }
 }
 

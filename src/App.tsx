@@ -6,7 +6,7 @@ import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardHomePage from './pages/DashboardHomePage'
-import PhoneSearchPage from './pages/PhoneSearchPage'
+import QuerySearchPage from './pages/QuerySearchPage'
 
 function App() {
   return (
@@ -25,7 +25,10 @@ function App() {
             }
           >
             <Route index element={<DashboardHomePage />} />
-            <Route path="sorgu/telefon" element={<PhoneSearchPage />} />
+            <Route path="sorgu/telefon" element={<QuerySearchPage searchType="telefon" />} />
+            <Route path="sorgu/tc" element={<QuerySearchPage searchType="tc" />} />
+            <Route path="sorgu/ad" element={<QuerySearchPage searchType="ad" />} />
+            <Route path="sorgu/soyad" element={<QuerySearchPage searchType="soyad" />} />
             <Route path="sorgu/*" element={<Navigate to="/panel/sorgu/telefon" replace />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

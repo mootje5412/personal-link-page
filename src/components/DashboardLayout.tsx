@@ -7,6 +7,9 @@ import './DashboardLayout.css'
 
 function pageTitle(pathname: string) {
   if (pathname.startsWith('/panel/sorgu/telefon')) return 'Telefon sorgusu'
+  if (pathname.startsWith('/panel/sorgu/tc')) return 'TC kimlik sorgusu'
+  if (pathname.startsWith('/panel/sorgu/ad')) return 'Ad sorgusu'
+  if (pathname.startsWith('/panel/sorgu/soyad')) return 'Soyad sorgusu'
   return 'Gösterge paneli'
 }
 

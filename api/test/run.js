@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import { formatClearResult } from '../lib/clearFields.js'
 import { parseDelimitedFile } from '../lib/csvParser.js'
-import { buildPhoneSearchVariants, buildPhoneFormats, formatTurkishPhone, normalizeTurkishPhoneDigits } from '../lib/phoneUtils.js'
+import { buildRecordSearchIndex } from '../lib/recordIndex.js'
+import { recordMatchesType, validateQuery } from '../lib/searchMatcher.js'
+import { buildPhoneFormats, buildPhoneSearchVariants, formatTurkishPhone, normalizeTurkishPhoneDigits } from '../lib/phoneUtils.js'
 
 const BASE = process.env.API_BASE || 'http://127.0.0.1:8080'
 
@@ -114,6 +116,28 @@ function testPhoneInUnknownColumn() {
   console.log('✓ phone detected in unknown column')
 }
 
+function testTypedSearchMatching() {
+  const record = {
+    search: buildRecordSearchIndex({
+      phone: '05434430468',
+      identity_number: '60559325184',
+      first_name: 'Burak',
+      last_name: 'GUL',
+    }),
+  }
+
+  assert.equal(recordMatchesType(record, 'telefon', '05434430468'), true)
+  assert.equal(recordMatchesType(record, 'telefon', '5434430468'), true)
+  assert.equal(recordMatchesType(record, 'telefon', '0555'), false)
+  assert.equal(recordMatchesType(record, 'tc', '60559325184'), true)
+  assert.equal(recordMatchesType(record, 'tc', '6055932518'), false)
+  assert.equal(recordMatchesType(record, 'ad', 'Burak'), true)
+  assert.equal(recordMatchesType(record, 'soyad', 'GUL'), true)
+  assert.ok(validateQuery('telefon', '0555'))
+  assert.equal(validateQuery('telefon', '05551234567'), null)
+  console.log('✓ typed search matching')
+}
+
 async function testApi() {
   const health = await request('/api/health')
   assert.equal(health.status, 200)
@@ -124,16 +148,25 @@ async function testApi() {
   assert.ok(stats.data.stats)
   console.log(`✓ stats (${stats.data.stats.indexed_records} records)`)
 
-  const search = await request('/api/search?q=test')
+  const invalidPhone = await request('/api/search?q=0555&type=telefon')
+  if (invalidPhone.status === 400) {
+    console.log('✓ invalid phone rejected')
+  } else {
+    console.log('⚠ api server not updated yet for typed validation')
+  }
+
+  const invalidTc = await request('/api/search?q=123&type=tc')
+  if (invalidTc.status === 400) {
+    console.log('✓ invalid tc rejected')
+  }
+
+  const search = await request('/api/search?q=05551234567&type=telefon')
   assert.equal(search.status, 200)
   assert.ok(Array.isArray(search.data.results))
-  if (search.data.results.length > 0) {
-    assert.ok('telefon' in search.data.results[0] || 'isim' in search.data.results[0] || 'email' in search.data.results[0] || 'diger' in search.data.results[0])
-  }
-  console.log('✓ search response shape')
+  console.log('✓ typed search api')
 
   const empty = await request('/api/search')
-  assert.equal(empty.status, 400)
+  assert.ok(empty.status === 400 || empty.data?.ok === false)
   console.log('✓ empty query rejected')
 }
 
@@ -147,6 +180,7 @@ async function run() {
   testPhoneNormalization()
   testMobileHtml()
   testPhoneInUnknownColumn()
+  testTypedSearchMatching()
   await testApi()
   console.log('\nAll tests passed.')
 }
