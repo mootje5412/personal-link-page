@@ -206,7 +206,13 @@ function polishSearchResult(result) {
     if (key === 'telefon') {
       if (!result.telefon) continue
       const formats = buildPhoneFormats(result.telefon)
-      polished.telefon = formats ?? result.telefon
+      if (formats) {
+        polished.telefon = formats.gosterim
+        polished.telefon_sifirli = formats.sifirli
+        polished.telefon_uluslararasi = formats.uluslararasi
+      } else {
+        polished.telefon = result.telefon
+      }
       continue
     }
 

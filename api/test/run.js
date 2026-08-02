@@ -46,9 +46,9 @@ function testClearFields() {
     city: 'Istanbul',
   })
 
-  assert.equal(formatted.telefon.gosterim, '0555 123 45 67')
-  assert.equal(formatted.telefon.sifirli, '05551234567')
-  assert.equal(formatted.telefon.uluslararasi, '+905551234567')
+  assert.equal(formatted.telefon, '0555 123 45 67')
+  assert.equal(formatted.telefon_sifirli, '05551234567')
+  assert.equal(formatted.telefon_uluslararasi, '+905551234567')
   assert.equal(formatted.isim, 'Ahmet Yilmaz')
   assert.equal(formatted.email, 'ahmet@example.com')
   assert.equal(formatted.sehir, 'Istanbul')
@@ -70,8 +70,8 @@ function testNestedJsonFields() {
   })
 
   assert.equal(formatted.isim, 'Burak GUL')
-  assert.equal(formatted.telefon.gosterim, '0543 443 04 68')
-  assert.equal(formatted.telefon.sifirli, '05434430468')
+  assert.equal(formatted.telefon, '0543 443 04 68')
+  assert.equal(formatted.telefon_sifirli, '05434430468')
   assert.equal(formatted.sehir, 'Ankara')
   assert.equal(formatted.ulke, 'Turkey')
   assert.equal(formatted.adres, 'Altay Eryaman')
@@ -92,13 +92,24 @@ function testPhoneNormalization() {
   console.log('✓ phone normalization')
 }
 
+function testMobileHtml() {
+  const formatted = formatClearResult({
+    phone: '05434430468',
+    full_name: 'Test User',
+    email: 'test@example.com',
+  })
+  assert.equal(formatted.telefon, '0543 443 04 68')
+  assert.equal(formatted.telefon_sifirli, '05434430468')
+  console.log('✓ flat phone fields for mobile')
+}
+
 function testPhoneInUnknownColumn() {
   const formatted = formatClearResult({
     contact: '0532 111 22 33',
     ad_soyad: 'Deniz Aksoy',
   })
 
-  assert.equal(formatted.telefon.gosterim, '0532 111 22 33')
+  assert.equal(formatted.telefon, '0532 111 22 33')
   assert.equal(formatted.isim, 'Deniz Aksoy')
   console.log('✓ phone detected in unknown column')
 }
@@ -134,6 +145,7 @@ async function run() {
   testClearFields()
   testNestedJsonFields()
   testPhoneNormalization()
+  testMobileHtml()
   testPhoneInUnknownColumn()
   await testApi()
   console.log('\nAll tests passed.')
