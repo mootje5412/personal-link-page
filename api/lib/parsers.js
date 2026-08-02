@@ -1,6 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import XLSX from 'xlsx'
+import { parseDelimitedFile } from './csvParser.js'
+import { cleanCell, maybeFormatPhone, normalizeHeader } from './valueUtils.js'
 
 function countTextLines(text) {
   if (!text) return { total_lines: 0, total_data_lines: 0 }
@@ -24,88 +26,59 @@ function countTextLines(text) {
   return { total_lines, total_data_lines }
 }
 
-function parseDelimited(text, delimiter) {
-  const lines = text.split(/\r?\n/).filter((line) => line.trim())
-  if (lines.length === 0) return { rows: [], total_lines: 0, total_data_lines: 0 }
-
-  const lineStats = countTextLines(text)
-  const headers = splitDelimitedLine(lines[0], delimiter).map((h, i) => h.trim() || `column_${i + 1}`)
-  const rows = []
-
-  for (let i = 1; i < lines.length; i += 1) {
-    const values = splitDelimitedLine(lines[i], delimiter)
-    const row = {}
-    headers.forEach((header, index) => {
-      row[header] = values[index] ?? ''
-    })
-    rows.push(row)
-  }
-
-  return {
-    rows,
-    total_lines: lineStats.total_lines,
-    total_data_lines: Math.max(lineStats.total_data_lines - 1, 0),
-  }
+function stripBom(text) {
+  return text.replace(/^\uFEFF/, '')
 }
 
-function splitDelimitedLine(line, delimiter) {
-  const result = []
-  let current = ''
-  let inQuotes = false
-
-  for (let i = 0; i < line.length; i += 1) {
-    const char = line[i]
-    const next = line[i + 1]
-
-    if (char === '"') {
-      if (inQuotes && next === '"') {
-        current += '"'
-        i += 1
-      } else {
-        inQuotes = !inQuotes
-      }
-      continue
-    }
-
-    if (char === delimiter && !inQuotes) {
-      result.push(current)
-      current = ''
-      continue
-    }
-
-    current += char
-  }
-
-  result.push(current)
-  return result
-}
-
-function flattenValue(value, prefix = '', out = {}) {
-  if (value == null) return out
+function flattenValue(value, prefix = '', out = {}, depth = 0) {
+  if (value == null || depth > 4) return out
 
   if (Array.isArray(value)) {
-    value.forEach((item, index) => flattenValue(item, prefix ? `${prefix}.${index}` : String(index), out))
+    value.forEach((item, index) => {
+      flattenValue(item, prefix ? `${prefix}_${index}` : String(index), out, depth + 1)
+    })
     return out
   }
 
   if (typeof value === 'object') {
     for (const [key, nested] of Object.entries(value)) {
-      flattenValue(nested, prefix ? `${prefix}.${key}` : key, out)
+      const next = prefix ? `${prefix}_${key}` : key
+      flattenValue(nested, next, out, depth + 1)
     }
     return out
   }
 
-  out[prefix || 'value'] = String(value)
+  const cleaned = String(value).trim()
+  if (cleaned) out[prefix || 'value'] = cleaned
   return out
 }
 
-export function normalizeRecord(record, sourceFile, rowIndex) {
-  const flat = flattenValue(record)
+function cleanRow(row) {
+  const out = {}
+  const usedKeys = new Set()
+
+  for (const [key, value] of Object.entries(row)) {
+    if (value == null) continue
+    const cleaned = cleanCell(value)
+    if (!cleaned) continue
+
+    let normalizedKey = normalizeHeader(key, Object.keys(out).length)
+    while (usedKeys.has(normalizedKey)) {
+      normalizedKey = `${normalizedKey}_${usedKeys.size + 1}`
+    }
+    usedKeys.add(normalizedKey)
+
+    out[normalizedKey] = maybeFormatPhone(normalizedKey, cleaned)
+  }
+  return out
+}
+
+export function normalizeRecord(fields, sourceFile, rowIndex) {
   return {
     source_file: sourceFile,
     row_index: rowIndex,
-    fields: flat,
-    text: Object.values(flat).join(' ').toLowerCase(),
+    fields,
+    text: Object.values(fields).join(' ').toLowerCase(),
   }
 }
 
@@ -129,28 +102,71 @@ function extractJsonRecords(parsed) {
   return [parsed]
 }
 
+function recordsFromRows(rows, relative) {
+  return rows.map((row, index) => normalizeRecord(cleanRow(row), relative, index + 1))
+}
+
+function parseLineOrientedText(raw, relative) {
+  const text = stripBom(raw)
+  const lineStats = countTextLines(text)
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+
+  const delimitedGuess = lines[0]?.includes(',') || lines[0]?.includes(';') || lines[0]?.includes('\t')
+  if (delimitedGuess && lines.length > 1) {
+    try {
+      const parsed = parseDelimitedFile(text)
+      if (parsed.rows.length > 0) {
+        return {
+          records: recordsFromRows(parsed.rows, relative),
+          total_lines: parsed.total_lines,
+          total_data_lines: parsed.total_data_lines,
+        }
+      }
+    } catch {
+      // fall back to plain lines
+    }
+  }
+
+  return {
+    records: lines.map((line, index) => normalizeRecord({ line }, relative, index + 1)),
+    total_lines: lineStats.total_lines,
+    total_data_lines: lines.length,
+  }
+}
+
 export function indexFile(filePath, fileType) {
   const ext = fileType || path.extname(filePath).toLowerCase()
   const relative = path.basename(filePath)
 
   if (ext === '.json') {
-    const raw = fs.readFileSync(filePath, 'utf8')
+    const raw = stripBom(fs.readFileSync(filePath, 'utf8'))
     const lineStats = countTextLines(raw)
     const parsed = JSON.parse(raw)
     const items = extractJsonRecords(parsed)
+    const records = items.map((item, index) => {
+      const fields = typeof item === 'object' && item !== null ? flattenValue(item) : { value: String(item) }
+      return normalizeRecord(fields, relative, index + 1)
+    })
+
     return {
-      records: items.map((item, index) => normalizeRecord(item, relative, index + 1)),
+      records,
       total_lines: lineStats.total_lines,
       total_data_lines: items.length,
     }
   }
 
   if (ext === '.jsonl' || ext === '.ndjson') {
-    const raw = fs.readFileSync(filePath, 'utf8')
+    const raw = stripBom(fs.readFileSync(filePath, 'utf8'))
     const lineStats = countTextLines(raw)
     const lines = raw.split(/\r?\n/).filter(Boolean)
+    const records = lines.map((line, index) => {
+      const item = JSON.parse(line)
+      const fields = typeof item === 'object' && item !== null ? flattenValue(item) : { value: String(item) }
+      return normalizeRecord(fields, relative, index + 1)
+    })
+
     return {
-      records: lines.map((line, index) => normalizeRecord(JSON.parse(line), relative, index + 1)),
+      records,
       total_lines: lineStats.total_lines,
       total_data_lines: lines.length,
     }
@@ -158,52 +174,48 @@ export function indexFile(filePath, fileType) {
 
   if (ext === '.csv') {
     const raw = fs.readFileSync(filePath, 'utf8')
-    const { rows, total_lines, total_data_lines } = parseDelimited(raw, ',')
+    const parsed = parseDelimitedFile(raw)
     return {
-      records: rows.map((row, index) => normalizeRecord(row, relative, index + 1)),
-      total_lines,
-      total_data_lines,
+      records: recordsFromRows(parsed.rows, relative),
+      total_lines: parsed.total_lines,
+      total_data_lines: parsed.total_data_lines,
     }
   }
 
   if (ext === '.tsv') {
     const raw = fs.readFileSync(filePath, 'utf8')
-    const { rows, total_lines, total_data_lines } = parseDelimited(raw, '\t')
+    const parsed = parseDelimitedFile(raw, '\t')
     return {
-      records: rows.map((row, index) => normalizeRecord(row, relative, index + 1)),
-      total_lines,
-      total_data_lines,
+      records: recordsFromRows(parsed.rows, relative),
+      total_lines: parsed.total_lines,
+      total_data_lines: parsed.total_data_lines,
     }
   }
 
   if (ext === '.txt' || ext === '.log' || ext === '.dat' || ext === '.sql' || ext === '.xml' || ext === '.yaml' || ext === '.yml') {
     const raw = fs.readFileSync(filePath, 'utf8')
-    const lineStats = countTextLines(raw)
-    const lines = raw.split(/\r?\n/).filter((line) => line.trim())
-    return {
-      records: lines.map((line, index) => normalizeRecord({ line }, relative, index + 1)),
-      total_lines: lineStats.total_lines,
-      total_data_lines: lines.length,
-    }
+    return parseLineOrientedText(raw, relative)
   }
 
   if (ext === '.xlsx' || ext === '.xls') {
     const workbook = XLSX.readFile(filePath, { cellDates: true })
     const records = []
     let total_records = 0
+    let total_lines = 0
 
     for (const sheetName of workbook.SheetNames) {
       const sheet = workbook.Sheets[sheetName]
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false, blankrows: false })
       total_records += rows.length
+      total_lines += rows.length
       rows.forEach((row, index) => {
-        records.push(normalizeRecord({ sheet: sheetName, ...row }, relative, index + 1))
+        records.push(normalizeRecord(cleanRow({ sheet: sheetName, ...row }), relative, index + 1))
       })
     }
 
     return {
       records,
-      total_lines: total_records,
+      total_lines,
       total_data_lines: total_records,
     }
   }
@@ -211,6 +223,6 @@ export function indexFile(filePath, fileType) {
   throw new Error(`Unsupported file type: ${ext}`)
 }
 
-export function parseFile(filePath) {
-  return indexFile(filePath).records
+export function parseFile(filePath, fileType) {
+  return indexFile(filePath, fileType).records
 }

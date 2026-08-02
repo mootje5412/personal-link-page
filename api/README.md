@@ -6,9 +6,11 @@ Node.js API that searches all files inside the `databases/` folder.
 
 - `.json`
 - `.jsonl` / `.ndjson`
-- `.csv` / `.tsv`
+- `.csv` / `.tsv` (auto-detects `,` `;` tab `|` delimiters)
 - `.txt` / `.log` / `.dat` / `.sql` / `.xml` / `.yaml` / `.yml`
 - `.xlsx` / `.xls`
+
+Search results return clear fields like `isim`, `telefon`, `email`, `tc`, `sehir`.
 
 Drop files into `databases/` (subfolders allowed). The API scans every supported file automatically every 15 seconds.
 

@@ -21,6 +21,7 @@ const EXTENSIONS = new Set([
 const SKIP_NAMES = new Set(['.gitkeep', '.ds_store', 'thumbs.db'])
 
 export function getDatabasesDir(rootDir = process.cwd()) {
+  if (process.env.DATABASES_DIR) return process.env.DATABASES_DIR
   return path.join(rootDir, 'databases')
 }
 

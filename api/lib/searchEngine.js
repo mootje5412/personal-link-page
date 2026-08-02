@@ -1,5 +1,6 @@
 import { listDatabaseFiles, resolveDatabasePath } from './fileWalker.js'
 import { indexFile } from './parsers.js'
+import { formatClearResult } from './clearFields.js'
 
 const cache = {
   fingerprint: '',
@@ -122,8 +123,8 @@ export function searchDatabases(query, options = {}) {
   for (const record of records) {
     if (!recordMatches(record, needles)) continue
     matches.push({
-      row_index: record.row_index,
-      match: record.fields,
+      row: record.row_index,
+      ...formatClearResult(record.fields),
     })
     if (matches.length >= limit) break
   }
