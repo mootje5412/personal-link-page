@@ -15,6 +15,7 @@ if (!TOKEN) {
   process.exit(1)
 }
 
+const bot = new Bot(TOKEN)
 let indexReady = false
 
 function buildKeyboard(sessionId, page, totalPages) {
