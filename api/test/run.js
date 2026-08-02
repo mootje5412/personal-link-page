@@ -4,7 +4,7 @@ import { parseDelimitedFile } from '../lib/csvParser.js'
 import { buildRecordSearchIndex } from '../lib/recordIndex.js'
 import { recordMatchesType, validateQuery } from '../lib/searchMatcher.js'
 import { detectSearchType, searchWithAutoType } from '../lib/queryDetect.js'
-import { formatResultsMessage } from '../lib/telegramFormat.js'
+import { formatResultsMessage, formatResultsPage, getTotalPages, PAGE_SIZE } from '../lib/telegramFormat.js'
 import { buildPhoneFormats, buildPhoneSearchVariants, formatTurkishPhone, normalizeTurkishPhoneDigits } from '../lib/phoneUtils.js'
 
 const BASE = process.env.API_BASE || 'http://127.0.0.1:8080'
@@ -126,22 +126,34 @@ function testQueryDetect() {
 }
 
 function testTelegramFormat() {
+  const sample = {
+    isim: 'Burak GUL',
+    ad: 'Burak',
+    soyad: 'GUL',
+    tc: '60559325184',
+    telefon: '0543 443 04 68',
+  }
+
   const message = formatResultsMessage('Burak', {
     ok: true,
     found: 1,
     returned: 1,
-    results: [
-      {
-        isim: 'Burak GUL',
-        ad: 'Burak',
-        soyad: 'GUL',
-        tc: '60559325184',
-        telefon: '0543 443 04 68',
-      },
-    ],
+    results: [sample],
   })
   assert.match(message, /Burak GUL/)
   assert.match(message, /60559325184/)
+  assert.match(message, /Sayfa 1\/1/)
+
+  const page = formatResultsPage({
+    query: 'Burak',
+    results: Array.from({ length: 15 }, () => sample),
+    found: 15,
+    page: 1,
+    ms: 12.5,
+  })
+  assert.match(page, /Sayfa 2\/2/)
+  assert.equal(getTotalPages(15), 2)
+  assert.equal(PAGE_SIZE, 10)
   console.log('✓ telegram format')
 }
 
