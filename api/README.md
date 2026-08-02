@@ -38,6 +38,8 @@ cd api
 python3 deploy.py
 ```
 
+Deploy updates API code only. Files already in the server `databases/` folder are kept.
+
 ## Example
 
 ```bash

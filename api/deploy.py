@@ -15,8 +15,9 @@ REMOTE_DIR = "/root/api"
 PORT = 8080
 
 LOCAL_DIR = Path(__file__).resolve().parent
-UPLOAD_DIRS = ["databases", "lib"]
+UPLOAD_DIRS = ["lib"]
 UPLOAD_FILES = ["server.js", "package.json"]
+REMOTE_DATABASES_DIR = f"{REMOTE_DIR}/databases"
 
 SYSTEMD_UNIT = f"""[Unit]
 Description=VeriPanel JavaScript Search API
@@ -70,8 +71,8 @@ def main() -> int:
     client.connect(SERVER, username=USER, password=PASSWORD, timeout=20)
 
     run(client, "systemctl stop search-api 2>/dev/null || true")
-    run(client, f"mkdir -p {REMOTE_DIR}")
-    run(client, f"rm -rf {REMOTE_DIR}/lib {REMOTE_DIR}/databases {REMOTE_DIR}/node_modules")
+    run(client, f"mkdir -p {REMOTE_DIR} {REMOTE_DATABASES_DIR}")
+    run(client, f"rm -rf {REMOTE_DIR}/lib {REMOTE_DIR}/node_modules")
     run(client, f"rm -f {REMOTE_DIR}/server.js {REMOTE_DIR}/package.json")
 
     sftp = client.open_sftp()
