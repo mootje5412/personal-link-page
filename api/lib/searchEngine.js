@@ -55,6 +55,9 @@ function buildFingerprint(rootDir) {
 }
 
 function rebuildIndex(rootDir) {
+  // Drop the old index first so rebuild does not need 2x memory.
+  cache.records = []
+
   const files = listDatabaseFiles(rootDir)
   const records = []
   let total_lines = 0
@@ -94,11 +97,14 @@ export function loadAllRecords(rootDir = process.cwd(), force = false) {
 
   const fingerprint = buildFingerprint(rootDir)
   if (!force && cache.loadedAt > 0 && cache.fingerprint === fingerprint) {
+    if (Date.now() - cache.loadedAt >= CACHE_TTL_MS) {
+      cache.loadedAt = Date.now()
+    }
     return cache
   }
 
   if (!force && cache.loadedAt > 0) {
-    scheduleRebuild(rootDir, 'stale-cache')
+    scheduleRebuild(rootDir, 'file-change')
     return cache
   }
 
@@ -113,8 +119,10 @@ export function loadAllRecords(rootDir = process.cwd(), force = false) {
 export function getLineStats(rootDir = process.cwd()) {
   if (cache.loadedAt > 0) {
     const fingerprint = buildFingerprint(rootDir)
-    if (fingerprint !== cache.fingerprint || Date.now() - cache.loadedAt >= CACHE_TTL_MS) {
-      scheduleRebuild(rootDir, 'stats-refresh')
+    if (fingerprint !== cache.fingerprint) {
+      scheduleRebuild(rootDir, 'file-change')
+    } else if (Date.now() - cache.loadedAt >= CACHE_TTL_MS) {
+      cache.loadedAt = Date.now()
     }
     return {
       ok: true,

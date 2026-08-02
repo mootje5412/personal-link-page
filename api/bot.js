@@ -40,7 +40,7 @@ function buildKeyboard(sessionId, page, totalPages) {
   return keyboard
 }
 
-async function sendResults(ctx, { query, searchResult, ms, page = 0, edit = false }) {
+async function sendResults(ctx, { query, searchResult, ms, page = 0 }) {
   const sessionId = createSession({
     query,
     results: searchResult.results,
@@ -58,15 +58,13 @@ async function sendResults(ctx, { query, searchResult, ms, page = 0, edit = fals
     ms,
   })
   const keyboard = buildKeyboard(sessionId, safePage, totalPages)
-  const options = { parse_mode: 'HTML', reply_markup: keyboard }
 
-  if (edit && ctx.callbackQuery?.message) {
-    await ctx.editMessageText(text, options)
-    await ctx.answerCallbackQuery()
-    return
+  try {
+    await ctx.reply(text, { parse_mode: 'HTML', reply_markup: keyboard })
+  } catch (error) {
+    console.error('HTML reply failed, retrying plain text:', error.message)
+    await ctx.reply(text.replace(/<[^>]+>/g, ''))
   }
-
-  await ctx.reply(text, options)
 }
 
 bot.command('start', async (ctx) => {
@@ -79,59 +77,69 @@ bot.callbackQuery(/^page:noop$/, async (ctx) => {
 })
 
 bot.callbackQuery(/^p:([a-z0-9]+):(\d+)$/, async (ctx) => {
-  const sessionId = ctx.match[1]
-  const page = Number(ctx.match[2])
-  const session = getSession(sessionId)
+  try {
+    const sessionId = ctx.match[1]
+    const page = Number(ctx.match[2])
+    const session = getSession(sessionId)
 
-  if (!session) {
-    await ctx.answerCallbackQuery({ text: 'Bu arama süresi doldu. Yeniden ara.', show_alert: true })
-    return
+    if (!session) {
+      await ctx.answerCallbackQuery({ text: 'Bu arama süresi doldu. Yeniden ara.', show_alert: true })
+      return
+    }
+
+    const text = formatResultsPage({
+      query: session.query,
+      results: session.results,
+      found: session.found,
+      page,
+      ms: session.ms,
+    })
+    const totalPages = getTotalPages(session.results.length)
+    const safePage = Math.min(Math.max(page, 0), totalPages - 1)
+
+    await ctx.editMessageText(text, {
+      parse_mode: 'HTML',
+      reply_markup: buildKeyboard(sessionId, safePage, totalPages),
+    })
+    await ctx.answerCallbackQuery()
+  } catch (error) {
+    console.error('Pagination error:', error)
+    await ctx.answerCallbackQuery({ text: 'Sayfa yüklenemedi.', show_alert: true })
   }
-
-  const text = formatResultsPage({
-    query: session.query,
-    results: session.results,
-    found: session.found,
-    page,
-    ms: session.ms,
-  })
-  const totalPages = getTotalPages(session.results.length)
-  const safePage = Math.min(Math.max(page, 0), totalPages - 1)
-
-  await ctx.editMessageText(text, {
-    parse_mode: 'HTML',
-    reply_markup: buildKeyboard(sessionId, safePage, totalPages),
-  })
-  await ctx.answerCallbackQuery()
 })
 
 bot.on('message:text', async (ctx) => {
   const query = ctx.message.text.trim()
   if (!query || query.startsWith('/')) return
 
-  const stats = getLineStats(ROOT_DIR).stats
-  if (stats.status !== 'ready' || stats.indexed_records === 0) {
-    await ctx.reply('Veritabanı hâlâ yükleniyor. Birkaç dakika sonra tekrar dene.')
-    return
+  try {
+    const stats = getLineStats(ROOT_DIR).stats
+    if (stats.status !== 'ready' || stats.indexed_records === 0) {
+      await ctx.reply('Veritabanı hâlâ yükleniyor. Birkaç dakika sonra tekrar dene.')
+      return
+    }
+
+    await ctx.replyWithChatAction('typing')
+
+    const started = performance.now()
+    const result = searchWithAutoType(query, { limit: MAX_FETCH, rootDir: ROOT_DIR })
+    const ms = Number((performance.now() - started).toFixed(1))
+
+    if (!result.ok) {
+      await ctx.reply(result.error || 'Sorgu başarısız.')
+      return
+    }
+
+    if (!result.found) {
+      await ctx.reply(`Sonuç bulunamadı: ${query}`)
+      return
+    }
+
+    await sendResults(ctx, { query, searchResult: result, ms, page: 0 })
+  } catch (error) {
+    console.error('Search handler error:', error)
+    await ctx.reply('Arama sırasında bir hata oluştu. Lütfen tekrar dene.')
   }
-
-  await ctx.replyWithChatAction('typing')
-
-  const started = performance.now()
-  const result = searchWithAutoType(query, { limit: MAX_FETCH, rootDir: ROOT_DIR })
-  const ms = Number((performance.now() - started).toFixed(1))
-
-  if (!result.ok) {
-    await ctx.reply(result.error || 'Sorgu başarısız.')
-    return
-  }
-
-  if (!result.found) {
-    await ctx.reply(`Sonuç bulunamadı: ${query}`)
-    return
-  }
-
-  await sendResults(ctx, { query, searchResult: result, ms, page: 0 })
 })
 
 bot.catch((error) => {

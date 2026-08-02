@@ -30,6 +30,7 @@ Type=simple
 User=root
 WorkingDirectory={REMOTE_DIR}
 Environment=NODE_ENV=production
+Environment=NODE_OPTIONS=--max-old-space-size=2048
 EnvironmentFile=-{REMOTE_ENV_FILE}
 ExecStart=/usr/bin/node {REMOTE_DIR}/bot.js
 Restart=always
