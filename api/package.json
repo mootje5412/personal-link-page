@@ -1,0 +1,22 @@
+{
+  "name": "veripanel-search-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node bot.js",
+    "api": "node server.js",
+    "dev": "node --watch bot.js",
+    "test": "node test/run.js",
+    "test:sql": "node test/sqlParser.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "grammy": "^1.35.0",
+    "xlsx": "^0.18.5"
+  }
+}
