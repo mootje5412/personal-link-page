@@ -17,10 +17,10 @@ Drop files into `databases/` (subfolders allowed). The API indexes and searches 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/health` | Health check |
-| GET | `/api/database?key=KEY` | File + record stats |
-| GET | `/api/files?key=KEY` | Same as database stats |
-| GET | `/api/search?q=QUERY&key=KEY` | Search all databases |
-| POST | `/api/reload?key=KEY` | Clear cache and reload files |
+| GET | `/api/database` | File + record stats |
+| GET | `/api/files` | Same as database stats |
+| GET | `/api/search?q=QUERY` | Search all databases |
+| POST | `/api/reload` | Clear cache and reload files |
 
 ## Run locally
 
@@ -38,10 +38,8 @@ cd api
 python3 deploy.py
 ```
 
-Default API key: `z2GFltjwp4rgccrOJdtc` (set `API_KEY` env var to change).
-
 ## Example
 
 ```bash
-curl "http://109.71.252.128:8080/api/search?q=05551234567&key=z2GFltjwp4rgccrOJdtc"
+curl "http://109.71.252.128:8080/api/search?q=05551234567"
 ```

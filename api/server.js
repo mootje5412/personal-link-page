@@ -7,19 +7,10 @@ import { getDatabasesDir, listDatabaseFiles } from './lib/fileWalker.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT_DIR = __dirname
 const PORT = Number(process.env.PORT || 8080)
-const API_KEY = process.env.API_KEY || 'z2GFltjwp4rgccrOJdtc'
 
 const app = express()
 app.disable('x-powered-by')
 app.use(express.json({ limit: '1mb' }))
-
-function verifyKey(req, res, next) {
-  const key = req.query.key || req.headers.authorization?.replace(/^Bearer\s+/i, '')
-  if (key !== API_KEY) {
-    return res.status(401).json({ ok: false, error: 'Invalid or missing API key' })
-  }
-  return next()
-}
 
 app.get('/', (_req, res) => {
   res.json({
@@ -28,9 +19,9 @@ app.get('/', (_req, res) => {
     version: '1.0.0',
     endpoints: {
       health: '/api/health',
-      files: '/api/files?key=YOUR_KEY',
-      search: '/api/search?q=QUERY&key=YOUR_KEY',
-      database: '/api/database?key=YOUR_KEY',
+      files: '/api/files',
+      search: '/api/search?q=QUERY',
+      database: '/api/database',
     },
   })
 })
@@ -44,11 +35,11 @@ app.get('/api/health', (_req, res) => {
   })
 })
 
-app.get('/api/files', verifyKey, (_req, res) => {
+app.get('/api/files', (_req, res) => {
   res.json(getDatabaseStats(ROOT_DIR))
 })
 
-app.get('/api/database', verifyKey, (_req, res) => {
+app.get('/api/database', (_req, res) => {
   const stats = getDatabaseStats(ROOT_DIR)
   res.json({
     ok: true,
@@ -61,7 +52,7 @@ app.get('/api/database', verifyKey, (_req, res) => {
   })
 })
 
-app.get('/api/search', verifyKey, (req, res) => {
+app.get('/api/search', (req, res) => {
   const started = performance.now()
   const limit = Math.min(Number(req.query.limit || 50), 200)
   const result = searchDatabases(req.query.q, { limit, rootDir: ROOT_DIR })
@@ -76,7 +67,7 @@ app.get('/api/search', verifyKey, (req, res) => {
   })
 })
 
-app.post('/api/reload', verifyKey, (_req, res) => {
+app.post('/api/reload', (_req, res) => {
   clearCache()
   const stats = getDatabaseStats(ROOT_DIR)
   res.json({ ok: true, message: 'Cache cleared and databases reloaded', ...stats })

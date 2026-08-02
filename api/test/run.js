@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 
 const BASE = process.env.API_BASE || 'http://127.0.0.1:8080'
-const KEY = process.env.API_KEY || 'z2GFltjwp4rgccrOJdtc'
 
 async function request(path) {
   const res = await fetch(`${BASE}${path}`)
@@ -17,41 +16,37 @@ async function run() {
   assert.equal(health.data.ok, true)
   console.log('✓ health')
 
-  const noKey = await request('/api/search?q=0555')
-  assert.equal(noKey.status, 401)
-  console.log('✓ auth required')
-
-  const stats = await request(`/api/database?key=${KEY}`)
+  const stats = await request('/api/database')
   assert.equal(stats.status, 200)
   assert.ok(stats.data.database.total_records >= 10)
   console.log(`✓ database stats (${stats.data.database.total_records} records)`)
 
-  const phoneSearch = await request(`/api/search?q=05551234567&key=${KEY}`)
+  const phoneSearch = await request('/api/search?q=05551234567')
   assert.equal(phoneSearch.status, 200)
   assert.ok(phoneSearch.data.results.length >= 1)
   console.log(`✓ phone search (${phoneSearch.data.results.length} hits)`)
 
-  const nameSearch = await request(`/api/search?q=Ahmet&key=${KEY}`)
+  const nameSearch = await request('/api/search?q=Ahmet')
   assert.equal(nameSearch.status, 200)
   assert.ok(nameSearch.data.results.length >= 1)
   console.log(`✓ name search (${nameSearch.data.results.length} hits)`)
 
-  const emailSearch = await request(`/api/search?q=ayse.demir&key=${KEY}`)
+  const emailSearch = await request('/api/search?q=ayse.demir')
   assert.equal(emailSearch.status, 200)
   assert.ok(emailSearch.data.results.length >= 1)
   console.log(`✓ email search (${emailSearch.data.results.length} hits)`)
 
-  const csvSearch = await request(`/api/search?q=Ali%20Vural&key=${KEY}`)
+  const csvSearch = await request('/api/search?q=Ali%20Vural')
   assert.equal(csvSearch.status, 200)
   assert.ok(csvSearch.data.results.length >= 1)
   console.log(`✓ csv search (${csvSearch.data.results.length} hits)`)
 
-  const jsonlSearch = await request(`/api/search?q=Zeynep&key=${KEY}`)
+  const jsonlSearch = await request('/api/search?q=Zeynep')
   assert.equal(jsonlSearch.status, 200)
   assert.ok(jsonlSearch.data.results.length >= 1)
   console.log(`✓ jsonl search (${jsonlSearch.data.results.length} hits)`)
 
-  const empty = await request(`/api/search?key=${KEY}`)
+  const empty = await request('/api/search')
   assert.equal(empty.status, 400)
   console.log('✓ empty query rejected')
 

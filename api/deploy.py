@@ -12,7 +12,6 @@ SERVER = "109.71.252.128"
 USER = "root"
 PASSWORD = os.environ.get("SERVER_PASS", "z2GFltjwp4rgccrOJdtc")
 REMOTE_DIR = "/root/api"
-API_KEY = "z2GFltjwp4rgccrOJdtc"
 PORT = 8080
 
 LOCAL_DIR = Path(__file__).resolve().parent
@@ -27,7 +26,6 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory={REMOTE_DIR}
-Environment=API_KEY={API_KEY}
 Environment=PORT={PORT}
 Environment=NODE_ENV=production
 ExecStart=/usr/bin/node {REMOTE_DIR}/server.js
@@ -102,11 +100,11 @@ def main() -> int:
     time.sleep(2)
 
     run(client, f'curl -s "http://127.0.0.1:{PORT}/api/health"')
-    run(client, f'curl -s "http://127.0.0.1:{PORT}/api/search?q=05551234567&key={API_KEY}" | head -c 500')
+    run(client, f'curl -s "http://127.0.0.1:{PORT}/api/search?q=05551234567" | head -c 500')
     run(client, "systemctl is-active search-api")
 
     client.close()
-    print(f"\nDone. API: http://{SERVER}:{PORT}/api/search?q=QUERY&key={API_KEY}")
+    print(f"\nDone. API: http://{SERVER}:{PORT}/api/search?q=QUERY")
     return 0
 
 
