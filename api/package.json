@@ -5,8 +5,9 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
+    "start": "node bot.js",
+    "api": "node server.js",
+    "dev": "node --watch bot.js",
     "test": "node test/run.js"
   },
   "engines": {
@@ -14,6 +15,7 @@
   },
   "dependencies": {
     "express": "^4.21.2",
+    "grammy": "^1.35.0",
     "xlsx": "^0.18.5"
   }
 }

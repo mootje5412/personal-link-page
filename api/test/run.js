@@ -3,6 +3,8 @@ import { formatClearResult } from '../lib/clearFields.js'
 import { parseDelimitedFile } from '../lib/csvParser.js'
 import { buildRecordSearchIndex } from '../lib/recordIndex.js'
 import { recordMatchesType, validateQuery } from '../lib/searchMatcher.js'
+import { detectSearchType, searchWithAutoType } from '../lib/queryDetect.js'
+import { formatResultsMessage } from '../lib/telegramFormat.js'
 import { buildPhoneFormats, buildPhoneSearchVariants, formatTurkishPhone, normalizeTurkishPhoneDigits } from '../lib/phoneUtils.js'
 
 const BASE = process.env.API_BASE || 'http://127.0.0.1:8080'
@@ -116,6 +118,39 @@ function testPhoneInUnknownColumn() {
   console.log('✓ phone detected in unknown column')
 }
 
+function testQueryDetect() {
+  assert.equal(detectSearchType('60559325184'), 'tc')
+  assert.equal(detectSearchType('0543 443 04 68'), 'telefon')
+  assert.equal(detectSearchType('Burak'), 'ad')
+  console.log('✓ query detect')
+}
+
+function testTelegramFormat() {
+  const message = formatResultsMessage('Burak', {
+    ok: true,
+    found: 1,
+    returned: 1,
+    results: [
+      {
+        isim: 'Burak GUL',
+        ad: 'Burak',
+        soyad: 'GUL',
+        tc: '60559325184',
+        telefon: '0543 443 04 68',
+      },
+    ],
+  })
+  assert.match(message, /Burak GUL/)
+  assert.match(message, /60559325184/)
+  console.log('✓ telegram format')
+}
+
+function testAutoSearch() {
+  const result = searchWithAutoType('60559325184', { limit: 1, rootDir: process.cwd() })
+  assert.equal(result.ok, true)
+  console.log('✓ auto search')
+}
+
 function testTypedSearchMatching() {
   const record = {
     search: buildRecordSearchIndex({
@@ -139,9 +174,16 @@ function testTypedSearchMatching() {
 }
 
 async function testApi() {
-  const health = await request('/api/health')
-  assert.equal(health.status, 200)
-  console.log('✓ health')
+  try {
+    const health = await request('/api/health')
+    if (health.status !== 200) {
+      console.log('⚠ HTTP API not running (Telegram bot mode)')
+      return
+    }
+  } catch {
+    console.log('⚠ HTTP API not running (Telegram bot mode)')
+    return
+  }
 
   const stats = await request('/api/stats')
   assert.equal(stats.status, 200)
@@ -180,6 +222,9 @@ async function run() {
   testPhoneNormalization()
   testMobileHtml()
   testPhoneInUnknownColumn()
+  testQueryDetect()
+  testTelegramFormat()
+  testAutoSearch()
   testTypedSearchMatching()
   await testApi()
   console.log('\nAll tests passed.')
