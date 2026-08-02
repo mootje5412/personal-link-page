@@ -55,6 +55,18 @@ export function formatTurkishPhone(value) {
   return String(value ?? '').trim()
 }
 
+export function buildPhoneFormats(value) {
+  const local = normalizeTurkishPhoneDigits(value)
+  if (!local || local.length !== 10 || !local.startsWith('5')) return null
+
+  return {
+    gosterim: formatTurkishPhone(local),
+    sifirli: `0${local}`,
+    uluslararasi: `+90${local}`,
+    numara: local,
+  }
+}
+
 export function looksLikePhoneValue(value) {
   const local = normalizeTurkishPhoneDigits(value)
   return local.length === 10 && local.startsWith('5')

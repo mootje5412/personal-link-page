@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { formatClearResult } from '../lib/clearFields.js'
 import { parseDelimitedFile } from '../lib/csvParser.js'
-import { buildPhoneSearchVariants, formatTurkishPhone, normalizeTurkishPhoneDigits } from '../lib/phoneUtils.js'
+import { buildPhoneSearchVariants, buildPhoneFormats, formatTurkishPhone, normalizeTurkishPhoneDigits } from '../lib/phoneUtils.js'
 
 const BASE = process.env.API_BASE || 'http://127.0.0.1:8080'
 
@@ -46,7 +46,9 @@ function testClearFields() {
     city: 'Istanbul',
   })
 
-  assert.equal(formatted.telefon, '0555 123 45 67')
+  assert.equal(formatted.telefon.gosterim, '0555 123 45 67')
+  assert.equal(formatted.telefon.sifirli, '05551234567')
+  assert.equal(formatted.telefon.uluslararasi, '+905551234567')
   assert.equal(formatted.isim, 'Ahmet Yilmaz')
   assert.equal(formatted.email, 'ahmet@example.com')
   assert.equal(formatted.sehir, 'Istanbul')
@@ -68,7 +70,8 @@ function testNestedJsonFields() {
   })
 
   assert.equal(formatted.isim, 'Burak GUL')
-  assert.equal(formatted.telefon, '0543 443 04 68')
+  assert.equal(formatted.telefon.gosterim, '0543 443 04 68')
+  assert.equal(formatted.telefon.sifirli, '05434430468')
   assert.equal(formatted.sehir, 'Ankara')
   assert.equal(formatted.ulke, 'Turkey')
   assert.equal(formatted.adres, 'Altay Eryaman')
@@ -81,6 +84,9 @@ function testPhoneNormalization() {
   assert.equal(normalizeTurkishPhoneDigits('+90 (543) 443-04-68'), '5434430468')
   assert.equal(normalizeTurkishPhoneDigits('05434430468'), '5434430468')
   assert.equal(formatTurkishPhone('905434430468'), '0543 443 04 68')
+  const formats = buildPhoneFormats('905434430468')
+  assert.equal(formats.gosterim, '0543 443 04 68')
+  assert.equal(formats.uluslararasi, '+905434430468')
   assert.ok(buildPhoneSearchVariants('0543 443 04 68').includes('5434430468'))
   assert.ok(buildPhoneSearchVariants('0543 443 04 68').includes('905434430468'))
   console.log('✓ phone normalization')
@@ -92,7 +98,7 @@ function testPhoneInUnknownColumn() {
     ad_soyad: 'Deniz Aksoy',
   })
 
-  assert.equal(formatted.telefon, '0532 111 22 33')
+  assert.equal(formatted.telefon.gosterim, '0532 111 22 33')
   assert.equal(formatted.isim, 'Deniz Aksoy')
   console.log('✓ phone detected in unknown column')
 }

@@ -125,20 +125,22 @@ export function searchDatabases(query, options = {}) {
   const { records } = loadAllRecords(rootDir)
   const needles = buildNeedles(trimmed)
   const matches = []
+  let totalFound = 0
 
   for (const record of records) {
     if (!recordMatches(record, needles)) continue
+    totalFound += 1
+    if (matches.length >= limit) continue
     matches.push({
       row: record.row_index,
       ...formatClearResult(record.fields),
     })
-    if (matches.length >= limit) break
   }
 
   return {
     ok: true,
     query: trimmed,
-    found: matches.length,
+    found: totalFound,
     returned: matches.length,
     results: matches,
   }

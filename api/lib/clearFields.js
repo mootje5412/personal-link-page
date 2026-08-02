@@ -1,5 +1,22 @@
 import { isNoiseKey, maybeFormatPhone, normalizeHeader, prettifyExtraKey } from './valueUtils.js'
-import { formatTurkishPhone, looksLikePhoneValue } from './phoneUtils.js'
+import { buildPhoneFormats, formatTurkishPhone, looksLikePhoneValue } from './phoneUtils.js'
+
+const RESULT_ORDER = [
+  'row',
+  'isim',
+  'telefon',
+  'email',
+  'tc',
+  'sehir',
+  'ilce',
+  'ulke',
+  'adres',
+  'posta_kodu',
+  'sirket',
+  'username',
+  'website',
+  'diger',
+]
 
 const FIELD_GROUPS = [
   ['isim', ['isim', 'name', 'full_name', 'ad_soyad', 'adsoyad', 'name_surname'], null],
@@ -177,5 +194,27 @@ export function formatClearResult(fields) {
     result.diger = extras
   }
 
-  return result
+  return polishSearchResult(result)
+}
+
+function polishSearchResult(result) {
+  const polished = {}
+
+  for (const key of RESULT_ORDER) {
+    if (key === 'row') continue
+
+    if (key === 'telefon') {
+      if (!result.telefon) continue
+      const formats = buildPhoneFormats(result.telefon)
+      polished.telefon = formats ?? result.telefon
+      continue
+    }
+
+    const value = result[key]
+    if (value == null || value === '') continue
+    if (key === 'diger' && typeof value === 'object' && Object.keys(value).length === 0) continue
+    polished[key] = value
+  }
+
+  return polished
 }
