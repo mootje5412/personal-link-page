@@ -43,9 +43,13 @@ app.get('/api/stats', (_req, res) => {
 })
 
 app.get('/api/database', (_req, res) => {
+  const stats = getDatabaseStats(ROOT_DIR)
   res.json({
     ok: true,
-    database: getDatabaseStats(ROOT_DIR),
+    database: {
+      total_records: stats.total_records,
+      status: stats.status,
+    },
   })
 })
 
@@ -69,7 +73,10 @@ app.post('/api/reload', (_req, res) => {
   res.json({
     ok: true,
     message: 'Cache cleared and databases reloaded',
-    database: getDatabaseStats(ROOT_DIR),
+    database: {
+      total_records: getDatabaseStats(ROOT_DIR).total_records,
+      status: 'ready',
+    },
   })
 })
 
