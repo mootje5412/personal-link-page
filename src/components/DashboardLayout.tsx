@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import MobileNav from './MobileNav'
 import Sidebar from './Sidebar'
 import { useAuth } from '../context/AuthContext'
 import { DatabaseStatsProvider } from '../context/DatabaseStatsContext'
@@ -61,8 +60,6 @@ function DashboardShell() {
         <main className="dashboard-content">
           <Outlet />
         </main>
-
-        <MobileNav />
       </div>
     </div>
   )

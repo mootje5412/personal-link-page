@@ -16,6 +16,37 @@ const cache = {
 }
 
 const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS || 300000)
+let rebuildPromise = null
+
+function scheduleRebuild(rootDir, reason = 'refresh') {
+  if (rebuildPromise) return rebuildPromise
+
+  if (cache.loadedAt > 0) {
+    cache.stats = { ...cache.stats, status: 'indexing' }
+  }
+
+  rebuildPromise = Promise.resolve()
+    .then(() => {
+      console.log(`Rebuilding index (${reason})...`)
+      rebuildIndex(rootDir)
+      console.log(`Index ready: ${cache.stats.indexed_records} records`)
+    })
+    .catch((error) => {
+      console.error(`Index rebuild failed: ${error.message}`)
+      cache.stats = { ...cache.stats, status: 'starting' }
+    })
+    .finally(() => {
+      rebuildPromise = null
+    })
+
+  return rebuildPromise
+}
+
+function cacheIsFresh(rootDir) {
+  if (cache.loadedAt <= 0) return false
+  if (Date.now() - cache.loadedAt >= CACHE_TTL_MS) return false
+  return cache.fingerprint === buildFingerprint(rootDir)
+}
 
 function buildNeedles(query) {
   const trimmed = query.trim()
@@ -85,26 +116,49 @@ function rebuildIndex(rootDir) {
 }
 
 export function loadAllRecords(rootDir = process.cwd(), force = false) {
-  const fingerprint = buildFingerprint(rootDir)
-  const now = Date.now()
-  const cacheValid =
-    !force &&
-    cache.fingerprint === fingerprint &&
-    cache.loadedAt > 0 &&
-    now - cache.loadedAt < CACHE_TTL_MS
-
-  if (!cacheValid) {
-    rebuildIndex(rootDir)
+  if (!force && cacheIsFresh(rootDir)) {
+    return cache
   }
 
+  const fingerprint = buildFingerprint(rootDir)
+  if (!force && cache.loadedAt > 0 && cache.fingerprint === fingerprint) {
+    return cache
+  }
+
+  if (!force && cache.loadedAt > 0) {
+    scheduleRebuild(rootDir, 'stale-cache')
+    return cache
+  }
+
+  if (rebuildPromise) {
+    return cache
+  }
+
+  rebuildIndex(rootDir)
   return cache
 }
 
 export function getLineStats(rootDir = process.cwd()) {
-  const { stats } = loadAllRecords(rootDir)
+  if (cache.loadedAt > 0) {
+    const fingerprint = buildFingerprint(rootDir)
+    if (fingerprint !== cache.fingerprint || Date.now() - cache.loadedAt >= CACHE_TTL_MS) {
+      scheduleRebuild(rootDir, 'stats-refresh')
+    }
+    return {
+      ok: true,
+      stats: cache.stats,
+    }
+  }
+
+  scheduleRebuild(rootDir, 'cold-start')
   return {
     ok: true,
-    stats,
+    stats: {
+      total_lines: 0,
+      total_data_lines: 0,
+      indexed_records: 0,
+      status: 'starting',
+    },
   }
 }
 
@@ -147,7 +201,7 @@ export function searchDatabases(query, options = {}) {
 }
 
 export function getDatabaseStats(rootDir = process.cwd()) {
-  const { stats } = loadAllRecords(rootDir)
+  const { stats } = getLineStats(rootDir)
   return {
     ok: true,
     total_records: stats.indexed_records,
@@ -171,9 +225,7 @@ export function startAutoRescan(rootDir = process.cwd(), intervalMs = Number(pro
   setInterval(() => {
     const fingerprint = buildFingerprint(rootDir)
     if (fingerprint !== cache.fingerprint) {
-      console.log('Database files changed, rebuilding index...')
-      rebuildIndex(rootDir)
-      console.log(`Index rebuilt: ${cache.stats.indexed_records} records`)
+      scheduleRebuild(rootDir, 'file-change')
     }
   }, intervalMs).unref()
 }

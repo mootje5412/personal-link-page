@@ -13,7 +13,9 @@ const PhoneSearchPage = () => {
   const [message, setMessage] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
 
-  const indexBusy = databaseLoading || database?.index_building || database?.status !== 'ready'
+  const indexBusy =
+    databaseLoading ||
+    (database?.status === 'starting' && (database?.indexed_records ?? 0) === 0)
   const indexStatus = databaseLoading
     ? 'Veritabanı durumu kontrol ediliyor…'
     : databaseStatusLabel(database?.status ?? 'starting', database?.index_building ?? false)

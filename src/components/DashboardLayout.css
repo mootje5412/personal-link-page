@@ -79,6 +79,6 @@
   }
 
   .dashboard-content {
-    padding: 20px 16px calc(88px + env(safe-area-inset-bottom, 0px));
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
   }
 }

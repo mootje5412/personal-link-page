@@ -43,10 +43,10 @@ export async function fetchDatabaseStats(): Promise<DatabaseSummary> {
     total_data_lines: data.stats.total_data_lines ?? null,
     total_size_mb: 0,
     indexed_records: data.stats.indexed_records ?? 0,
-    index_ready: status === 'ready',
+    index_ready: status === 'ready' || (data.stats.indexed_records ?? 0) > 0,
     index_building: status === 'indexing',
     auto_watch: true,
-    status,
+    status: (data.stats.indexed_records ?? 0) > 0 && status === 'starting' ? 'ready' : status,
   }
 }
 
