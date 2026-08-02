@@ -3,7 +3,6 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { getDatabaseStats, searchDatabases, clearCache } from './lib/searchEngine.js'
 import { getLineStats } from './lib/stats.js'
-import { getDatabasesDir, listDatabaseFiles } from './lib/fileWalker.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT_DIR = __dirname
@@ -21,7 +20,6 @@ app.get('/', (_req, res) => {
     endpoints: {
       health: '/api/health',
       stats: '/api/stats',
-      files: '/api/files',
       search: '/api/search?q=QUERY',
       database: '/api/database',
     },
@@ -32,8 +30,6 @@ app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     status: 'ready',
-    databases_dir: getDatabasesDir(ROOT_DIR),
-    files: listDatabaseFiles(ROOT_DIR).length,
   })
 })
 
@@ -46,20 +42,10 @@ app.get('/api/stats', (_req, res) => {
   })
 })
 
-app.get('/api/files', (_req, res) => {
-  res.json(getDatabaseStats(ROOT_DIR))
-})
-
 app.get('/api/database', (_req, res) => {
-  const stats = getDatabaseStats(ROOT_DIR)
   res.json({
     ok: true,
-    database: {
-      total_files: stats.total_files,
-      total_records: stats.total_records,
-      status: 'ready',
-    },
-    files: stats.files,
+    database: getDatabaseStats(ROOT_DIR),
   })
 })
 
@@ -80,8 +66,11 @@ app.get('/api/search', (req, res) => {
 
 app.post('/api/reload', (_req, res) => {
   clearCache()
-  const stats = getDatabaseStats(ROOT_DIR)
-  res.json({ ok: true, message: 'Cache cleared and databases reloaded', ...stats })
+  res.json({
+    ok: true,
+    message: 'Cache cleared and databases reloaded',
+    database: getDatabaseStats(ROOT_DIR),
+  })
 })
 
 app.use((_req, res) => {
@@ -90,5 +79,4 @@ app.use((_req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Search API listening on http://0.0.0.0:${PORT}`)
-  console.log(`Databases folder: ${getDatabasesDir(ROOT_DIR)}`)
 })

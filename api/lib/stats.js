@@ -63,11 +63,9 @@ export function countFileLines(filePath) {
 
 export function getLineStats(rootDir = process.cwd()) {
   const files = listDatabaseFiles(rootDir)
-  const fileStats = []
   let total_lines = 0
   let total_data_lines = 0
   let total_records = 0
-  let total_size_bytes = 0
 
   for (const file of files) {
     try {
@@ -78,37 +76,18 @@ export function getLineStats(rootDir = process.cwd()) {
       total_lines += lines.total_lines
       total_data_lines += lines.total_data_lines
       total_records += parsed.length
-      total_size_bytes += file.size_bytes
-
-      fileStats.push({
-        ...file,
-        total_lines: lines.total_lines,
-        total_data_lines: lines.total_data_lines,
-        indexed_records: parsed.length,
-        status: 'ok',
-      })
-    } catch (error) {
-      fileStats.push({
-        ...file,
-        total_lines: 0,
-        total_data_lines: 0,
-        indexed_records: 0,
-        status: 'error',
-        error: error.message,
-      })
+    } catch {
+      // skip unreadable files
     }
   }
 
   return {
     ok: true,
     stats: {
-      total_files: files.length,
       total_lines,
       total_data_lines,
       indexed_records: total_records,
-      total_size_mb: Number((total_size_bytes / (1024 * 1024)).toFixed(2)),
       status: 'ready',
     },
-    files: fileStats,
   }
 }

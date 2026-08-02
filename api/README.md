@@ -17,9 +17,8 @@ Drop files into `databases/` (subfolders allowed). The API indexes and searches 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/health` | Health check |
-| GET | `/api/stats` | Line counts + indexed record stats |
-| GET | `/api/database` | File + record stats |
-| GET | `/api/files` | Same as database stats |
+| GET | `/api/stats` | Line counts only |
+| GET | `/api/database` | Record count + status |
 | GET | `/api/search?q=QUERY` | Search all databases |
 | POST | `/api/reload` | Clear cache and reload files |
 

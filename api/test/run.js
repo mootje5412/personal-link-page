@@ -18,21 +18,24 @@ async function run() {
 
   const stats = await request('/api/stats')
   assert.equal(stats.status, 200)
-  assert.equal(stats.data.stats.total_files, 0)
   assert.equal(stats.data.stats.total_lines, 0)
   assert.equal(stats.data.stats.total_data_lines, 0)
   assert.equal(stats.data.stats.indexed_records, 0)
+  assert.equal(stats.data.stats.total_files, undefined)
+  assert.ok(!('files' in stats.data))
   console.log('✓ line stats (empty databases)')
 
   const database = await request('/api/database')
   assert.equal(database.status, 200)
   assert.equal(database.data.database.total_records, 0)
+  assert.ok(!('files' in database.data))
   console.log('✓ database stats (empty)')
 
   const search = await request('/api/search?q=test')
   assert.equal(search.status, 200)
   assert.equal(search.data.found, 0)
   assert.equal(search.data.results.length, 0)
+  assert.equal(search.data.files_indexed, undefined)
   console.log('✓ search returns empty results')
 
   const empty = await request('/api/search')

@@ -80,7 +80,6 @@ export function searchDatabases(query, options = {}) {
   for (const record of records) {
     if (!recordMatches(record, needles)) continue
     matches.push({
-      source_file: record.source_file,
       row_index: record.row_index,
       match: record.fields,
     })
@@ -92,19 +91,16 @@ export function searchDatabases(query, options = {}) {
     query: trimmed,
     found: matches.length,
     returned: matches.length,
-    total_records: records.length,
-    files_indexed: files.filter((f) => f.status === 'ok').length,
     results: matches,
   }
 }
 
 export function getDatabaseStats(rootDir = process.cwd()) {
-  const { records, files } = loadAllRecords(rootDir)
+  const { records } = loadAllRecords(rootDir)
   return {
     ok: true,
-    total_files: files.length,
     total_records: records.length,
-    files,
+    status: 'ready',
   }
 }
 
