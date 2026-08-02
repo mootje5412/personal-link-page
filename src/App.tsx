@@ -5,7 +5,8 @@ import DashboardLayout from './components/DashboardLayout'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
-import DashboardPage from './pages/DashboardPage'
+import DashboardHomePage from './pages/DashboardHomePage'
+import PhoneSearchPage from './pages/PhoneSearchPage'
 
 function App() {
   return (
@@ -23,8 +24,9 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<DashboardPage />} />
-            <Route path="sorgu/*" element={<Navigate to="/panel" replace />} />
+            <Route index element={<DashboardHomePage />} />
+            <Route path="sorgu/telefon" element={<PhoneSearchPage />} />
+            <Route path="sorgu/*" element={<Navigate to="/panel/sorgu/telefon" replace />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

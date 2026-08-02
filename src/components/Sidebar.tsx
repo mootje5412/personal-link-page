@@ -61,7 +61,7 @@ const Sidebar = ({
           {!collapsed && (
             <div className="sidebar-user-meta">
               <span className="sidebar-user-name">{username}</span>
-              <span className="sidebar-user-role">Panel</span>
+              <span className="sidebar-user-role">Üye</span>
             </div>
           )}
         </div>
@@ -72,7 +72,7 @@ const Sidebar = ({
             className={`sidebar-link ${isDashboardActive() ? 'active' : ''}`}
             onClick={onCloseMobile}
           >
-            <span className="sidebar-link-label">Panel</span>
+            <span className="sidebar-link-label">Gösterge Paneli</span>
           </Link>
 
           {!collapsed && <p className="sidebar-section-label">Sorgu</p>}
@@ -82,7 +82,7 @@ const Sidebar = ({
             className={`sidebar-link sidebar-search-link ${isPhoneSearchActive() ? 'active' : ''}`}
             onClick={onCloseMobile}
           >
-            <span className="sidebar-link-label">Telefon Sorgu</span>
+            <span className="sidebar-link-label">Telefon Sorgusu</span>
           </Link>
         </nav>
 
