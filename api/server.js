@@ -2,6 +2,7 @@ import express from 'express'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { getDatabaseStats, searchDatabases, clearCache } from './lib/searchEngine.js'
+import { getLineStats } from './lib/stats.js'
 import { getDatabasesDir, listDatabaseFiles } from './lib/fileWalker.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -19,6 +20,7 @@ app.get('/', (_req, res) => {
     version: '1.0.0',
     endpoints: {
       health: '/api/health',
+      stats: '/api/stats',
       files: '/api/files',
       search: '/api/search?q=QUERY',
       database: '/api/database',
@@ -32,6 +34,15 @@ app.get('/api/health', (_req, res) => {
     status: 'ready',
     databases_dir: getDatabasesDir(ROOT_DIR),
     files: listDatabaseFiles(ROOT_DIR).length,
+  })
+})
+
+app.get('/api/stats', (_req, res) => {
+  const started = performance.now()
+  const stats = getLineStats(ROOT_DIR)
+  res.json({
+    ...stats,
+    ms: Number((performance.now() - started).toFixed(2)),
   })
 })
 

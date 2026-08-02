@@ -17,6 +17,7 @@ Drop files into `databases/` (subfolders allowed). The API indexes and searches 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/health` | Health check |
+| GET | `/api/stats` | Line counts + indexed record stats |
 | GET | `/api/database` | File + record stats |
 | GET | `/api/files` | Same as database stats |
 | GET | `/api/search?q=QUERY` | Search all databases |
@@ -41,5 +42,6 @@ python3 deploy.py
 ## Example
 
 ```bash
+curl "http://109.71.252.128:8080/api/stats"
 curl "http://109.71.252.128:8080/api/search?q=05551234567"
 ```

@@ -16,10 +16,17 @@ async function run() {
   assert.equal(health.data.ok, true)
   console.log('✓ health')
 
-  const stats = await request('/api/database')
+  const stats = await request('/api/stats')
   assert.equal(stats.status, 200)
-  assert.ok(stats.data.database.total_records >= 10)
-  console.log(`✓ database stats (${stats.data.database.total_records} records)`)
+  assert.ok(stats.data.stats.total_lines >= 10)
+  assert.ok(stats.data.stats.total_data_lines >= 10)
+  assert.ok(stats.data.stats.indexed_records >= 10)
+  console.log(`✓ line stats (${stats.data.stats.total_data_lines} data lines, ${stats.data.stats.indexed_records} records)`)
+
+  const database = await request('/api/database')
+  assert.equal(database.status, 200)
+  assert.ok(database.data.database.total_records >= 10)
+  console.log(`✓ database stats (${database.data.database.total_records} records)`)
 
   const phoneSearch = await request('/api/search?q=05551234567')
   assert.equal(phoneSearch.status, 200)

@@ -100,6 +100,7 @@ def main() -> int:
     time.sleep(2)
 
     run(client, f'curl -s "http://127.0.0.1:{PORT}/api/health"')
+    run(client, f'curl -s "http://127.0.0.1:{PORT}/api/stats" | head -c 400')
     run(client, f'curl -s "http://127.0.0.1:{PORT}/api/search?q=05551234567" | head -c 500')
     run(client, "systemctl is-active search-api")
 
