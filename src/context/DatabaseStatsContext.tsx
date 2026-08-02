@@ -23,13 +23,15 @@ export function DatabaseStatsProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (silent = false) => {
     try {
       const data = await fetchDatabaseStats()
       setDatabase(data)
       setError('')
     } catch {
-      setDatabase(null)
+      if (!silent) {
+        setDatabase(null)
+      }
       setError('Veritabanı istatistikleri yüklenemedi.')
     } finally {
       setLoading(false)
@@ -45,16 +47,16 @@ export function DatabaseStatsProvider({ children }: { children: ReactNode }) {
   }, [reload])
 
   useEffect(() => {
-    if (!database?.index_building) {
+    if (!database?.index_building && database?.status === 'ready') {
       return
     }
 
     const timer = window.setInterval(() => {
-      reload()
+      reload(true)
     }, 5000)
 
     return () => window.clearInterval(timer)
-  }, [database?.index_building, reload])
+  }, [database?.index_building, database?.status, reload])
 
   const value = useMemo(
     () => ({ database, loading, error, reload }),

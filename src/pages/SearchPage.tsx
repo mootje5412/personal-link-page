@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import SearchResultsTable from '../components/SearchResultsTable'
 import { useDatabaseStats } from '../context/DatabaseStatsContext'
 import { databaseStatusLabel } from '../services/databaseApi'
 import { recordLocalSearch } from '../services/localAnalytics'
@@ -28,11 +29,9 @@ const SearchPage = () => {
 
     try {
       const data = await queryDatabase('telefon', query.trim())
-      const searchedQuery = query.trim()
       setResults(data.results ?? [])
       setMessage(formatSearchMessage(data))
-      recordLocalSearch('telefon', searchedQuery)
-      setQuery('')
+      recordLocalSearch('telefon', query.trim())
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Telefon sorgusu başarısız.')
     } finally {
@@ -65,10 +64,11 @@ const SearchPage = () => {
             <input
               id="search-query"
               type="tel"
-              inputMode="numeric"
+              inputMode="tel"
+              autoComplete="tel"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="05xxxxxxxxx"
+              placeholder="05xx xxx xx xx"
               maxLength={120}
               required
               disabled={indexBusy}
@@ -83,53 +83,7 @@ const SearchPage = () => {
 
       {results.length > 0 && (
         <section className="search-results" aria-label="Arama sonuçları">
-          <h2>Sonuçlar ({results.length})</h2>
-
-          <div className="search-results-mobile">
-            {results.map((row, index) => (
-              <article key={`${row.phone}-${row.identity_number}-${index}`} className="search-result-row">
-                <div className="search-result-cell">
-                  <span>E-posta</span>
-                  <strong>{row.email || '—'}</strong>
-                </div>
-                <div className="search-result-cell">
-                  <span>Telefon</span>
-                  <strong>{row.phone || '—'}</strong>
-                </div>
-                <div className="search-result-cell">
-                  <span>İsim</span>
-                  <strong>{row.full_name || '—'}</strong>
-                </div>
-                <div className="search-result-cell">
-                  <span>Numara</span>
-                  <strong>{row.identity_number || '—'}</strong>
-                </div>
-              </article>
-            ))}
-          </div>
-
-          <div className="search-results-table-wrap search-results-table-wrap--desktop">
-            <table className="search-results-table">
-              <thead>
-                <tr>
-                  <th>E-posta</th>
-                  <th>Telefon</th>
-                  <th>İsim</th>
-                  <th>Numara</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((row, index) => (
-                  <tr key={`${row.phone}-${row.identity_number}-${index}`}>
-                    <td>{row.email || '—'}</td>
-                    <td>{row.phone || '—'}</td>
-                    <td>{row.full_name || '—'}</td>
-                    <td>{row.identity_number || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SearchResultsTable results={results} />
         </section>
       )}
     </div>

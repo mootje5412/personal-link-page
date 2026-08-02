@@ -1,0 +1,112 @@
+import express from 'express'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { renderHomePage, renderSearchPage, wantsHtml } from './lib/mobileHtml.js'
+import { getDatabaseStats, getLineStats, searchDatabases, clearCache, startAutoRescan } from './lib/searchEngine.js'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const ROOT_DIR = __dirname
+const PORT = Number(process.env.PORT || 8080)
+
+const app = express()
+app.disable('x-powered-by')
+app.use(express.json({ limit: '1mb' }))
+
+app.get('/', (req, res) => {
+  if (wantsHtml(req)) {
+    return res.type('html').send(renderHomePage())
+  }
+
+  res.json({
+    ok: true,
+    name: 'VeriPanel Search API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      stats: '/api/stats',
+      search: '/api/search?q=QUERY',
+      search_mobile: '/api/search?q=QUERY&format=html',
+      database: '/api/database',
+    },
+  })
+})
+
+app.get('/api/health', (_req, res) => {
+  res.json({
+    ok: true,
+    status: 'ready',
+  })
+})
+
+app.get('/api/stats', (_req, res) => {
+  const started = performance.now()
+  const stats = getLineStats(ROOT_DIR)
+  res.json({
+    ...stats,
+    ms: Number((performance.now() - started).toFixed(2)),
+  })
+})
+
+app.get('/api/database', (_req, res) => {
+  const stats = getDatabaseStats(ROOT_DIR)
+  res.json({
+    ok: true,
+    database: {
+      total_records: stats.total_records,
+      status: stats.status,
+    },
+  })
+})
+
+app.get('/api/search', (req, res) => {
+  const started = performance.now()
+  const limit = Math.min(Number(req.query.limit || 50), 200)
+  const type = req.query.type
+  const result = searchDatabases(req.query.q, { limit, rootDir: ROOT_DIR, type })
+
+  if (!result.ok) {
+    if (wantsHtml(req)) {
+      return res.status(400).type('html').send(renderSearchPage(String(req.query.q ?? ''), result))
+    }
+    return res.status(400).json(result)
+  }
+
+  const payload = {
+    ...result,
+    ms: Number((performance.now() - started).toFixed(2)),
+  }
+
+  if (wantsHtml(req)) {
+    return res.type('html').send(renderSearchPage(String(req.query.q ?? ''), payload))
+  }
+
+  res.json(payload)
+})
+
+app.post('/api/reload', (_req, res) => {
+  clearCache()
+  res.json({
+    ok: true,
+    message: 'Cache cleared and databases reloaded',
+    database: {
+      total_records: getDatabaseStats(ROOT_DIR).total_records,
+      status: 'ready',
+    },
+  })
+})
+
+app.use((_req, res) => {
+  res.status(404).json({ ok: false, error: 'Not found' })
+})
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Search API listening on http://0.0.0.0:${PORT}`)
+  setImmediate(() => {
+    const started = performance.now()
+    const stats = getLineStats(ROOT_DIR)
+    console.log(
+      `Index warmed in ${Math.round(performance.now() - started)}ms (${stats.stats.indexed_records} records)`,
+    )
+  })
+  startAutoRescan(ROOT_DIR)
+})

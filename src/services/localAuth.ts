@@ -1,6 +1,9 @@
+import { pbkdf2 } from '@noble/hashes/pbkdf2.js'
+import { sha256 } from '@noble/hashes/sha2.js'
 import type { AuthResponse, AuthUser, RegisterResponse } from './authTypes'
 
 const REGISTRY_KEY = 'veripanel_users_registry'
+const PBKDF2_ITERATIONS = 120_000
 
 type StoredUser = {
   id: number
@@ -36,17 +39,17 @@ function base64ToBuf(b64: string) {
   return bytes
 }
 
-async function hashApiKey(apiKey: string): Promise<string> {
-  const enc = new TextEncoder()
-  const salt = crypto.getRandomValues(new Uint8Array(16))
-  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(apiKey), 'PBKDF2', false, ['deriveBits'])
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 120_000, hash: 'SHA-256' },
-    keyMaterial,
-    256
-  )
+function deriveKeyBytes(apiKey: string, salt: Uint8Array): Uint8Array {
+  return pbkdf2(sha256, new TextEncoder().encode(apiKey), salt, {
+    c: PBKDF2_ITERATIONS,
+    dkLen: 32,
+  })
+}
 
-  return `pbkdf2:${bufToBase64(salt)}:${bufToBase64(new Uint8Array(bits))}`
+async function hashApiKey(apiKey: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const derived = deriveKeyBytes(apiKey, salt)
+  return `pbkdf2:${bufToBase64(salt)}:${bufToBase64(derived)}`
 }
 
 async function verifyApiKey(apiKey: string, storedHash: string): Promise<boolean> {
@@ -55,17 +58,10 @@ async function verifyApiKey(apiKey: string, storedHash: string): Promise<boolean
   const [, saltB64, hashB64] = storedHash.split(':')
   if (!saltB64 || !hashB64) return false
 
-  const enc = new TextEncoder()
   const salt = base64ToBuf(saltB64)
   const expected = base64ToBuf(hashB64)
-  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(apiKey), 'PBKDF2', false, ['deriveBits'])
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 120_000, hash: 'SHA-256' },
-    keyMaterial,
-    256
-  )
+  const derived = deriveKeyBytes(apiKey, salt)
 
-  const derived = new Uint8Array(bits)
   if (derived.length !== expected.length) return false
 
   let match = 0
@@ -96,7 +92,11 @@ function toPublicUser(user: StoredUser): AuthUser {
 }
 
 function createToken(user: StoredUser) {
-  return `local_${user.id}_${crypto.randomUUID()}`
+  const id =
+    typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}_${Math.random().toString(36).slice(2)}`
+  return `local_${user.id}_${id}`
 }
 
 export async function localRegister(username: string): Promise<RegisterResponse> {
