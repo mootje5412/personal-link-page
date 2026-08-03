@@ -1,0 +1,137 @@
+.location-panel {
+  background: var(--surface);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 20px;
+  padding: 1rem;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+}
+
+.location-panel.is-active {
+  border-color: rgba(52, 211, 153, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(52, 211, 153, 0.15),
+    var(--shadow);
+}
+
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.panel-label {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.panel-header h2 {
+  margin: 0.15rem 0 0;
+  font-size: 1.15rem;
+}
+
+.status-pill {
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.status-pill.off {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--muted);
+}
+
+.status-pill.on {
+  background: rgba(52, 211, 153, 0.18);
+  color: var(--success);
+}
+
+.coords-block {
+  margin-bottom: 0.95rem;
+}
+
+.coords {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.95rem;
+  color: var(--accent);
+}
+
+.address {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.panel-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+}
+
+.btn {
+  border-radius: 12px;
+  padding: 0.72rem 0.85rem;
+  font-weight: 600;
+  font-size: 0.88rem;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease,
+    background 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.btn.primary {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, #14b8a6, #0f766e);
+  color: white;
+}
+
+.btn.danger {
+  grid-column: 1 / -1;
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--danger);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+.btn.secondary {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text);
+}
+
+.btn.ghost {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  border: 1px dashed rgba(148, 163, 184, 0.25);
+}
+
+.real-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 3px solid white;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.45);
+}
