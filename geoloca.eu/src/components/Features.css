@@ -16,7 +16,7 @@
 }
 
 .feature-card:hover {
-  border-color: rgba(16, 185, 129, 0.25);
+  border-color: rgba(124, 108, 246, 0.3);
   transform: translateY(-2px);
 }
 

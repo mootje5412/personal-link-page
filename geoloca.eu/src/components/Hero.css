@@ -1,5 +1,5 @@
 .hero {
-  padding: 7rem 0 4rem;
+  padding: 7.5rem 0 4.5rem;
 }
 
 .hero-grid {
@@ -9,20 +9,31 @@
 }
 
 .hero-pill {
-  display: inline-block;
-  margin-bottom: 1.25rem;
-  padding: 0.35rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 1.35rem;
+  padding: 0.38rem 0.85rem 0.38rem 0.65rem;
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--accent-light);
+  color: var(--accent-bright);
   background: var(--accent-dim);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(124, 108, 246, 0.25);
   border-radius: 999px;
+}
+
+.hero-pill::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-light);
+  animation: pulse-dot 2s ease infinite;
 }
 
 .hero-copy h1 {
   margin: 0 0 1.25rem;
-  font-size: clamp(2.25rem, 5.5vw, 3.25rem);
+  font-size: clamp(2.25rem, 5.5vw, 3.35rem);
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1.08;
@@ -30,12 +41,13 @@
 
 .hero-accent {
   display: block;
-  margin-top: 0.15em;
+  margin-top: 0.12em;
+  min-height: 1.1em;
 }
 
 .hero-text {
-  margin: 0 0 1.75rem;
-  max-width: 480px;
+  margin: 0 0 1.85rem;
+  max-width: 490px;
   font-size: 1.08rem;
   color: var(--muted);
   line-height: 1.65;
@@ -48,25 +60,54 @@
 }
 
 .hero-card {
-  padding: 1.25rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  padding: 1.35rem;
+  background: linear-gradient(160deg, var(--surface) 0%, rgba(20, 20, 25, 0.6) 100%);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 28px 56px rgba(0, 0, 0, 0.45);
+}
+
+.hero-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.hero-card-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.hero-card-status {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-light);
+}
+
+.hero-card-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-light);
+  box-shadow: 0 0 8px var(--accent-glow);
 }
 
 .hero-card-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.65rem 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.88rem;
-}
-
-.hero-card-row:last-of-type {
-  border-bottom: none;
-  margin-bottom: 1rem;
+  padding: 0.55rem 0;
+  font-size: 0.86rem;
 }
 
 .hero-card-row .label {
@@ -75,20 +116,23 @@
 
 .hero-card-row .value {
   font-weight: 600;
-}
-
-.hero-card-row .value.live {
-  color: var(--accent-light);
+  color: var(--text);
 }
 
 .hero-map {
   position: relative;
-  height: 140px;
+  height: 150px;
+  margin-top: 1rem;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    radial-gradient(circle at 60% 45%, rgba(124, 108, 246, 0.15), transparent 45%),
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
     var(--bg-soft);
-  background-size: 20px 20px;
+  background-size:
+    auto,
+    22px 22px,
+    22px 22px,
+    auto;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   overflow: hidden;
@@ -96,26 +140,36 @@
 
 .map-pin {
   position: absolute;
-  top: 42%;
-  left: 58%;
-  width: 14px;
-  height: 14px;
-  background: #ef4444;
+  top: 40%;
+  left: 56%;
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
   border: 2.5px solid #fff;
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+.map-pin::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border: 1px solid rgba(124, 108, 246, 0.4);
+  border-radius: 50%;
+  transform: rotate(45deg);
+  animation: pulse-dot 2.5s ease infinite;
 }
 
 @media (min-width: 900px) {
   .hero-grid {
-    grid-template-columns: 1.1fr 0.9fr;
+    grid-template-columns: 1.08fr 0.92fr;
     gap: 4rem;
   }
 }
 
 @media (max-width: 899px) {
   .hero-card {
-    max-width: 400px;
+    max-width: 420px;
   }
 }

@@ -13,10 +13,11 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
 .country-tag:hover {
   color: var(--text);
-  border-color: rgba(16, 185, 129, 0.3);
+  border-color: rgba(124, 108, 246, 0.35);
+  background: var(--accent-dim);
 }

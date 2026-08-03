@@ -21,11 +21,15 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  transition: transform 0.2s;
 }
 
 .plan.featured {
-  border-color: rgba(16, 185, 129, 0.45);
-  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.1), 0 20px 40px rgba(0, 0, 0, 0.3);
+  border-color: rgba(124, 108, 246, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(124, 108, 246, 0.12),
+    0 24px 48px rgba(0, 0, 0, 0.35);
+  background: linear-gradient(180deg, rgba(124, 108, 246, 0.06) 0%, var(--surface) 100%);
 }
 
 .plan-badge {
@@ -38,7 +42,7 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #fff;
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent-light), var(--accent));
   border-radius: 6px;
 }
 

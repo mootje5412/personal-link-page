@@ -5,7 +5,10 @@
 .country-word {
   display: inline-block;
   font-weight: 800;
-  color: var(--accent-light);
+  background: linear-gradient(135deg, var(--accent-bright) 0%, var(--accent-light) 50%, #818cf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .country-in {
