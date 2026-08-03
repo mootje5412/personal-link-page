@@ -1,7 +1,11 @@
+import { useCountryRotator } from '../hooks/useCountryRotator';
 import CountryRotator from './CountryRotator';
+import HeroPreview from './HeroPreview';
 import './Hero.css';
 
 export default function Hero() {
+  const { country, phase } = useCountryRotator();
+
   return (
     <section className="hero">
       <div className="container hero-grid">
@@ -10,7 +14,7 @@ export default function Hero() {
           <h1>
             Change your location to
             <span className="hero-accent">
-              <CountryRotator />
+              <CountryRotator country={country} phase={phase} />
             </span>
           </h1>
           <p className="hero-text">
@@ -35,27 +39,7 @@ export default function Hero() {
           </div>
         </div>
 
-        <div className="hero-card">
-          <div className="hero-card-header">
-            <span className="hero-card-title">GeoLoca desktop</span>
-            <span className="hero-card-status">Connected</span>
-          </div>
-          <div className="hero-card-row">
-            <span className="label">Location</span>
-            <span className="value">Netherlands</span>
-          </div>
-          <div className="hero-card-row">
-            <span className="label">Phone</span>
-            <span className="value">iPhone · USB</span>
-          </div>
-          <div className="hero-card-row">
-            <span className="label">Apps synced</span>
-            <span className="value">Snap, Maps +more</span>
-          </div>
-          <div className="hero-map">
-            <div className="map-pin" />
-          </div>
-        </div>
+        <HeroPreview country={country} />
       </div>
     </section>
   );

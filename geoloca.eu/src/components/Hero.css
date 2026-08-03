@@ -63,35 +63,10 @@
   gap: 0.65rem;
 }
 
-.hero-card {
-  padding: 1.35rem;
-  background: linear-gradient(165deg, var(--surface) 0%, rgba(22, 22, 26, 0.85) 100%);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.02) inset,
-    0 24px 48px rgba(0, 0, 0, 0.35);
-  animation: fade-up var(--duration-slow) var(--ease-out) 0.12s both;
-  transition:
-    transform var(--duration-normal) var(--ease-out),
-    box-shadow var(--duration-normal) var(--ease-smooth),
-    border-color var(--duration-normal) var(--ease-smooth);
-}
-
-.hero-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--accent-border);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
-    0 28px 56px rgba(0, 0, 0, 0.4);
-}
-
 .hero-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1rem;
-  padding-bottom: 0.85rem;
   border-bottom: 1px solid var(--border);
 }
 
@@ -117,13 +92,13 @@
   border-radius: 50%;
   background: var(--accent-light);
   box-shadow: 0 0 6px var(--accent-glow);
+  animation: pulse-dot 2.5s var(--ease-smooth) infinite;
 }
 
 .hero-card-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.55rem 0;
   font-size: 0.86rem;
 }
 
@@ -136,62 +111,9 @@
   color: var(--text);
 }
 
-.hero-map {
-  position: relative;
-  height: 150px;
-  margin-top: 1rem;
-  background:
-    radial-gradient(circle at 60% 45%, rgba(99, 102, 241, 0.1), transparent 48%),
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    var(--bg-soft);
-  background-size:
-    auto,
-    22px 22px,
-    22px 22px,
-    auto;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  overflow: hidden;
-}
-
-.map-pin {
-  position: absolute;
-  top: 40%;
-  left: 56%;
-  width: 16px;
-  height: 16px;
-  background: var(--accent);
-  border: 2.5px solid #fff;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
-  box-shadow: 0 4px 14px var(--accent-glow);
-  transition: transform var(--duration-normal) var(--ease-out);
-}
-
-.hero-card:hover .map-pin {
-  transform: rotate(-45deg) scale(1.05);
-}
-
-.map-pin::after {
-  content: '';
-  position: absolute;
-  inset: -8px;
-  border: 1px solid var(--accent-border);
-  border-radius: 50%;
-  transform: rotate(45deg);
-  animation: pulse-dot 3s var(--ease-smooth) infinite;
-}
-
 @media (min-width: 900px) {
   .hero-grid {
     grid-template-columns: 1.08fr 0.92fr;
     gap: 4rem;
-  }
-}
-
-@media (max-width: 899px) {
-  .hero-card {
-    max-width: 420px;
   }
 }
