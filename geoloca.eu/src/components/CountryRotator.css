@@ -1,0 +1,52 @@
+.country-rotator {
+  display: inline-block;
+  position: relative;
+  min-width: 7ch;
+  vertical-align: bottom;
+}
+
+.country-word {
+  display: inline-block;
+  color: #5eead4;
+  font-weight: 600;
+}
+
+.country-in {
+  animation: country-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.country-out {
+  animation: country-out 0.4s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+
+@keyframes country-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes country-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-14px);
+    filter: blur(3px);
+  }
+}
+
+@media (min-width: 768px) {
+  .country-rotator {
+    min-width: 10ch;
+  }
+}
