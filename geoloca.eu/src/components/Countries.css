@@ -13,11 +13,16 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition:
+    color var(--duration-normal) var(--ease-smooth),
+    border-color var(--duration-normal) var(--ease-smooth),
+    background var(--duration-normal) var(--ease-smooth),
+    transform var(--duration-normal) var(--ease-out);
 }
 
 .country-tag:hover {
   color: var(--text);
-  border-color: rgba(124, 108, 246, 0.35);
+  border-color: var(--accent-border);
   background: var(--accent-dim);
+  transform: translateY(-1px);
 }

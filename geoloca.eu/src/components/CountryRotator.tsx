@@ -7,7 +7,7 @@ export default function CountryRotator() {
   const [phase, setPhase] = useState<'in' | 'out'>('in');
 
   useEffect(() => {
-    const hold = window.setTimeout(() => setPhase('out'), 2600);
+    const hold = window.setTimeout(() => setPhase('out'), 2800);
     return () => window.clearTimeout(hold);
   }, [index]);
 
@@ -16,7 +16,7 @@ export default function CountryRotator() {
     const swap = window.setTimeout(() => {
       setIndex((i) => (i + 1) % COUNTRIES.length);
       setPhase('in');
-    }, 420);
+    }, 480);
     return () => window.clearTimeout(swap);
   }, [phase]);
 

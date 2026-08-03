@@ -46,7 +46,11 @@ export default function FAQ() {
                 {item.q}
                 <span className="faq-icon">{open === i ? '−' : '+'}</span>
               </button>
-              {open === i && <p className="faq-a">{item.a}</p>}
+              <div className="faq-a-wrap" aria-hidden={open !== i}>
+                <div className="faq-a-inner">
+                  <p className="faq-a">{item.a}</p>
+                </div>
+              </div>
             </div>
           ))}
         </div>

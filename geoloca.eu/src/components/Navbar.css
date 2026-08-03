@@ -5,7 +5,7 @@
   right: 0;
   z-index: 100;
   padding: 0.85rem 0;
-  transition: padding 0.25s;
+  transition: padding var(--duration-normal) var(--ease-out);
 }
 
 .navbar.scrolled {
@@ -23,15 +23,22 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.55rem 0.55rem 0.55rem 1rem;
-  background: rgba(10, 10, 11, 0.75);
+  background: rgba(10, 10, 12, 0.72);
   border: 1px solid var(--border);
   border-radius: 999px;
-  backdrop-filter: blur(16px);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  transition:
+    background var(--duration-normal) var(--ease-smooth),
+    border-color var(--duration-normal) var(--ease-smooth),
+    box-shadow var(--duration-normal) var(--ease-smooth);
 }
 
 .navbar.scrolled .nav-inner {
-  background: rgba(10, 10, 11, 0.92);
+  background: rgba(10, 10, 12, 0.9);
+  border-color: var(--border-strong);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
 }
 
 .logo {
@@ -40,6 +47,11 @@
   letter-spacing: -0.03em;
   text-decoration: none;
   color: var(--text);
+  transition: opacity var(--duration-fast) var(--ease-smooth);
+}
+
+.logo:hover {
+  opacity: 0.9;
 }
 
 .logo span {
@@ -58,6 +70,9 @@
   border: 1px solid var(--border);
   border-radius: 50%;
   cursor: pointer;
+  transition:
+    background var(--duration-normal) var(--ease-smooth),
+    border-color var(--duration-normal) var(--ease-smooth);
 }
 
 .nav-toggle span {
@@ -67,7 +82,7 @@
   margin: 0 auto;
   background: var(--text);
   border-radius: 1px;
-  transition: transform 0.2s;
+  transition: transform var(--duration-normal) var(--ease-out);
 }
 
 .nav-toggle.open span:first-child {
@@ -91,12 +106,14 @@
   color: var(--muted);
   text-decoration: none;
   border-radius: 999px;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color var(--duration-normal) var(--ease-smooth),
+    background var(--duration-normal) var(--ease-smooth);
 }
 
 .nav-links a:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .nav-cta {
@@ -105,10 +122,14 @@
   background: var(--accent) !important;
   color: #fff !important;
   font-weight: 600 !important;
+  transition:
+    background var(--duration-normal) var(--ease-smooth),
+    box-shadow var(--duration-normal) var(--ease-smooth) !important;
 }
 
 .nav-cta:hover {
   background: var(--accent-light) !important;
+  box-shadow: 0 4px 16px var(--accent-glow);
 }
 
 @media (min-width: 768px) {
@@ -130,10 +151,11 @@
     left: 1rem;
     right: 1rem;
     padding: 0.75rem;
-    background: rgba(14, 14, 16, 0.98);
+    background: rgba(14, 14, 18, 0.96);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     align-items: stretch;
+    animation: fade-up var(--duration-normal) var(--ease-out);
   }
 
   .nav-links.open a {
