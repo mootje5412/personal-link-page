@@ -1,35 +1,66 @@
-.countries {
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+.countries-section {
+  position: relative;
+  z-index: 1;
+  padding: 2rem 0 5rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(45, 212, 191, 0.03) 0%, transparent 50%, rgba(45, 212, 191, 0.02) 100%);
+  overflow: hidden;
 }
 
-.country-grid {
+.marquee-wrap {
+  position: relative;
+  margin: 2.5rem 0 1rem;
+  mask-image: linear-gradient(90deg, transparent, black 12%, black 88%, transparent);
+}
+
+.marquee-wrap.reverse {
+  margin-top: 0.75rem;
+}
+
+.marquee {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-  justify-content: center;
+  gap: 1rem;
+  width: max-content;
+  animation: marquee 40s linear infinite;
 }
 
-.country-chip {
-  padding: 0.5rem 0.9rem;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.75);
+.marquee.slow {
+  animation-duration: 55s;
+}
+
+.marquee-wrap.reverse .marquee {
+  animation-direction: reverse;
+}
+
+.marquee-item {
+  flex-shrink: 0;
+  padding: 0.65rem 1.25rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
 }
 
-.country-chip:hover {
-  border-color: rgba(94, 234, 212, 0.3);
-  color: #fff;
+.marquee-item.dim {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.05);
 }
 
-.country-chip.muted {
-  color: rgba(255, 255, 255, 0.35);
-  border-style: dashed;
+.countries-foot {
+  padding-top: 2rem;
+  text-align: center;
 }
 
-.country-chip.muted:hover {
-  color: rgba(255, 255, 255, 0.5);
+.countries-more {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-dim);
 }

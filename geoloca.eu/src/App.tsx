@@ -1,3 +1,4 @@
+import Background from './components/Background';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import HowItWorks from './components/HowItWorks';
@@ -9,6 +10,7 @@ import './App.css';
 export default function App() {
   return (
     <>
+      <Background />
       <Navbar />
       <main>
         <Hero />

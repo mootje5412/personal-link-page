@@ -1,4 +1,4 @@
-/* layout shell */
 main {
-  overflow-x: hidden;
+  position: relative;
+  z-index: 1;
 }

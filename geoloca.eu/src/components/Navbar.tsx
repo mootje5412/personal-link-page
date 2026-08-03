@@ -12,7 +12,7 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
+    const onScroll = () => setScrolled(window.scrollY > 32);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
@@ -20,36 +20,39 @@ export default function Navbar() {
 
   return (
     <header className={`navbar ${scrolled ? 'scrolled' : ''}`}>
-      <nav className="navbar-inner">
-        <a href="#" className="logo">
-          Geo<span>Loca</span>
-        </a>
+      <nav className="navbar-shell">
+        <div className="navbar-inner">
+          <a href="#" className="logo">
+            <span className="logo-mark">G</span>
+            GeoLoca
+          </a>
 
-        <button
-          type="button"
-          className="menu-btn"
-          aria-label="Menu"
-          aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
-        >
-          <span />
-          <span />
-        </button>
+          <button
+            type="button"
+            className={`menu-btn ${open ? 'open' : ''}`}
+            aria-label="Menu"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+          >
+            <span />
+            <span />
+          </button>
 
-        <ul className={`nav-links ${open ? 'open' : ''}`}>
-          {links.map((link) => (
-            <li key={link.href}>
-              <a href={link.href} onClick={() => setOpen(false)}>
-                {link.label}
+          <ul className={`nav-links ${open ? 'open' : ''}`}>
+            {links.map((link) => (
+              <li key={link.href}>
+                <a href={link.href} onClick={() => setOpen(false)}>
+                  {link.label}
+                </a>
+              </li>
+            ))}
+            <li>
+              <a href="#setup" className="nav-cta" onClick={() => setOpen(false)}>
+                Get started
               </a>
             </li>
-          ))}
-          <li>
-            <a href="#setup" className="nav-cta" onClick={() => setOpen(false)}>
-              Get started
-            </a>
-          </li>
-        </ul>
+          </ul>
+        </div>
       </nav>
     </header>
   );
