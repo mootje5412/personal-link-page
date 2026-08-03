@@ -9,6 +9,7 @@ const faqs = [
   {
     q: 'Do you offer refunds?',
     a: 'No. All sales are final and we don\u2019t accept refunds. That\u2019s why we offer a full 3-day free trial with no card — test every feature before you pay.',
+    policy: true,
   },
   {
     q: 'Does it work with Snap and Google Maps?',
@@ -45,7 +46,7 @@ export default function FAQ() {
 
         <div className="faq-list">
           {faqs.map((item, i) => (
-            <div key={item.q} className={`faq-item ${open === i ? 'open' : ''}`}>
+            <div key={item.q} className={`faq-item ${open === i ? 'open' : ''} ${item.policy ? 'faq-item--policy' : ''}`}>
               <button type="button" className="faq-q" onClick={() => setOpen(open === i ? null : i)}>
                 {item.q}
                 <span className="faq-icon">{open === i ? '−' : '+'}</span>

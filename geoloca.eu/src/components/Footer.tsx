@@ -22,7 +22,7 @@ export default function Footer() {
           </nav>
           <nav className="footer-nav footer-nav-secondary">
             <a href="#pricing">Free trial</a>
-            <a href="#faq">Refund policy</a>
+            <a href="#refund-policy">Refund policy</a>
           </nav>
         </div>
         <p className="footer-copy">&copy; {new Date().getFullYear()} GeoLoca.eu · EUR pricing</p>

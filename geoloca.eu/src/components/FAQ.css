@@ -33,6 +33,16 @@
   background: rgba(22, 22, 26, 0.95);
 }
 
+.faq-item--policy {
+  border-color: rgba(99, 102, 241, 0.18);
+  background: rgba(99, 102, 241, 0.03);
+}
+
+.faq-item--policy.open {
+  border-color: var(--accent-border);
+  background: rgba(99, 102, 241, 0.06);
+}
+
 .faq-q {
   width: 100%;
   display: flex;

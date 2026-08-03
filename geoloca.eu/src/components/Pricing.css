@@ -126,9 +126,9 @@
   align-items: flex-start;
   gap: 0.75rem;
   margin-bottom: 1.25rem;
-  padding: 1rem 1.15rem;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border);
+  padding: 1.1rem 1.2rem;
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid var(--accent-border);
   border-radius: var(--radius-sm);
 }
 
@@ -147,6 +147,18 @@
 
 .pricing-policy strong {
   color: var(--text);
+}
+
+.policy-link {
+  color: var(--accent-light);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--duration-fast) var(--ease-smooth);
+}
+
+.policy-link:hover {
+  border-bottom-color: var(--accent-light);
 }
 
 .pricing-foot {

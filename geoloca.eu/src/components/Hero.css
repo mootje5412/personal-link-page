@@ -1,11 +1,26 @@
 .hero {
-  padding: 7.5rem 0 4.5rem;
+  padding: 7.5rem 0 2rem;
+  position: relative;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: 10%;
+  right: 5%;
+  width: min(420px, 50vw);
+  height: min(420px, 50vw);
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 68%);
+  pointer-events: none;
+  filter: blur(40px);
 }
 
 .hero-grid {
   display: grid;
   gap: 3rem;
   align-items: center;
+  position: relative;
+  z-index: 1;
 }
 
 .hero-copy {

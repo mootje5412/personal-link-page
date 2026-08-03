@@ -70,6 +70,17 @@ body::before {
   z-index: 0;
 }
 
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 20%, #000 20%, transparent 75%);
+  pointer-events: none;
+  z-index: 0;
+}
+
 #root {
   position: relative;
   z-index: 1;
@@ -98,6 +109,7 @@ a {
 
 .section {
   padding: 5.5rem 0;
+  position: relative;
 }
 
 .section-tag {

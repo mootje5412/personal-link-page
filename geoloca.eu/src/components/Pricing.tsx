@@ -77,8 +77,11 @@ export default function Pricing() {
             <path d="M8 5v4M8 11h.01" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
           </svg>
           <p>
-            <strong>All sales are final.</strong> We don&apos;t accept refunds. Use the free trial
-            to test everything first. Cancel anytime to stop future charges.
+            <strong>All sales are final.</strong> We don&apos;t accept refunds.{' '}
+            <a href="#refund-policy" className="policy-link">
+              Read full policy
+            </a>
+            . Use the free trial to test everything first.
           </p>
         </div>
 

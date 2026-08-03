@@ -17,8 +17,8 @@ export default function CTA() {
             <a href="#pricing" className="btn btn-primary">
               Start free trial
             </a>
-            <a href="#faq" className="btn btn-secondary">
-              Read FAQ
+            <a href="#refund-policy" className="btn btn-secondary">
+              Refund policy
             </a>
           </div>
         </div>
