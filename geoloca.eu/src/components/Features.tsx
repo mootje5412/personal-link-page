@@ -67,20 +67,29 @@ const items = [
 export default function Features() {
   return (
     <section id="features" className="section features">
-      <div className="container">
-        <div className="section-head center">
+      <div className="container features-layout">
+        <div className="features-intro">
           <span className="section-tag">Features</span>
           <h2 className="section-title">Built for real use</h2>
-          <p className="section-desc center">
+          <p className="section-desc">
             Everything you need to control where your phone thinks you are.
           </p>
+          <p className="features-scroll-hint">Scroll to stack</p>
         </div>
-        <div className="feature-grid">
-          {items.map((item) => (
-            <article key={item.title} className="feature-card">
+
+        <div className="feature-stack">
+          {items.map((item, index) => (
+            <article
+              key={item.title}
+              className="feature-card"
+              style={{ '--i': index } as React.CSSProperties}
+            >
+              <span className="feature-index">{String(index + 1).padStart(2, '0')}</span>
               <span className="feature-icon">{item.icon}</span>
-              <h3>{item.title}</h3>
-              <p>{item.text}</p>
+              <div className="feature-body">
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </div>
             </article>
           ))}
         </div>
