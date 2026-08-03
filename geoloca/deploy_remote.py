@@ -32,6 +32,17 @@ NGINX_SITE = f"""server {{
     listen 80 default_server;
     listen [::]:80 default_server;
     server_name _;
+    return 301 https://$host$request_uri;
+}}
+
+server {{
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name _;
+
+    ssl_certificate /etc/ssl/certs/geoloca.crt;
+    ssl_certificate_key /etc/ssl/private/geoloca.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
 
     root {REMOTE_DIR};
     index index.html;
@@ -52,6 +63,18 @@ NGINX_SITE = f"""server {{
         add_header Cache-Control "no-cache";
     }}
 }}
+"""
+
+SSL_SETUP = """
+mkdir -p /etc/ssl/private /etc/ssl/certs
+if [ ! -f /etc/ssl/certs/geoloca.crt ]; then
+  openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+    -keyout /etc/ssl/private/geoloca.key \
+    -out /etc/ssl/certs/geoloca.crt \
+    -subj "/CN=109.71.252.128/O=Geoloca" \
+    -addext "subjectAltName=IP:109.71.252.128"
+  chmod 600 /etc/ssl/private/geoloca.key
+fi
 """
 
 
@@ -115,7 +138,8 @@ def main() -> int:
     upload_dir(sftp, LOCAL_DIST, REMOTE_DIR)
     sftp.close()
 
-    print("\n--- Configuring nginx ---")
+    print("\n--- Configuring nginx + HTTPS ---")
+    run(client, SSL_SETUP.strip())
     run(client, f"cat > /etc/nginx/sites-available/geoloca << 'EOF'\n{NGINX_SITE}EOF")
     run(client, "rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/*")
     run(client, "ln -sf /etc/nginx/sites-available/geoloca /etc/nginx/sites-enabled/geoloca")
@@ -126,12 +150,12 @@ def main() -> int:
     time.sleep(2)
     print("\n--- Verifying ---")
     run(client, "systemctl is-active nginx")
-    run(client, "curl -sI http://127.0.0.1/ | head -10")
+    run(client, "curl -skI https://127.0.0.1/ | head -10")
     run(client, f"ls -la {REMOTE_DIR}")
     run(client, "ls -la /root")
 
     client.close()
-    print(f"\nDone. Geoloca is live at http://{SERVER}/")
+    print(f"\nDone. Geoloca is live at https://{SERVER}/")
     return 0
 
 

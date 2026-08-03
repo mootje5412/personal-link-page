@@ -9,9 +9,10 @@
   gap: 0.75rem;
   padding: 1rem;
   border-radius: 18px;
-  background: rgba(15, 23, 42, 0.96);
-  border: 1px solid rgba(20, 184, 166, 0.35);
-  box-shadow: var(--shadow);
+  background: var(--surface);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  box-shadow: var(--shadow), var(--glow);
+  backdrop-filter: blur(20px);
 }
 
 .install-banner strong {
@@ -21,7 +22,7 @@
 
 .install-banner p {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   color: var(--muted);
 }
 
@@ -36,12 +37,15 @@
   border-radius: 12px;
   font-weight: 600;
   color: var(--text);
-  background: rgba(148, 163, 184, 0.12);
+  background: var(--surface-3);
+  border: 1px solid rgba(113, 113, 122, 0.2);
 }
 
 .install-btn.primary {
-  background: linear-gradient(135deg, #14b8a6, #0f766e);
+  background: linear-gradient(135deg, #a78bfa, #7c3aed);
   color: white;
+  border: none;
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.3);
 }
 
 @media (min-width: 640px) {

@@ -10,15 +10,15 @@ function createSvg(size) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#14b8a6"/>
-      <stop offset="100%" stop-color="#0f766e"/>
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="#042f2e"/>
-  <circle cx="256" cy="256" r="170" fill="url(#g)" opacity="0.25"/>
-  <circle cx="256" cy="220" r="72" fill="url(#g)" stroke="#ecfdf5" stroke-width="16"/>
-  <path d="M256 292 L256 390" stroke="#ecfdf5" stroke-width="18" stroke-linecap="round"/>
-  <circle cx="256" cy="220" r="24" fill="#ecfdf5"/>
+  <rect width="512" height="512" rx="112" fill="#08080c"/>
+  <circle cx="256" cy="256" r="170" fill="url(#g)" opacity="0.22"/>
+  <circle cx="256" cy="220" r="72" fill="url(#g)" stroke="#f4f4f5" stroke-width="16"/>
+  <path d="M256 292 L256 390" stroke="#f4f4f5" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="256" cy="220" r="24" fill="#f4f4f5"/>
 </svg>`;
 }
 

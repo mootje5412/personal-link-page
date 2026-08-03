@@ -7,6 +7,9 @@ interface LocationPanelProps {
   address: string;
   active: boolean;
   loadingAddress: boolean;
+  locating: boolean;
+  gpsAvailable: boolean;
+  locationSource: 'gps' | 'ip' | null;
   onApply: () => void;
   onStop: () => void;
   onCopy: () => void;
@@ -20,6 +23,9 @@ export default function LocationPanel({
   address,
   active,
   loadingAddress,
+  locating,
+  gpsAvailable,
+  locationSource,
   onApply,
   onStop,
   onCopy,
@@ -33,7 +39,9 @@ export default function LocationPanel({
       <div className="panel-header">
         <div>
           <p className="panel-label">Selected location</p>
-          <h2>{active ? 'Spoof active' : hasLocation ? 'Ready to apply' : 'Tap the map'}</h2>
+          <h2>
+            {active ? 'Spoof active' : hasLocation ? 'Ready to apply' : 'Pick a spot'}
+          </h2>
         </div>
         <span className={`status-pill ${active ? 'on' : 'off'}`}>
           {active ? 'ON' : 'OFF'}
@@ -43,29 +51,55 @@ export default function LocationPanel({
       <div className="coords-block">
         {hasLocation ? (
           <>
-            <p className="coords">{formatCoords(lat, lng)}</p>
+            <div className="coords-row">
+              <p className="coords">{formatCoords(lat, lng)}</p>
+              {locationSource && (
+                <span className={`source-badge ${locationSource}`}>
+                  {locationSource === 'gps' ? 'GPS' : 'Approx'}
+                </span>
+              )}
+            </div>
             <p className="address">{loadingAddress ? 'Looking up address…' : address}</p>
           </>
         ) : (
-          <p className="hint">Tap anywhere on the map or search for a place to set your location.</p>
+          <p className="hint">
+            Tap the map, search a place, or use the locate button to set your position.
+          </p>
         )}
       </div>
 
       <div className="panel-actions">
         {!active ? (
           <button type="button" className="btn primary" disabled={!hasLocation} onClick={onApply}>
+            <span className="btn-icon">◎</span>
             Apply location
           </button>
         ) : (
           <button type="button" className="btn danger" onClick={onStop}>
+            <span className="btn-icon">✕</span>
             Stop spoofing
           </button>
         )}
         <button type="button" className="btn secondary" disabled={!hasLocation} onClick={onCopy}>
           {copied ? 'Copied!' : 'Copy coords'}
         </button>
-        <button type="button" className="btn ghost" onClick={onUseReal}>
-          Use my GPS
+        <button
+          type="button"
+          className="btn ghost"
+          disabled={locating}
+          onClick={onUseReal}
+        >
+          {locating ? (
+            <>
+              <span className="btn-spinner" />
+              Finding you…
+            </>
+          ) : (
+            <>
+              <span className="btn-icon">⌖</span>
+              {gpsAvailable ? 'Use my GPS' : 'Find my location'}
+            </>
+          )}
         </button>
       </div>
     </section>

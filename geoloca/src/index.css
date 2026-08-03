@@ -5,17 +5,22 @@
 }
 
 :root {
-  --bg: #042f2e;
-  --surface: rgba(15, 23, 42, 0.92);
-  --surface-2: rgba(30, 41, 59, 0.95);
-  --accent: #14b8a6;
-  --accent-strong: #0f766e;
-  --text: #f8fafc;
-  --muted: #94a3b8;
-  --danger: #f87171;
+  --bg: #08080c;
+  --bg-2: #0e0e14;
+  --surface: rgba(16, 16, 22, 0.94);
+  --surface-2: rgba(22, 22, 30, 0.96);
+  --surface-3: rgba(30, 30, 42, 0.98);
+  --accent: #a78bfa;
+  --accent-strong: #7c3aed;
+  --accent-2: #22d3ee;
+  --text: #f4f4f5;
+  --muted: #71717a;
+  --danger: #fb7185;
   --success: #34d399;
-  --shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  --shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  --glow: 0 0 40px rgba(124, 58, 237, 0.18);
   font-family:
+    'Inter',
     'Segoe UI',
     system-ui,
     -apple-system,
@@ -41,7 +46,7 @@ body,
 }
 
 body {
-  background: radial-gradient(circle at top, #115e59 0%, #042f2e 55%, #020617 100%);
+  background: var(--bg);
 }
 
 button,
@@ -63,9 +68,11 @@ input {
 .leaflet-container {
   width: 100%;
   height: 100%;
-  background: #0f172a;
+  background: #0a0a0f;
 }
 
-.leaflet-control-attribution {
-  font-size: 10px !important;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

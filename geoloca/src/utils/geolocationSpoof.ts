@@ -3,9 +3,28 @@ import type { SavedLocation } from './location';
 type GeoSuccess = PositionCallback;
 type GeoError = PositionErrorCallback;
 
+export interface PositionResult {
+  lat: number;
+  lng: number;
+  source: 'gps' | 'ip';
+  label?: string;
+}
+
 let spoofLocation: SavedLocation | null = null;
 let spoofActive = false;
 let patched = false;
+
+let originalGet: (
+  success: GeoSuccess,
+  error?: GeoError | null,
+  options?: PositionOptions
+) => void;
+
+let originalWatch: (
+  success: GeoSuccess,
+  error?: GeoError | null,
+  options?: PositionOptions
+) => number;
 
 function buildPosition(lat: number, lng: number): GeolocationPosition {
   const coords: GeolocationCoordinates = {
@@ -42,8 +61,8 @@ function patchGeolocation(): void {
   if (patched || !navigator.geolocation) return;
   patched = true;
 
-  const originalGet = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
-  const originalWatch = navigator.geolocation.watchPosition.bind(navigator.geolocation);
+  originalGet = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+  originalWatch = navigator.geolocation.watchPosition.bind(navigator.geolocation);
 
   navigator.geolocation.getCurrentPosition = (
     success: GeoSuccess,
@@ -76,26 +95,72 @@ export function applyGeolocationSpoof(active: boolean, location: SavedLocation |
   spoofLocation = location;
 }
 
-export async function getRealPosition(): Promise<{ lat: number; lng: number }> {
+function getNativeGps(): Promise<PositionResult> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error('Geolocation not supported'));
       return;
     }
 
-    const tempActive = spoofActive;
-    spoofActive = false;
+    if (!patched) {
+      patchGeolocation();
+    }
 
-    navigator.geolocation.getCurrentPosition(
+    originalGet(
       (pos) => {
-        spoofActive = tempActive;
-        resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        resolve({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          source: 'gps',
+          label: 'My GPS location',
+        });
       },
-      (err) => {
-        spoofActive = tempActive;
-        reject(err);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
+      (err) => reject(err),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
   });
+}
+
+async function getIpLocation(): Promise<PositionResult> {
+  const res = await fetch('https://ipapi.co/json/');
+  if (!res.ok) throw new Error('IP lookup failed');
+  const data = (await res.json()) as {
+    latitude?: number;
+    longitude?: number;
+    city?: string;
+    region?: string;
+    country_name?: string;
+  };
+
+  if (typeof data.latitude !== 'number' || typeof data.longitude !== 'number') {
+    throw new Error('Invalid IP location');
+  }
+
+  const parts = [data.city, data.region, data.country_name].filter(Boolean);
+  return {
+    lat: data.latitude,
+    lng: data.longitude,
+    source: 'ip',
+    label: parts.length ? parts.join(', ') : 'Approximate location',
+  };
+}
+
+export async function getRealPosition(options?: {
+  preferIp?: boolean;
+}): Promise<PositionResult> {
+  const canUseGps = window.isSecureContext && !!navigator.geolocation;
+
+  if (canUseGps && !options?.preferIp) {
+    try {
+      return await getNativeGps();
+    } catch {
+      /* fall back to IP-based location */
+    }
+  }
+
+  return getIpLocation();
+}
+
+export function isGpsAvailable(): boolean {
+  return window.isSecureContext && !!navigator.geolocation;
 }

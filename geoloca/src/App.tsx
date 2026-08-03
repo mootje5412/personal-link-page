@@ -3,13 +3,18 @@ import MapView from './components/MapView';
 import SearchBar from './components/SearchBar';
 import LocationPanel from './components/LocationPanel';
 import InstallPrompt from './components/InstallPrompt';
+import Toast, { type ToastType } from './components/Toast';
 import {
   loadSpoofState,
   reverseGeocode,
   saveSpoofState,
   type SavedLocation,
 } from './utils/location';
-import { applyGeolocationSpoof, getRealPosition } from './utils/geolocationSpoof';
+import {
+  applyGeolocationSpoof,
+  getRealPosition,
+  isGpsAvailable,
+} from './utils/geolocationSpoof';
 import './App.css';
 
 const DEFAULT_CENTER: [number, number] = [40.7128, -74.006];
@@ -23,9 +28,16 @@ export default function App() {
   const [realLocation, setRealLocation] = useState<[number, number] | null>(null);
   const [address, setAddress] = useState(saved.location?.address ?? '');
   const [loadingAddress, setLoadingAddress] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [active, setActive] = useState(saved.active);
   const [copied, setCopied] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
+  const [locationSource, setLocationSource] = useState<'gps' | 'ip' | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
+  const showToast = useCallback((message: string, type: ToastType = 'info') => {
+    setToast({ message, type });
+  }, []);
 
   useEffect(() => {
     applyGeolocationSpoof(active, picked);
@@ -44,18 +56,46 @@ export default function App() {
     setLoadingAddress(false);
   }, []);
 
+  const handleFindLocation = useCallback(async () => {
+    setLocating(true);
+    try {
+      const pos = await getRealPosition();
+      setRealLocation([pos.lat, pos.lng]);
+      setLocationSource(pos.source);
+      await updateLocation(pos.lat, pos.lng, pos.label ?? 'My location');
+      setActive(false);
+
+      if (pos.source === 'gps') {
+        showToast('GPS location found', 'success');
+      } else {
+        showToast('Using approximate location (GPS needs HTTPS)', 'info');
+      }
+    } catch {
+      showToast('Could not detect your location. Tap the map instead.', 'error');
+    } finally {
+      setLocating(false);
+    }
+  }, [showToast, updateLocation]);
+
   useEffect(() => {
-    getRealPosition()
-      .then((pos) => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const pos = await getRealPosition();
+        if (cancelled) return;
         setRealLocation([pos.lat, pos.lng]);
+        setLocationSource(pos.source);
         if (!saved.location) {
-          setCenter([pos.lat, pos.lng]);
+          await updateLocation(pos.lat, pos.lng, pos.label ?? 'My location');
         }
-      })
-      .catch(() => {
-        /* GPS unavailable — keep default map center */
-      });
-  }, [saved.location]);
+      } catch {
+        /* keep default map center */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [saved.location, updateLocation]);
 
   const marker = useMemo<[number, number] | null>(() => {
     if (!picked) return null;
@@ -64,10 +104,20 @@ export default function App() {
 
   return (
     <div className="app">
+      <div className="app-bg" aria-hidden />
+
       <header className="app-header">
         <div className="brand">
           <span className="brand-icon" aria-hidden>
-            ◎
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="10" r="3.5" stroke="currentColor" strokeWidth="1.8" />
+              <path
+                d="M12 21s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10Z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinejoin="round"
+              />
+            </svg>
           </span>
           <div>
             <h1>Geoloca</h1>
@@ -80,7 +130,7 @@ export default function App() {
           aria-expanded={panelOpen}
           onClick={() => setPanelOpen((v) => !v)}
         >
-          {panelOpen ? 'Hide' : 'Show'}
+          {panelOpen ? 'Hide' : 'Panel'}
         </button>
       </header>
 
@@ -90,11 +140,13 @@ export default function App() {
           marker={marker}
           realLocation={realLocation}
           onPick={(lat, lng) => updateLocation(lat, lng)}
-          onRecenter={() => picked && setCenter([picked.lat, picked.lng])}
+          onLocate={handleFindLocation}
+          locating={locating}
         />
       </div>
 
       <div className={`bottom-sheet ${panelOpen ? 'open' : 'closed'}`}>
+        <div className="sheet-handle" aria-hidden />
         <SearchBar
           onSelect={(result) => updateLocation(result.lat, result.lng, result.label)}
         />
@@ -104,31 +156,34 @@ export default function App() {
           address={address}
           active={active}
           loadingAddress={loadingAddress}
+          locating={locating}
+          gpsAvailable={isGpsAvailable()}
+          locationSource={locationSource}
           copied={copied}
-          onApply={() => setActive(true)}
-          onStop={() => setActive(false)}
+          onApply={() => {
+            setActive(true);
+            showToast('Location spoof is now active', 'success');
+          }}
+          onStop={() => {
+            setActive(false);
+            showToast('Spoofing stopped', 'info');
+          }}
           onCopy={async () => {
             if (!picked) return;
             await navigator.clipboard.writeText(`${picked.lat}, ${picked.lng}`);
             setCopied(true);
             window.setTimeout(() => setCopied(false), 1800);
           }}
-          onUseReal={async () => {
-            try {
-              const pos = await getRealPosition();
-              setRealLocation([pos.lat, pos.lng]);
-              await updateLocation(pos.lat, pos.lng, 'My GPS location');
-              setActive(false);
-            } catch {
-              setAddress('Could not access GPS. Allow location permission and try again.');
-            }
-          }}
+          onUseReal={handleFindLocation}
         />
-        <p className="footer-note">
-          Tap the map to place your pin, then tap Apply. Install to Home Screen for one-tap access.
-        </p>
       </div>
 
+      <Toast
+        message={toast?.message ?? ''}
+        type={toast?.type}
+        visible={!!toast}
+        onHide={() => setToast(null)}
+      />
       <InstallPrompt />
     </div>
   );
