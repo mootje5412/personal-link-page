@@ -1,0 +1,115 @@
+.pricing {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.pricing .section-desc strong {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.pricing-grid {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.plan {
+  position: relative;
+  padding: 1.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.plan-featured {
+  border-color: var(--green);
+}
+
+.plan-badge {
+  position: absolute;
+  top: -10px;
+  left: 1.25rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--green);
+  color: #111;
+  border-radius: 4px;
+}
+
+.plan h3 {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.plan-price {
+  margin-bottom: 0.5rem;
+}
+
+.plan-price .amount {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.plan-price .period {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-left: 0.15rem;
+}
+
+.plan-desc {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.plan ul {
+  margin: 0 0 1.25rem;
+  padding: 0;
+  list-style: none;
+}
+
+.plan li {
+  padding: 0.3rem 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.plan li:last-child {
+  border-bottom: none;
+}
+
+.plan li::before {
+  content: '✓ ';
+  color: var(--green);
+  font-weight: 700;
+}
+
+.plan-btn {
+  display: block;
+  width: 100%;
+}
+
+.pricing-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.5;
+}
+
+@media (min-width: 768px) {
+  .pricing-grid {
+    grid-template-columns: repeat(3, 1fr);
+    align-items: start;
+  }
+
+  .plan-featured {
+    transform: scale(1.02);
+  }
+}

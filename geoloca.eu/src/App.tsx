@@ -1,22 +1,23 @@
-import Background from './components/Background';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
+import Features from './components/Features';
 import HowItWorks from './components/HowItWorks';
 import Countries from './components/Countries';
-import Setup from './components/Setup';
+import Pricing from './components/Pricing';
+import FAQ from './components/FAQ';
 import Footer from './components/Footer';
-import './App.css';
 
 export default function App() {
   return (
     <>
-      <Background />
       <Navbar />
       <main>
         <Hero />
+        <Features />
         <HowItWorks />
         <Countries />
-        <Setup />
+        <Pricing />
+        <FAQ />
       </main>
       <Footer />
     </>

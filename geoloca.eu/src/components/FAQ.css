@@ -1,0 +1,29 @@
+.faq {
+  border-top: 1px solid var(--border);
+}
+
+.faq-list {
+  margin: 0;
+}
+
+.faq-item {
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.faq-item:first-child {
+  padding-top: 0;
+}
+
+.faq-item dt {
+  margin: 0 0 0.4rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.faq-item dd {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
