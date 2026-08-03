@@ -28,7 +28,7 @@ export default function SearchBar({ onSelect }: SearchBarProps) {
       setResults(items);
       setOpen(items.length > 0);
       setLoading(false);
-    }, 400);
+    }, 350);
 
     return () => window.clearTimeout(debounceRef.current);
   }, [query]);
@@ -45,21 +45,22 @@ export default function SearchBar({ onSelect }: SearchBarProps) {
 
   return (
     <div className="search-bar" ref={wrapperRef}>
-      <div className="search-input-wrap">
-        <span className="search-icon" aria-hidden>
-          ⌕
-        </span>
+      <label className="search-field">
+        <svg className="search-svg" viewBox="0 0 20 20" aria-hidden>
+          <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.6" fill="none" />
+          <path d="M13 13l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
         <input
           type="search"
-          placeholder="Search city, address, place..."
+          placeholder="Search a place"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => results.length > 0 && setOpen(true)}
         />
-        {loading && <span className="search-spinner" />}
-      </div>
+        {loading && <span className="search-spin" />}
+      </label>
       {open && (
-        <ul className="search-results">
+        <ul className="search-list">
           {results.map((item) => (
             <li key={`${item.lat}-${item.lng}-${item.label}`}>
               <button

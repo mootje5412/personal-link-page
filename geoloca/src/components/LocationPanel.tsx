@@ -36,71 +36,45 @@ export default function LocationPanel({
 
   return (
     <section className={`location-panel ${active ? 'is-active' : ''}`}>
-      <div className="panel-header">
-        <div>
-          <p className="panel-label">Selected location</p>
-          <h2>
-            {active ? 'Spoof active' : hasLocation ? 'Ready to apply' : 'Pick a spot'}
-          </h2>
+      <div className="panel-top">
+        <div className="panel-status">
+          <span className={`dot ${active ? 'live' : ''}`} />
+          <span>{active ? 'Using fake spot' : 'Not active'}</span>
         </div>
-        <span className={`status-pill ${active ? 'on' : 'off'}`}>
-          {active ? 'ON' : 'OFF'}
-        </span>
-      </div>
-
-      <div className="coords-block">
-        {hasLocation ? (
-          <>
-            <div className="coords-row">
-              <p className="coords">{formatCoords(lat, lng)}</p>
-              {locationSource && (
-                <span className={`source-badge ${locationSource}`}>
-                  {locationSource === 'gps' ? 'GPS' : 'Approx'}
-                </span>
-              )}
-            </div>
-            <p className="address">{loadingAddress ? 'Looking up address…' : address}</p>
-          </>
-        ) : (
-          <p className="hint">
-            Tap the map, search a place, or use the locate button to set your position.
-          </p>
+        {locationSource && hasLocation && (
+          <span className="source-tag">{locationSource === 'gps' ? 'GPS' : 'Network'}</span>
         )}
       </div>
 
-      <div className="panel-actions">
+      {hasLocation ? (
+        <div className="location-info">
+          <p className="coords">{formatCoords(lat, lng)}</p>
+          <p className="address">{loadingAddress ? 'Getting address…' : address}</p>
+        </div>
+      ) : (
+        <p className="empty-hint">Tap the map or search somewhere</p>
+      )}
+
+      <p className="scope-line">Only affects this app — not Snap, Google Maps, etc.</p>
+
+      <div className="actions">
         {!active ? (
-          <button type="button" className="btn primary" disabled={!hasLocation} onClick={onApply}>
-            <span className="btn-icon">◎</span>
-            Apply location
+          <button type="button" className="btn main" disabled={!hasLocation} onClick={onApply}>
+            Use this location
           </button>
         ) : (
-          <button type="button" className="btn danger" onClick={onStop}>
-            <span className="btn-icon">✕</span>
-            Stop spoofing
+          <button type="button" className="btn stop" onClick={onStop}>
+            Turn off
           </button>
         )}
-        <button type="button" className="btn secondary" disabled={!hasLocation} onClick={onCopy}>
-          {copied ? 'Copied!' : 'Copy coords'}
-        </button>
-        <button
-          type="button"
-          className="btn ghost"
-          disabled={locating}
-          onClick={onUseReal}
-        >
-          {locating ? (
-            <>
-              <span className="btn-spinner" />
-              Finding you…
-            </>
-          ) : (
-            <>
-              <span className="btn-icon">⌖</span>
-              {gpsAvailable ? 'Use my GPS' : 'Find my location'}
-            </>
-          )}
-        </button>
+        <div className="actions-row">
+          <button type="button" className="btn subtle" disabled={!hasLocation} onClick={onCopy}>
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+          <button type="button" className="btn subtle" disabled={locating} onClick={onUseReal}>
+            {locating ? 'Finding…' : gpsAvailable ? 'My GPS' : 'Find me'}
+          </button>
+        </div>
       </div>
     </section>
   );

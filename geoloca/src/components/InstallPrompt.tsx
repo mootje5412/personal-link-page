@@ -9,17 +9,13 @@ interface BeforeInstallPromptEvent extends Event {
 export default function InstallPrompt() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
-  const [installed, setInstalled] = useState(false);
 
   useEffect(() => {
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
 
-    if (isStandalone) {
-      setInstalled(true);
-      return;
-    }
+    if (isStandalone) return;
 
     const onBeforeInstall = (e: Event) => {
       e.preventDefault();
@@ -28,45 +24,38 @@ export default function InstallPrompt() {
     };
 
     const onInstalled = () => {
-      setInstalled(true);
       setVisible(false);
       setDeferred(null);
     };
 
     window.addEventListener('beforeinstallprompt', onBeforeInstall);
     window.addEventListener('appinstalled', onInstalled);
-
     return () => {
       window.removeEventListener('beforeinstallprompt', onBeforeInstall);
       window.removeEventListener('appinstalled', onInstalled);
     };
   }, []);
 
-  if (installed || !visible || !deferred) return null;
+  if (!visible || !deferred) return null;
 
   return (
-    <div className="install-banner">
-      <div>
-        <strong>Add Geoloca to Home Screen</strong>
-        <p>Install the app for quick access to your location changer.</p>
-      </div>
-      <div className="install-actions">
-        <button type="button" className="install-btn" onClick={() => setVisible(false)}>
-          Later
+    <div className="install-bar">
+      <p>Add to home screen for quick access</p>
+      <div className="install-btns">
+        <button type="button" onClick={() => setVisible(false)}>
+          Not now
         </button>
         <button
           type="button"
-          className="install-btn primary"
+          className="go"
           onClick={async () => {
             await deferred.prompt();
-            const choice = await deferred.userChoice;
-            if (choice.outcome === 'accepted') {
-              setVisible(false);
-            }
+            await deferred.userChoice;
+            setVisible(false);
             setDeferred(null);
           }}
         >
-          Install
+          Add
         </button>
       </div>
     </div>

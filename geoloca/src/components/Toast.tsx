@@ -13,7 +13,7 @@ interface ToastProps {
 export default function Toast({ message, type = 'info', visible, onHide }: ToastProps) {
   useEffect(() => {
     if (!visible) return;
-    const timer = window.setTimeout(onHide, 4200);
+    const timer = window.setTimeout(onHide, 3200);
     return () => window.clearTimeout(timer);
   }, [visible, onHide]);
 
@@ -21,10 +21,7 @@ export default function Toast({ message, type = 'info', visible, onHide }: Toast
 
   return (
     <div className={`toast toast-${type}`} role="status">
-      <span className="toast-icon" aria-hidden>
-        {type === 'success' ? '✓' : type === 'error' ? '!' : 'i'}
-      </span>
-      <p>{message}</p>
+      {message}
     </div>
   );
 }

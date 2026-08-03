@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import MapView from './components/MapView';
 import SearchBar from './components/SearchBar';
 import LocationPanel from './components/LocationPanel';
+import ScopeNotice from './components/ScopeNotice';
 import InstallPrompt from './components/InstallPrompt';
 import Toast, { type ToastType } from './components/Toast';
 import {
@@ -64,14 +65,9 @@ export default function App() {
       setLocationSource(pos.source);
       await updateLocation(pos.lat, pos.lng, pos.label ?? 'My location');
       setActive(false);
-
-      if (pos.source === 'gps') {
-        showToast('GPS location found', 'success');
-      } else {
-        showToast('Using approximate location (GPS needs HTTPS)', 'info');
-      }
+      showToast(pos.source === 'gps' ? 'Found your location' : 'Rough location from network', 'success');
     } catch {
-      showToast('Could not detect your location. Tap the map instead.', 'error');
+      showToast('Could not find you — tap the map instead', 'error');
     } finally {
       setLocating(false);
     }
@@ -89,7 +85,7 @@ export default function App() {
           await updateLocation(pos.lat, pos.lng, pos.label ?? 'My location');
         }
       } catch {
-        /* keep default map center */
+        /* keep default */
       }
     })();
     return () => {
@@ -104,25 +100,9 @@ export default function App() {
 
   return (
     <div className="app">
-      <div className="app-bg" aria-hidden />
-
       <header className="app-header">
         <div className="brand">
-          <span className="brand-icon" aria-hidden>
-            <svg viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="10" r="3.5" stroke="currentColor" strokeWidth="1.8" />
-              <path
-                d="M12 21s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10Z"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </span>
-          <div>
-            <h1>Geoloca</h1>
-            <p>Location changer</p>
-          </div>
+          <h1>geoloca</h1>
         </div>
         <button
           type="button"
@@ -130,7 +110,7 @@ export default function App() {
           aria-expanded={panelOpen}
           onClick={() => setPanelOpen((v) => !v)}
         >
-          {panelOpen ? 'Hide' : 'Panel'}
+          {panelOpen ? 'hide' : 'show'}
         </button>
       </header>
 
@@ -147,9 +127,7 @@ export default function App() {
 
       <div className={`bottom-sheet ${panelOpen ? 'open' : 'closed'}`}>
         <div className="sheet-handle" aria-hidden />
-        <SearchBar
-          onSelect={(result) => updateLocation(result.lat, result.lng, result.label)}
-        />
+        <SearchBar onSelect={(r) => updateLocation(r.lat, r.lng, r.label)} />
         <LocationPanel
           lat={picked?.lat ?? null}
           lng={picked?.lng ?? null}
@@ -162,20 +140,18 @@ export default function App() {
           copied={copied}
           onApply={() => {
             setActive(true);
-            showToast('Location spoof is now active', 'success');
+            showToast('Using this spot inside Geoloca', 'success');
           }}
-          onStop={() => {
-            setActive(false);
-            showToast('Spoofing stopped', 'info');
-          }}
+          onStop={() => setActive(false)}
           onCopy={async () => {
             if (!picked) return;
             await navigator.clipboard.writeText(`${picked.lat}, ${picked.lng}`);
             setCopied(true);
-            window.setTimeout(() => setCopied(false), 1800);
+            window.setTimeout(() => setCopied(false), 1600);
           }}
           onUseReal={handleFindLocation}
         />
+        <ScopeNotice />
       </div>
 
       <Toast
