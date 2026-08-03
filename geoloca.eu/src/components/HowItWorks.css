@@ -7,6 +7,7 @@
 .steps {
   display: grid;
   gap: 1rem;
+  position: relative;
 }
 
 .step-card {
@@ -24,22 +25,23 @@
 .step-card:hover {
   border-color: var(--accent-border);
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.2);
 }
 
 .step-num {
   position: absolute;
   left: 1.25rem;
   top: 1.35rem;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
   font-size: 0.8rem;
   font-weight: 800;
-  color: var(--accent-light);
+  color: var(--accent-bright);
   background: var(--accent-dim);
-  border-radius: 8px;
+  border: 1px solid var(--accent-border);
+  border-radius: 9px;
 }
 
 .step-card h3 {
@@ -58,11 +60,23 @@
 @media (min-width: 768px) {
   .steps {
     grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+  }
+
+  .steps::before {
+    content: '';
+    position: absolute;
+    top: 2.5rem;
+    left: 18%;
+    right: 18%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-border), transparent);
+    pointer-events: none;
   }
 
   .step-card {
     padding: 1.5rem;
-    padding-top: 3.25rem;
+    padding-top: 3.35rem;
   }
 
   .step-num {

@@ -1,5 +1,6 @@
 .features {
   border-top: 1px solid var(--border);
+  background: linear-gradient(180deg, transparent 0%, rgba(99, 102, 241, 0.02) 50%, transparent 100%);
 }
 
 .feature-grid {
@@ -8,7 +9,7 @@
 }
 
 .feature-card {
-  padding: 1.35rem;
+  padding: 1.5rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -22,13 +23,34 @@
 .feature-card:hover {
   border-color: var(--accent-border);
   transform: translateY(-3px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
   background: var(--surface-hover);
+}
+
+.feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 0.85rem;
+  color: var(--accent-light);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-border);
+  border-radius: 11px;
+  transition:
+    background var(--duration-normal) var(--ease-smooth),
+    transform var(--duration-normal) var(--ease-out);
+}
+
+.feature-card:hover .feature-icon {
+  background: rgba(99, 102, 241, 0.16);
+  transform: scale(1.05);
 }
 
 .feature-card h3 {
   margin: 0 0 0.4rem;
-  font-size: 0.95rem;
+  font-size: 0.98rem;
   font-weight: 700;
 }
 

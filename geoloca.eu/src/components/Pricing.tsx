@@ -15,7 +15,7 @@ const plans = [
     name: 'Pro',
     price: '€4.99',
     period: '/ month',
-    desc: 'After trial. Cancel anytime.',
+    desc: 'After trial. Cancel anytime — no refunds.',
     features: ['Unlimited changes', 'Saved locations', 'Priority support', 'All app updates'],
     cta: 'Get Pro',
     featured: false,
@@ -69,6 +69,17 @@ export default function Pricing() {
               </a>
             </article>
           ))}
+        </div>
+
+        <div className="pricing-policy">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+            <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M8 5v4M8 11h.01" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+          <p>
+            <strong>All sales are final.</strong> We don&apos;t accept refunds. Use the free trial
+            to test everything first. Cancel anytime to stop future charges.
+          </p>
         </div>
 
         <p className="pricing-foot">

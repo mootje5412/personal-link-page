@@ -10,14 +10,14 @@
 .pricing-grid {
   display: grid;
   gap: 1rem;
-  margin-bottom: 1.75rem;
+  margin-bottom: 1.25rem;
 }
 
 .plan {
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: 1.75rem;
+  padding: 1.85rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -28,36 +28,37 @@
 }
 
 .plan:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+  transform: translateY(-3px);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
 }
 
 .plan.featured {
   border-color: var(--accent-border);
   box-shadow:
     0 0 0 1px rgba(99, 102, 241, 0.08),
-    0 20px 44px rgba(0, 0, 0, 0.3);
-  background: linear-gradient(180deg, rgba(99, 102, 241, 0.05) 0%, var(--surface) 100%);
+    0 22px 48px rgba(0, 0, 0, 0.32);
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.06) 0%, var(--surface) 55%);
 }
 
 .plan.featured:hover {
   box-shadow:
-    0 0 0 1px rgba(99, 102, 241, 0.12),
-    0 24px 52px rgba(0, 0, 0, 0.32);
+    0 0 0 1px rgba(99, 102, 241, 0.14),
+    0 28px 56px rgba(0, 0, 0, 0.34);
 }
 
 .plan-badge {
   position: absolute;
   top: -11px;
   left: 1.25rem;
-  padding: 0.2rem 0.6rem;
+  padding: 0.22rem 0.65rem;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #fff;
   background: var(--accent);
-  border-radius: 6px;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .plan h3 {
@@ -71,7 +72,7 @@
 }
 
 .price .amount {
-  font-size: 2.25rem;
+  font-size: 2.35rem;
   font-weight: 800;
   letter-spacing: -0.03em;
 }
@@ -96,7 +97,10 @@
 }
 
 .plan li {
-  padding: 0.45rem 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.48rem 0;
   font-size: 0.86rem;
   color: var(--muted);
   border-bottom: 1px solid var(--border);
@@ -108,13 +112,41 @@
 
 .plan li::before {
   content: '✓';
-  margin-right: 0.5rem;
+  flex-shrink: 0;
   color: var(--accent-light);
   font-weight: 700;
 }
 
 .plan-btn {
   width: 100%;
+}
+
+.pricing-policy {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.15rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.pricing-policy svg {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  color: var(--accent-light);
+}
+
+.pricing-policy p {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.pricing-policy strong {
+  color: var(--text);
 }
 
 .pricing-foot {
@@ -135,6 +167,6 @@
   }
 
   .plan.featured:hover {
-    transform: scale(1.02) translateY(-2px);
+    transform: scale(1.02) translateY(-3px);
   }
 }

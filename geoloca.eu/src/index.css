@@ -101,13 +101,18 @@ a {
 }
 
 .section-tag {
-  display: inline-block;
-  margin-bottom: 0.75rem;
-  font-size: 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 0.85rem;
+  padding: 0.32rem 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--accent-light);
+  color: var(--accent-bright);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
 }
 
 .section-title {

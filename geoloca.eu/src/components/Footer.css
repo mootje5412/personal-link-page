@@ -1,16 +1,17 @@
 .footer {
-  padding: 2.5rem 0 3rem;
+  padding: 3rem 0 3.25rem;
   border-top: 1px solid var(--border);
+  background: var(--bg-soft);
 }
 
 .footer-grid {
   display: grid;
-  gap: 1.5rem;
+  gap: 2rem;
 }
 
 .footer-brand {
-  margin: 0 0 0.25rem;
-  font-size: 1.1rem;
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
   font-weight: 800;
   letter-spacing: -0.03em;
 }
@@ -20,9 +21,23 @@
 }
 
 .footer-tagline {
-  margin: 0;
-  font-size: 0.85rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
   color: var(--dim);
+}
+
+.footer-legal {
+  margin: 0;
+  max-width: 320px;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--dim);
+}
+
+.footer-links-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
 }
 
 .footer-nav {
@@ -43,15 +58,22 @@
   color: var(--text);
 }
 
+.footer-nav-secondary a {
+  font-size: 0.8rem;
+  color: var(--dim);
+}
+
 .footer-copy {
   margin: 0;
-  font-size: 0.8rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
   color: var(--dim);
 }
 
 @media (min-width: 640px) {
   .footer-grid {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1.2fr auto;
     align-items: start;
   }
 

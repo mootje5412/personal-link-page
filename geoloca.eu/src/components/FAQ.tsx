@@ -7,6 +7,10 @@ const faqs = [
     a: 'Yes. No credit card when you sign up. After 3 days you pick Pro, Yearly, or stop — nothing charges unless you choose a paid plan.',
   },
   {
+    q: 'Do you offer refunds?',
+    a: 'No. All sales are final and we don\u2019t accept refunds. That\u2019s why we offer a full 3-day free trial with no card — test every feature before you pay.',
+  },
+  {
     q: 'Does it work with Snap and Google Maps?',
     a: 'Yes. GeoLoca changes your phone GPS. Any app that reads location will show where you picked.',
   },
@@ -20,7 +24,7 @@ const faqs = [
   },
   {
     q: 'Can I cancel?',
-    a: 'Anytime from account settings. You keep access until the end of your billing period.',
+    a: 'Anytime from account settings. You keep access until the end of your billing period. No refunds on past payments.',
   },
 ];
 
