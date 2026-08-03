@@ -1,30 +1,62 @@
+.how {
+  background: var(--bg-soft);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
 .steps {
   display: grid;
   gap: 1rem;
 }
 
-.step {
-  padding: 1.25rem;
+.step-card {
+  position: relative;
+  padding: 1.5rem 1.5rem 1.5rem 4rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 
-.step h3 {
-  margin: 0 0 0.4rem;
-  font-size: 1rem;
-  font-weight: 600;
+.step-num {
+  position: absolute;
+  left: 1.25rem;
+  top: 1.35rem;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--accent-light);
+  background: var(--accent-dim);
+  border-radius: 8px;
 }
 
-.step p {
+.step-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.step-card p {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: var(--muted);
   line-height: 1.55;
 }
 
-@media (min-width: 700px) {
+@media (min-width: 768px) {
   .steps {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  .step-card {
+    padding: 1.5rem;
+    padding-top: 3.25rem;
+  }
+
+  .step-num {
+    left: 1.25rem;
+    top: 1.25rem;
   }
 }

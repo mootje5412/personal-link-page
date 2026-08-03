@@ -4,35 +4,42 @@
 
 .feature-grid {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.85rem;
 }
 
-.feature {
-  padding: 1.1rem 1.25rem;
+.feature-card {
+  padding: 1.35rem;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  transition: border-color 0.2s, transform 0.2s;
 }
 
-.feature h3 {
-  margin: 0 0 0.35rem;
+.feature-card:hover {
+  border-color: rgba(16, 185, 129, 0.25);
+  transform: translateY(-2px);
+}
+
+.feature-card h3 {
+  margin: 0 0 0.4rem;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.feature p {
+.feature-card p {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   color: var(--muted);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
-@media (min-width: 600px) {
+@media (min-width: 640px) {
   .feature-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (min-width: 900px) {
+@media (min-width: 960px) {
   .feature-grid {
     grid-template-columns: repeat(3, 1fr);
   }

@@ -1,32 +1,27 @@
 import './HowItWorks.css';
 
 const steps = [
-  {
-    title: '1. Connect phone to laptop',
-    text: 'Use a USB cable or connect both devices to the same Wi‑Fi. GeoLoca links them in seconds.',
-  },
-  {
-    title: '2. Choose a country',
-    text: 'Search on the map or type a city. Canada, Netherlands, Japan — anywhere you want.',
-  },
-  {
-    title: '3. Turn it on',
-    text: 'Your phone sends the new location to every app — Snap, Google Maps, Instagram, all of them.',
-  },
+  { n: '1', title: 'Connect devices', text: 'USB cable or Wi‑Fi. GeoLoca pairs your phone and laptop.' },
+  { n: '2', title: 'Pick a country', text: 'Tap the map or search. Canada, Netherlands, Japan — anywhere.' },
+  { n: '3', title: 'Go live', text: 'Every app on your phone uses the new location instantly.' },
 ];
 
 export default function HowItWorks() {
   return (
-    <section id="how" className="section">
+    <section id="how" className="section how">
       <div className="container">
-        <h2 className="section-title">How it works</h2>
-        <p className="section-desc">Phone + laptop. That&apos;s it.</p>
+        <div className="section-head">
+          <span className="section-tag">How it works</span>
+          <h2 className="section-title">Three steps</h2>
+          <p className="section-desc">Phone plus laptop. That&apos;s the whole setup.</p>
+        </div>
         <div className="steps">
           {steps.map((step) => (
-            <div key={step.title} className="step">
+            <article key={step.n} className="step-card">
+              <span className="step-num">{step.n}</span>
               <h3>{step.title}</h3>
               <p>{step.text}</p>
-            </div>
+            </article>
           ))}
         </div>
       </div>

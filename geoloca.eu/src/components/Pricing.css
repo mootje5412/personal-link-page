@@ -1,81 +1,85 @@
 .pricing {
   border-top: 1px solid var(--border);
-  background: var(--surface);
 }
 
-.pricing .section-desc strong {
-  color: var(--green);
-  font-weight: 600;
+.trial-highlight {
+  color: var(--accent-light);
+  font-weight: 700;
 }
 
 .pricing-grid {
   display: grid;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.75rem;
 }
 
 .plan {
   position: relative;
-  padding: 1.5rem;
-  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 
-.plan-featured {
-  border-color: var(--green);
+.plan.featured {
+  border-color: rgba(16, 185, 129, 0.45);
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.1), 0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
 .plan-badge {
   position: absolute;
-  top: -10px;
+  top: -11px;
   left: 1.25rem;
-  padding: 0.2rem 0.55rem;
+  padding: 0.2rem 0.6rem;
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
-  background: var(--green);
-  color: #111;
-  border-radius: 4px;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 6px;
 }
 
 .plan h3 {
-  margin: 0.25rem 0 0.75rem;
+  margin: 0.15rem 0 0.75rem;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.plan-price {
+.price {
   margin-bottom: 0.5rem;
 }
 
-.plan-price .amount {
-  font-size: 2rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+.price .amount {
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
 
-.plan-price .period {
+.price .period {
+  margin-left: 0.2rem;
   font-size: 0.9rem;
   color: var(--muted);
-  margin-left: 0.15rem;
 }
 
 .plan-desc {
-  margin: 0 0 1rem;
-  font-size: 0.85rem;
+  margin: 0 0 1.25rem;
+  font-size: 0.88rem;
   color: var(--muted);
 }
 
 .plan ul {
-  margin: 0 0 1.25rem;
+  flex: 1;
+  margin: 0 0 1.5rem;
   padding: 0;
   list-style: none;
 }
 
 .plan li {
-  padding: 0.3rem 0;
-  font-size: 0.85rem;
+  padding: 0.45rem 0;
+  font-size: 0.86rem;
   color: var(--muted);
   border-bottom: 1px solid var(--border);
 }
@@ -85,31 +89,30 @@
 }
 
 .plan li::before {
-  content: '✓ ';
-  color: var(--green);
+  content: '✓';
+  margin-right: 0.5rem;
+  color: var(--accent-light);
   font-weight: 700;
 }
 
 .plan-btn {
-  display: block;
   width: 100%;
 }
 
-.pricing-note {
+.pricing-foot {
   margin: 0;
-  font-size: 0.8rem;
-  color: var(--muted);
   text-align: center;
-  line-height: 1.5;
+  font-size: 0.82rem;
+  color: var(--dim);
 }
 
 @media (min-width: 768px) {
   .pricing-grid {
     grid-template-columns: repeat(3, 1fr);
-    align-items: start;
+    align-items: stretch;
   }
 
-  .plan-featured {
-    transform: scale(1.02);
+  .plan.featured {
+    transform: scale(1.03);
   }
 }

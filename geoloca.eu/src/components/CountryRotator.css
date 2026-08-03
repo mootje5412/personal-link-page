@@ -4,14 +4,14 @@
 
 .country-word {
   display: inline-block;
-  color: var(--green);
-  font-weight: 700;
+  font-weight: 800;
+  color: var(--accent-light);
 }
 
 .country-in {
-  animation: country-in 0.4s ease forwards;
+  animation: country-in 0.45s ease forwards;
 }
 
 .country-out {
-  animation: country-out 0.3s ease forwards;
+  animation: country-out 0.35s ease forwards;
 }
