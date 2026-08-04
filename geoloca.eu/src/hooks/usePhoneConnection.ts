@@ -2,12 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ConnectionStatus, DetectedDevice } from '../data/phones';
 import {
   burstScanLocal,
-  downloadGeoLocaLink,
   isLinkOnline,
-  openGeoLocaLink,
   requestWebUsb,
   scanLocalUsb,
   setDeviceLocation,
+  tryExistingWebUsb,
 } from '../utils/usbBridge';
 
 export type AppliedLocation = {
@@ -17,7 +16,7 @@ export type AppliedLocation = {
   label: string;
 };
 
-const SCAN_MS = 1500;
+const SCAN_MS = 800;
 
 export function usePhoneConnection() {
   const [status, setStatus] = useState<ConnectionStatus>('waiting');
@@ -25,8 +24,6 @@ export function usePhoneConnection() {
   const [appliedLocation, setAppliedLocation] = useState<AppliedLocation | null>(null);
   const [applyingLocation, setApplyingLocation] = useState(false);
   const [linkOnline, setLinkOnline] = useState(false);
-  const [needsLink, setNeedsLink] = useState(false);
-  const [scanHints, setScanHints] = useState<string[]>([]);
   const scanRef = useRef<number | null>(null);
   const connectedRef = useRef(false);
 
@@ -37,14 +34,16 @@ export function usePhoneConnection() {
     }
   }, []);
 
-  const connectDevice = useCallback((device: DetectedDevice) => {
-    connectedRef.current = true;
-    setConnectedDevice(device);
-    setStatus('connected');
-    setNeedsLink(false);
-    setAppliedLocation(null);
-    stopScan();
-  }, [stopScan]);
+  const connectDevice = useCallback(
+    (device: DetectedDevice) => {
+      connectedRef.current = true;
+      setConnectedDevice(device);
+      setStatus('connected');
+      setAppliedLocation(null);
+      stopScan();
+    },
+    [stopScan],
+  );
 
   const runScan = useCallback(async (): Promise<boolean> => {
     if (connectedRef.current) return true;
@@ -52,25 +51,24 @@ export function usePhoneConnection() {
     const online = await isLinkOnline();
     setLinkOnline(online);
 
-    if (!online) {
-      setNeedsLink(true);
-      setStatus('waiting');
-      return false;
-    }
-
-    setNeedsLink(false);
     setStatus('detecting_usb');
-    const scan = await scanLocalUsb();
 
-    if (scan.connected && scan.device) {
-      setStatus('connecting');
-      await new Promise((r) => window.setTimeout(r, 400));
-      connectDevice(scan.device);
-      setScanHints([]);
+    const web = await tryExistingWebUsb();
+    if (web.connected && web.device) {
+      connectDevice(web.device);
       return true;
     }
 
-    setScanHints(scan.hints ?? []);
+    if (online) {
+      const scan = await scanLocalUsb();
+      if (scan.connected && scan.device) {
+        setStatus('connecting');
+        await new Promise((r) => window.setTimeout(r, 300));
+        connectDevice(scan.device);
+        return true;
+      }
+    }
+
     setStatus('waiting');
     return false;
   }, [connectDevice]);
@@ -89,31 +87,13 @@ export function usePhoneConnection() {
   const connectIphone = useCallback(async () => {
     setStatus('detecting_usb');
 
-    let scan = await burstScanLocal(8, 350);
-    if (scan.connected && scan.device) {
-      connectDevice(scan.device);
-      return true;
-    }
-
-    if (!scan.linkOnline) {
-      openGeoLocaLink();
-      setNeedsLink(true);
-      setStatus('waiting');
-      scan = await burstScanLocal(20, 500);
-      if (scan.connected && scan.device) {
-        connectDevice(scan.device);
-        return true;
-      }
-      return false;
-    }
-
     const web = await requestWebUsb();
     if (web.connected && web.device) {
       connectDevice(web.device);
       return true;
     }
 
-    scan = await burstScanLocal(6, 400);
+    let scan = await burstScanLocal(10, 300);
     if (scan.connected && scan.device) {
       connectDevice(scan.device);
       return true;
@@ -165,12 +145,9 @@ export function usePhoneConnection() {
     appliedLocation,
     applyingLocation,
     linkOnline,
-    needsLink,
-    scanHints,
     connected: status === 'connected',
     disconnect,
     applyLocation,
     connectIphone,
-    downloadLink: downloadGeoLocaLink,
   };
 }

@@ -25,11 +25,8 @@ type Props = {
   appliedLocation: AppliedLocation | null;
   applyingLocation: boolean;
   linkOnline: boolean;
-  needsLink: boolean;
-  scanHints: string[];
   onDisconnect: () => void;
   onConnect: () => void;
-  onDownloadLink: () => void;
   onApplyLocation: (country: string, lat: number, lng: number, label: string) => void;
 };
 
@@ -66,11 +63,8 @@ export default function DashboardMap({
   appliedLocation,
   applyingLocation,
   linkOnline,
-  needsLink,
-  scanHints,
   onDisconnect,
   onConnect,
-  onDownloadLink,
   onApplyLocation,
 }: Props) {
   const { t } = useLanguage();
@@ -291,14 +285,11 @@ export default function DashboardMap({
         status={connectionStatus}
         connectedDevice={connectedDevice}
         linkOnline={linkOnline}
-        needsLink={needsLink}
-        scanHints={scanHints}
         onDisconnect={() => {
           onDisconnect();
           setShowPhonePanel(true);
         }}
         onConnect={onConnect}
-        onDownloadLink={onDownloadLink}
         open={!connected || showPhonePanel}
         onClose={connected ? () => setShowPhonePanel(false) : undefined}
       />

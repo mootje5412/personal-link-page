@@ -55,6 +55,8 @@ const en = {
   'usb.waiting_sub': 'Plug your iPhone in with USB and tap Trust on your phone',
   'usb.success_title': 'Successfully connected',
   'usb.listening': 'Listening for iPhone on USB…',
+  'usb.plug_scan': 'Plug iPhone in via USB — scanning…',
+  'usb.tip_unlock': 'Keep iPhone unlocked while connecting',
   'usb.tip_cable': 'Use a USB data cable (not charge-only)',
   'usb.tip_trust': 'Unlock iPhone and tap Trust This Computer',
   'usb.allow_usb': 'Allow USB access',

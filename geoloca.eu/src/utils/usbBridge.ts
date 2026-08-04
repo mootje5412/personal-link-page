@@ -9,7 +9,6 @@ export type UsbScanResult = {
   device?: DetectedDevice;
   linkOnline?: boolean;
   error?: 'link_offline' | 'no_device';
-  hints?: string[];
 };
 
 export type LocationResult = {
@@ -24,7 +23,7 @@ const APPLE_VENDOR = 0x05ac;
 
 async function localFetch<T>(path: string, init?: RequestInit): Promise<T | null> {
   const isScan = path.includes('/usb/scan');
-  const timeoutMs = init?.method === 'POST' ? 20000 : isScan ? 45000 : 8000;
+  const timeoutMs = init?.method === 'POST' ? 20000 : isScan ? 30000 : 5000;
   try {
     const res = await fetch(`${LOCAL}${path}`, {
       ...init,
@@ -44,19 +43,18 @@ export async function isLinkOnline(): Promise<boolean> {
   return Boolean(health?.ok);
 }
 
-/** Only scans the computer running the browser — not the remote server. */
 export async function scanLocalUsb(): Promise<UsbScanResult> {
   const online = await isLinkOnline();
   if (!online) {
     return { connected: false, linkOnline: false, error: 'link_offline' };
   }
 
-  const result = await localFetch<{ connected?: boolean; device?: DetectedDevice; hints?: string[] }>('/usb/scan');
+  const result = await localFetch<{ connected?: boolean; device?: DetectedDevice }>('/usb/scan');
   if (result?.connected && result.device) {
     return { connected: true, device: result.device, linkOnline: true };
   }
 
-  return { connected: false, linkOnline: true, error: 'no_device', hints: result?.hints };
+  return { connected: false, linkOnline: true, error: 'no_device' };
 }
 
 export async function burstScanLocal(tries = 12, gapMs = 400): Promise<UsbScanResult> {
@@ -79,45 +77,48 @@ export async function setDeviceLocation(lat: number, lng: number): Promise<Locat
   return local ?? { ok: false, error: 'link_offline' };
 }
 
-export async function requestWebUsb(): Promise<UsbScanResult> {
+function deviceFromUsb(usbDevice: USBDevice): DetectedDevice {
+  const name = usbDevice.productName || 'iPhone';
+  return { name, model: name, connection: 'usb' };
+}
+
+export async function tryExistingWebUsb(): Promise<UsbScanResult> {
   if (!('usb' in navigator)) return { connected: false, error: 'no_device' };
   try {
-    const device = await navigator.usb!.requestDevice({ filters: [{ vendorId: APPLE_VENDOR }] });
-    const name = device.productName || 'iPhone';
-    return { connected: true, device: { name, model: name, connection: 'usb' }, linkOnline: await isLinkOnline() };
+    const devices = await navigator.usb!.getDevices();
+    const iphone = devices.find((d) => d.vendorId === APPLE_VENDOR);
+    if (iphone) {
+      return { connected: true, device: deviceFromUsb(iphone), linkOnline: await isLinkOnline() };
+    }
   } catch {
-    return { connected: false, error: 'no_device' };
+    /* ignore */
   }
+  return { connected: false, error: 'no_device' };
 }
 
-export function downloadGeoLocaLink() {
-  const ua = navigator.userAgent.toLowerCase();
-  const base = `${window.location.origin}/connect/`;
-  const href = ua.includes('win') ? `${base}GeoLoca-Link.bat` : `${base}GeoLoca-Link.command`;
-  const a = document.createElement('a');
-  a.href = href;
-  a.download = href.includes('.bat') ? 'GeoLoca-Link.bat' : 'GeoLoca-Link.command';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
+export async function requestWebUsb(): Promise<UsbScanResult> {
+  if (!('usb' in navigator)) return { connected: false, error: 'no_device' };
 
-export function openGeoLocaLink() {
-  downloadGeoLocaLink();
-}
+  const existing = await tryExistingWebUsb();
+  if (existing.connected) return existing;
 
-export function getGeoLocaLinkTerminalCommand() {
-  const site = window.location.origin;
-  const url = `${site}/connect/usb_helper.py`;
-  return `mkdir -p ~/.geoloca && python3 -c "import ssl,urllib.request,os; p=os.path.expanduser('~/.geoloca/usb_helper.py'); c=ssl.create_default_context(); c.check_hostname=False; c.verify_mode=ssl.CERT_NONE; open(p,'wb').write(urllib.request.urlopen('${url}',context=c).read()); print('Saved to',p)" && python3 ~/.geoloca/usb_helper.py`;
-}
-
-export async function copyGeoLocaLinkCommand() {
-  const cmd = getGeoLocaLinkTerminalCommand();
   try {
-    await navigator.clipboard.writeText(cmd);
-    return true;
+    const device = await navigator.usb!.requestDevice({
+      filters: [{ vendorId: APPLE_VENDOR }],
+    });
+    return { connected: true, device: deviceFromUsb(device), linkOnline: await isLinkOnline() };
   } catch {
-    return false;
+    /* try showing all USB devices so user can pick iPhone */
   }
+
+  try {
+    const device = await navigator.usb!.requestDevice({ filters: [] });
+    if (device.vendorId === APPLE_VENDOR) {
+      return { connected: true, device: deviceFromUsb(device), linkOnline: await isLinkOnline() };
+    }
+  } catch {
+    /* user cancelled or no device */
+  }
+
+  return { connected: false, error: 'no_device' };
 }

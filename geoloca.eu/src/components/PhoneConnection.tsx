@@ -1,19 +1,14 @@
-import { useState } from 'react';
 import type { ConnectionStatus, DetectedDevice } from '../data/phones';
 import { deviceLabel } from '../data/phones';
 import { useLanguage } from '../i18n/LanguageContext';
-import { copyGeoLocaLinkCommand, getGeoLocaLinkTerminalCommand } from '../utils/usbBridge';
 import './PhoneConnection.css';
 
 type Props = {
   status: ConnectionStatus;
   connectedDevice: DetectedDevice | null;
   linkOnline: boolean;
-  needsLink: boolean;
-  scanHints: string[];
   onDisconnect: () => void;
   onConnect: () => void;
-  onDownloadLink: () => void;
   open?: boolean;
   onClose?: () => void;
 };
@@ -22,17 +17,12 @@ export default function PhoneConnection({
   status,
   connectedDevice,
   linkOnline,
-  needsLink,
-  scanHints,
   onDisconnect,
   onConnect,
-  onDownloadLink,
   open = true,
   onClose,
 }: Props) {
   const { t } = useLanguage();
-  const [copied, setCopied] = useState(false);
-  const isMac = /mac/i.test(navigator.userAgent);
 
   if (!open) return null;
 
@@ -71,56 +61,13 @@ export default function PhoneConnection({
                   ? t('usb.scanning_ports')
                   : linkOnline
                     ? t('usb.listening')
-                    : t('usb.link_offline')}
+                    : t('usb.plug_scan')}
             </div>
-
-            {needsLink && !linkOnline && (
-              <div className="phone-link-banner">
-                <p>{t('usb.link_needed')}</p>
-                {isMac ? (
-                  <>
-                    <p className="phone-link-mac-tip">{t('usb.mac_gatekeeper')}</p>
-                    <code className="phone-link-cmd">{getGeoLocaLinkTerminalCommand()}</code>
-                    <button
-                      type="button"
-                      className="btn btn-secondary phone-link-btn"
-                      onClick={() => {
-                        void copyGeoLocaLinkCommand().then((ok) => {
-                          setCopied(ok);
-                          if (ok) window.setTimeout(() => setCopied(false), 2500);
-                        });
-                      }}
-                    >
-                      {copied ? t('usb.copied') : t('usb.copy_terminal')}
-                    </button>
-                    <p className="phone-link-mac-tip">{t('usb.mac_terminal_steps')}</p>
-                  </>
-                ) : (
-                  <button type="button" className="btn btn-secondary phone-link-btn" onClick={onDownloadLink}>
-                    {t('usb.download_link')}
-                  </button>
-                )}
-              </div>
-            )}
-
-            {linkOnline && !needsLink && scanHints.length > 0 && (
-              <div className="phone-link-banner phone-link-banner--warn">
-                <p>{t('usb.no_device_title')}</p>
-                <ul className="phone-hint-list">
-                  {scanHints.map((hint) => (
-                    <li key={hint}>{hint}</li>
-                  ))}
-                </ul>
-                {isMac && (
-                  <p className="phone-link-mac-tip">{t('usb.restart_link')}</p>
-                )}
-              </div>
-            )}
 
             <ul className="phone-waiting-tips">
               <li>{t('usb.tip_cable')}</li>
               <li>{t('usb.tip_trust')}</li>
-              <li>{t('usb.tip_same_pc')}</li>
+              <li>{t('usb.tip_unlock')}</li>
             </ul>
 
             <button type="button" className="btn btn-primary phone-allow-btn" onClick={onConnect}>
