@@ -737,12 +737,25 @@
   cursor: pointer;
 }
 
-.phone-auto-scan {
-  margin: 0.5rem 0 0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--accent-bright);
-  animation: phone-pulse 2s var(--ease-smooth) infinite;
+.real-map-you-are-here {
+  position: absolute;
+  left: 1rem;
+  bottom: 6.5rem;
+  z-index: 8;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #93c5fd;
+  background: rgba(10, 12, 18, 0.88);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+}
+
+.phone-allow-btn {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 0.25rem;
 }
 
 .phone-usb-fail {

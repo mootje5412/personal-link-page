@@ -3,6 +3,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { attachAuthRoutes } from './auth-routes.js';
+import { attachUsbRoutes } from './usb-routes.js';
 
 const PORT = Number(process.env.PORT || 3001);
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -33,7 +34,7 @@ app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  res.setHeader('Permissions-Policy', 'geolocation=(self), microphone=(), camera=()');
   next();
 });
 
@@ -64,6 +65,7 @@ app.use('/api/auth/register', authLimiter);
 app.use('/api/auth/google', authLimiter);
 
 attachAuthRoutes(app, allowedOrigins);
+attachUsbRoutes(app);
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });

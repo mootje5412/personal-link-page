@@ -58,6 +58,7 @@ export default function Dashboard() {
             applyingLocation={phone.applyingLocation}
             scanning={phone.scanning}
             onDisconnect={phone.disconnect}
+            onRequestAccess={() => void phone.requestAccess()}
             onApplyLocation={phone.applyLocation}
           />
           {showWelcome && (

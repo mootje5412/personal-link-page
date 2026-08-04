@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { useEffect, useState } from 'react';
+import { CircleMarker, MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './RealMap.css';
@@ -16,14 +16,30 @@ type RealMapProps = {
   lng: number;
   zoom?: number;
   interactive?: boolean;
+  userLat?: number | null;
+  userLng?: number | null;
   onPick?: (lat: number, lng: number) => void;
 };
 
-function MapViewSync({ lat, lng, zoom }: { lat: number; lng: number; zoom: number }) {
+function MapViewSync({
+  lat,
+  lng,
+  zoom,
+  fly,
+}: {
+  lat: number;
+  lng: number;
+  zoom: number;
+  fly: boolean;
+}) {
   const map = useMap();
   useEffect(() => {
-    map.flyTo([lat, lng], zoom, { duration: 0.85 });
-  }, [lat, lng, zoom, map]);
+    if (fly) {
+      map.flyTo([lat, lng], zoom, { duration: 0.85 });
+    } else {
+      map.setView([lat, lng], zoom);
+    }
+  }, [lat, lng, zoom, fly, map]);
   return null;
 }
 
@@ -46,10 +62,20 @@ function MapClickHandler({
 export default function RealMap({
   lat,
   lng,
-  zoom = 3,
+  zoom = 4,
   interactive = true,
+  userLat,
+  userLng,
   onPick,
 }: RealMapProps) {
+  const [fly, setFly] = useState(true);
+
+  useEffect(() => {
+    setFly(true);
+    const t = window.setTimeout(() => setFly(false), 900);
+    return () => window.clearTimeout(t);
+  }, [lat, lng, zoom]);
+
   return (
     <div className="real-map-wrap">
       <MapContainer
@@ -75,11 +101,26 @@ export default function RealMap({
           pane="overlayPane"
           opacity={0.85}
         />
+        {userLat != null && userLng != null && (
+          <CircleMarker
+            center={[userLat, userLng]}
+            radius={8}
+            pathOptions={{
+              color: '#3b82f6',
+              fillColor: '#60a5fa',
+              fillOpacity: 0.9,
+              weight: 3,
+            }}
+          />
+        )}
         <Marker position={[lat, lng]} icon={pinIcon} />
-        <MapViewSync lat={lat} lng={lng} zoom={zoom} />
+        <MapViewSync lat={lat} lng={lng} zoom={zoom} fly={fly} />
         <MapClickHandler interactive={interactive} onPick={onPick} />
       </MapContainer>
       <div className="real-map-vignette" aria-hidden />
+      {userLat != null && userLng != null && (
+        <div className="real-map-you-are-here">Your location</div>
+      )}
     </div>
   );
 }

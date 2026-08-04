@@ -8,6 +8,7 @@ type Props = {
   connectedDevice: DetectedDevice | null;
   scanning: boolean;
   onDisconnect: () => void;
+  onRequestAccess?: () => void;
   open?: boolean;
   onClose?: () => void;
 };
@@ -17,6 +18,7 @@ export default function PhoneConnection({
   connectedDevice,
   scanning,
   onDisconnect,
+  onRequestAccess,
   open = true,
   onClose,
 }: Props) {
@@ -66,6 +68,12 @@ export default function PhoneConnection({
               <li>{t('usb.tip_cable')}</li>
               <li>{t('usb.tip_trust')}</li>
             </ul>
+
+            {onRequestAccess && status === 'waiting' && (
+              <button type="button" className="btn btn-primary phone-allow-btn" onClick={onRequestAccess}>
+                {t('usb.allow_usb')}
+              </button>
+            )}
           </div>
         )}
 

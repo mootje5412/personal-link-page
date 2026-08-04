@@ -162,8 +162,12 @@ def main():
     upload_dir(sftp, LOCAL_DIST, REMOTE_WEB)
 
     # API
-    run(client, f"mkdir -p {REMOTE_API} {REMOTE_DATA}")
+    run(client, f"mkdir -p {REMOTE_API} {REMOTE_DATA} /opt/geoloca-bridge")
     upload_dir(sftp, LOCAL_SERVER, REMOTE_API, skip={"node_modules", "data", ".env"})
+    bridge_local = ROOT / "bridge" / "usb_helper.py"
+    if bridge_local.is_file():
+        print("  bridge/usb_helper.py")
+        sftp.put(str(bridge_local), "/opt/geoloca-bridge/usb_helper.py")
     sftp.close()
 
     session_secret = secrets.token_hex(32)
@@ -194,6 +198,22 @@ fi""",
     run(client, f"cat > /etc/systemd/system/geoloca-api.service << 'EOF'\n{SYSTEMD_UNIT}EOF")
     run(client, "systemctl daemon-reload && systemctl enable geoloca-api && systemctl restart geoloca-api")
 
+    USB_HELPER_UNIT = """[Unit]
+Description=GeoLoca USB Helper
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/geoloca-bridge/usb_helper.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+"""
+    run(client, f"cat > /etc/systemd/system/geoloca-usb-helper.service << 'EOF'\n{USB_HELPER_UNIT}EOF")
+    run(client, "systemctl daemon-reload && systemctl enable geoloca-usb-helper && systemctl restart geoloca-usb-helper")
+
     run(client, SSL_SETUP.strip())
     run(client, f"cat > /etc/nginx/sites-available/geoloca << 'EOF'\n{NGINX_SITE}EOF")
     run(client, "ln -sf /etc/nginx/sites-available/geoloca /etc/nginx/sites-enabled/geoloca")
@@ -201,7 +221,9 @@ fi""",
 
     time.sleep(2)
     run(client, "systemctl is-active geoloca-api")
+    run(client, "systemctl is-active geoloca-usb-helper || true")
     run(client, "curl -sk https://127.0.0.1/api/health")
+    run(client, "curl -sk https://127.0.0.1/api/usb/scan")
     run(client, "curl -skI https://127.0.0.1/ | head -6")
     client.close()
     print(f"\nLive at https://{SERVER}/")

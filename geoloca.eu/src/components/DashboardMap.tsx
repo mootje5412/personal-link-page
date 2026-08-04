@@ -26,6 +26,7 @@ type Props = {
   applyingLocation: boolean;
   scanning: boolean;
   onDisconnect: () => void;
+  onRequestAccess: () => void;
   onApplyLocation: (country: string, lat: number, lng: number, label: string) => void;
 };
 
@@ -63,6 +64,7 @@ export default function DashboardMap({
   applyingLocation,
   scanning,
   onDisconnect,
+  onRequestAccess,
   onApplyLocation,
 }: Props) {
   const { t } = useLanguage();
@@ -71,12 +73,30 @@ export default function DashboardMap({
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showPhonePanel, setShowPhonePanel] = useState(false);
   const [mapZoom, setMapZoom] = useState(4);
+  const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [pin, setPin] = useState(() => {
     const c = countryCoords('Netherlands');
     return { lat: c.lat, lng: c.lng, label: 'Netherlands' };
   });
 
   const spot = MAP_SPOTS[country];
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setUserPos({ lat, lng });
+        setPin({ lat, lng, label: t('map.your_location') });
+        setMapZoom(12);
+      },
+      () => {
+        /* keep default pin */
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
+    );
+  }, [t]);
 
   useEffect(() => {
     const c = countryCoords(country);
@@ -149,6 +169,8 @@ export default function DashboardMap({
         lng={pin.lng}
         zoom={mapZoom}
         interactive={connected}
+        userLat={userPos?.lat ?? null}
+        userLng={userPos?.lng ?? null}
         onPick={handleMapPick}
       />
 
@@ -271,6 +293,7 @@ export default function DashboardMap({
           onDisconnect();
           setShowPhonePanel(true);
         }}
+        onRequestAccess={onRequestAccess}
         open={!connected || showPhonePanel}
         onClose={connected ? () => setShowPhonePanel(false) : undefined}
       />
