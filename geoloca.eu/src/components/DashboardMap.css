@@ -1,18 +1,13 @@
 .dash-map {
-  position: relative;
-  flex: 1;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
   background: #0a0d14;
   overflow: hidden;
 }
 
-.dash-map.waiting .dash-map-svg {
-  filter: saturate(0.65) brightness(0.75);
-}
-
 .dash-map-toolbar {
   position: absolute;
-  top: 1rem;
+  top: 5rem;
   left: 1rem;
   right: 1rem;
   z-index: 4;
@@ -28,11 +23,11 @@
   align-items: center;
   gap: 0.5rem;
   flex: 1;
-  max-width: 280px;
-  padding: 0.55rem 0.85rem;
-  background: rgba(10, 12, 18, 0.88);
+  max-width: 320px;
+  padding: 0.6rem 0.9rem;
+  background: rgba(10, 12, 18, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  border-radius: 11px;
   backdrop-filter: blur(12px);
   pointer-events: auto;
 }
@@ -45,7 +40,7 @@
 .dash-map-search input {
   width: 100%;
   padding: 0;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   font-weight: 500;
   color: var(--text);
   background: transparent;
@@ -53,17 +48,49 @@
   outline: none;
 }
 
-.dash-map-search input:disabled {
+.dash-map-search input::placeholder {
   color: var(--dim);
-  cursor: not-allowed;
+}
+
+.dash-map-results {
+  position: absolute;
+  top: 8.5rem;
+  left: 1rem;
+  z-index: 5;
+  width: min(320px, calc(100% - 2rem));
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  background: rgba(10, 12, 18, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+
+.dash-map-results button {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.dash-map-results button:hover {
+  background: rgba(99, 102, 241, 0.12);
 }
 
 .dash-map-layer {
-  padding: 0.35rem 0.65rem;
+  padding: 0.4rem 0.7rem;
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--muted);
-  background: rgba(10, 12, 18, 0.85);
+  background: rgba(10, 12, 18, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   backdrop-filter: blur(10px);
@@ -93,39 +120,23 @@
   }
 }
 
-.dash-map-wait-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  background:
-    repeating-linear-gradient(
-      -45deg,
-      transparent,
-      transparent 12px,
-      rgba(255, 255, 255, 0.015) 12px,
-      rgba(255, 255, 255, 0.015) 24px
-    ),
-    rgba(10, 10, 14, 0.35);
-  pointer-events: none;
-}
-
 .dash-map-countries {
   position: absolute;
   left: 1rem;
-  bottom: 1rem;
+  bottom: 5.5rem;
   z-index: 4;
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  max-width: min(360px, 70vw);
+  max-width: min(420px, 55vw);
 }
 
 .dash-map-tag {
-  padding: 0.35rem 0.65rem;
-  font-size: 0.72rem;
+  padding: 0.38rem 0.7rem;
+  font-size: 0.74rem;
   font-weight: 600;
   color: var(--muted);
-  background: rgba(10, 12, 18, 0.88);
+  background: rgba(10, 12, 18, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
   backdrop-filter: blur(10px);
@@ -136,7 +147,7 @@
     background var(--duration-normal) var(--ease-smooth);
 }
 
-.dash-map-tag:hover:not(:disabled) {
+.dash-map-tag:hover {
   color: var(--text);
   border-color: var(--accent-border);
 }
@@ -144,18 +155,13 @@
 .dash-map-tag.active {
   color: var(--accent-bright);
   border-color: var(--accent-border);
-  background: rgba(99, 102, 241, 0.12);
-}
-
-.dash-map-tag:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+  background: rgba(99, 102, 241, 0.14);
 }
 
 .dash-map-controls {
   position: absolute;
   right: 1rem;
-  bottom: 1rem;
+  bottom: 5.5rem;
   z-index: 4;
   display: flex;
   flex-direction: column;
@@ -163,27 +169,38 @@
 }
 
 .dash-map .map-ctrl {
-  width: 32px;
-  height: 32px;
-  font-size: 1rem;
-  background: rgba(10, 12, 18, 0.9);
-  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font-size: 1.05rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--muted);
+  background: rgba(10, 12, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    color var(--duration-normal) var(--ease-smooth),
+    border-color var(--duration-normal) var(--ease-smooth);
 }
 
-.dash-map .map-ctrl:disabled {
-  opacity: 0.4;
+.dash-map .map-ctrl:hover {
+  color: var(--text);
+  border-color: var(--accent-border);
 }
 
 .dash-map-coords {
   position: absolute;
-  left: 50%;
-  bottom: 1rem;
+  right: 1rem;
+  top: 5rem;
   z-index: 4;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.35rem 0.75rem;
+  padding: 0.4rem 0.75rem;
   font-size: 0.72rem;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
@@ -194,17 +211,67 @@
   backdrop-filter: blur(10px);
 }
 
+.dash-map-location-bar {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  background: rgba(10, 12, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.dash-map-location-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.dash-map-location-text strong {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.dash-map-apply {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 @media (max-width: 640px) {
+  .dash-map-toolbar {
+    top: 4.5rem;
+    flex-wrap: wrap;
+  }
+
+  .dash-map-coords {
+    top: auto;
+    bottom: 5.5rem;
+    left: 1rem;
+    right: auto;
+  }
+
   .dash-map-countries {
     display: none;
   }
 
-  .dash-map-toolbar {
+  .dash-map-location-bar {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .dash-map-search {
-    max-width: none;
+  .dash-map-apply {
+    width: 100%;
   }
 }

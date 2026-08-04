@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import DashboardMap from '../components/DashboardMap';
+import DashboardSettings from '../components/DashboardSettings';
 import './Dashboard.css';
 
 function trialDaysLeft(iso: string) {
@@ -8,8 +10,11 @@ function trialDaysLeft(iso: string) {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
 }
 
+type Tab = 'map' | 'settings';
+
 export default function Dashboard() {
   const { user, loading, logout } = useAuth();
+  const [tab, setTab] = useState<Tab>('map');
 
   if (loading) {
     return (
@@ -23,90 +28,61 @@ export default function Dashboard() {
 
   const firstName = user.name.split(' ')[0];
   const daysLeft = trialDaysLeft(user.trialEndsAt);
-  const connected = false;
 
   return (
     <div className="dashboard">
-      <header className="dash-header">
-        <Link to="/" className="dash-logo">
-          Geo<span>Loca</span>
-        </Link>
-
-        <div className="dash-header-center">
-          <p className="dash-welcome">
-            Welcome back, <strong>{firstName}</strong>
-          </p>
-          {user.trialActive && (
-            <span className="dash-trial-pill">
-              {daysLeft} day{daysLeft === 1 ? '' : 's'} left on trial
-            </span>
-          )}
-        </div>
-
-        <div className="dash-header-actions">
-          {user.avatar ? (
-            <img src={user.avatar} alt="" className="dash-avatar" />
-          ) : (
-            <span className="dash-avatar dash-avatar-fallback">{firstName.charAt(0)}</span>
-          )}
-          <button type="button" className="btn btn-secondary dash-logout-btn" onClick={() => logout()}>
-            Log out
-          </button>
-        </div>
-      </header>
-
-      <div className="dash-body">
-        <DashboardMap connected={connected} />
-
-        <aside className="dash-panel">
-          <div className={`dash-connect ${connected ? 'online' : 'waiting'}`}>
-            <div className="dash-connect-head">
-              <span className="dash-status-dot" />
-              <span className="dash-status-label">
-                {connected ? 'Connected to laptop' : 'Waiting to connect'}
+      {tab === 'map' ? (
+        <>
+          <DashboardMap />
+          <div className="dash-welcome-float">
+            <p>
+              Welcome, <strong>{firstName}</strong>
+            </p>
+            {user.trialActive && (
+              <span>
+                {daysLeft} day{daysLeft === 1 ? '' : 's'} left on trial
               </span>
-            </div>
-
-            {connected ? (
-              <>
-                <p className="dash-connect-text">
-                  Your laptop is linked. Pick a country on the map — your phone follows instantly.
-                </p>
-                <ul className="dash-connect-list">
-                  <li>
-                    <span>Laptop</span>
-                    <strong>Online</strong>
-                  </li>
-                  <li>
-                    <span>Phone</span>
-                    <strong>Ready</strong>
-                  </li>
-                </ul>
-              </>
-            ) : (
-              <>
-                <p className="dash-connect-text">
-                  Open <strong>GeoLoca desktop</strong> on your laptop and sign in with the same
-                  account. The map unlocks once your devices are paired.
-                </p>
-                <ol className="dash-connect-steps">
-                  <li>Download GeoLoca on your laptop</li>
-                  <li>Connect your phone via USB or Wi‑Fi</li>
-                  <li>Pick any country on the map</li>
-                </ol>
-                <button type="button" className="btn btn-primary dash-connect-btn">
-                  Download desktop app
-                </button>
-              </>
             )}
           </div>
+        </>
+      ) : (
+        <DashboardSettings user={user} onLogout={() => logout()} />
+      )}
 
-          <div className="dash-account-mini">
-            <span className="dash-account-label">Signed in as</span>
-            <strong>{user.email}</strong>
-          </div>
-        </aside>
-      </div>
+      <nav className="dash-tabs" aria-label="Dashboard navigation">
+        <Link to="/" className="dash-tabs-logo">
+          Geo<span>Loca</span>
+        </Link>
+        <div className="dash-tabs-pills">
+          <button
+            type="button"
+            className={`dash-tab ${tab === 'map' ? 'active' : ''}`}
+            onClick={() => setTab('map')}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path d="M2 5l6-3 6 3v8l-6 3-6-3V5Z" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M8 2v12M2 5l6 3 6-3" stroke="currentColor" strokeWidth="1.2" />
+            </svg>
+            Map
+          </button>
+          <button
+            type="button"
+            className={`dash-tab ${tab === 'settings' ? 'active' : ''}`}
+            onClick={() => setTab('settings')}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3" />
+              <path
+                d="M8 1.5v1.2M8 13.3v1.2M1.5 8h1.2M13.3 8h1.2M3.4 3.4l.85.85M11.75 11.75l.85.85M3.4 12.6l.85-.85M11.75 4.25l.85-.85"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+              />
+            </svg>
+            Settings
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }

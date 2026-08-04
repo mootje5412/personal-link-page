@@ -1,29 +1,37 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { COUNTRIES } from '../data/countries';
 import { MAP_SPOTS } from '../data/mapSpots';
 import './DashboardMap.css';
 
+type Country = (typeof COUNTRIES)[number];
+
 type Props = {
-  connected: boolean;
-  selectedCountry?: (typeof COUNTRIES)[number];
-  onSelectCountry?: (country: (typeof COUNTRIES)[number]) => void;
+  selectedCountry?: Country;
+  onSelectCountry?: (country: Country) => void;
 };
 
 export default function DashboardMap({
-  connected,
   selectedCountry = 'Netherlands',
   onSelectCountry,
 }: Props) {
-  const [country, setCountry] = useState(selectedCountry);
+  const [country, setCountry] = useState<Country>(selectedCountry);
+  const [query, setQuery] = useState('');
   const spot = MAP_SPOTS[country];
 
-  const pick = (c: (typeof COUNTRIES)[number]) => {
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return COUNTRIES;
+    return COUNTRIES.filter((c) => c.toLowerCase().includes(q));
+  }, [query]);
+
+  const pick = (c: Country) => {
     setCountry(c);
+    setQuery('');
     onSelectCountry?.(c);
   };
 
   return (
-    <div className={`dash-map ${connected ? 'connected' : 'waiting'}`}>
+    <div className="dash-map">
       <div className="dash-map-toolbar">
         <label className="dash-map-search">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
@@ -31,15 +39,27 @@ export default function DashboardMap({
             <path d="M9.5 9.5L12 12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
           </svg>
           <input
-            type="text"
-            value={country}
-            readOnly
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Search country…"
-            disabled={!connected}
+            aria-label="Search country"
           />
         </label>
-        <span className="dash-map-layer">Map</span>
+        <span className="dash-map-layer">Satellite</span>
       </div>
+
+      {query && filtered.length > 0 && (
+        <ul className="dash-map-results">
+          {filtered.slice(0, 6).map((c) => (
+            <li key={c}>
+              <button type="button" onClick={() => pick(c)}>
+                {c}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <svg className="dash-map-svg" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden>
         <defs>
@@ -86,25 +106,20 @@ export default function DashboardMap({
           <path d="M80 0 V240 M160 0 V240 M240 0 V240 M320 0 V240" />
         </g>
 
-        {connected && (
-          <g className="dash-map-pin" style={{ transform: `translate(${spot.x}px, ${spot.y}px)` }}>
-            <circle cx="0" cy="0" r="32" fill="url(#dash-map-glow)" className="dash-pin-glow" />
-            <circle cx="0" cy="0" r="18" fill="none" stroke="rgba(99,102,241,0.4)" strokeWidth="1.2" />
-            <circle cx="0" cy="0" r="6" fill="#6366f1" stroke="#fff" strokeWidth="2.5" />
-            <path d="M0 7 L-5 17 L5 17 Z" fill="#6366f1" />
-          </g>
-        )}
+        <g className="dash-map-pin" style={{ transform: `translate(${spot.x}px, ${spot.y}px)` }}>
+          <circle cx="0" cy="0" r="32" fill="url(#dash-map-glow)" className="dash-pin-glow" />
+          <circle cx="0" cy="0" r="18" fill="none" stroke="rgba(99,102,241,0.4)" strokeWidth="1.2" />
+          <circle cx="0" cy="0" r="6" fill="#6366f1" stroke="#fff" strokeWidth="2.5" />
+          <path d="M0 7 L-5 17 L5 17 Z" fill="#6366f1" />
+        </g>
       </svg>
 
-      {!connected && <div className="dash-map-wait-overlay" aria-hidden />}
-
       <div className="dash-map-countries">
-        {COUNTRIES.slice(0, 8).map((c) => (
+        {COUNTRIES.slice(0, 10).map((c) => (
           <button
             key={c}
             type="button"
             className={`dash-map-tag ${country === c ? 'active' : ''}`}
-            disabled={!connected}
             onClick={() => pick(c)}
           >
             {c}
@@ -113,21 +128,29 @@ export default function DashboardMap({
       </div>
 
       <div className="dash-map-controls">
-        <button type="button" className="map-ctrl" disabled={!connected} aria-hidden tabIndex={-1}>
+        <button type="button" className="map-ctrl" aria-label="Zoom in">
           +
         </button>
-        <button type="button" className="map-ctrl" disabled={!connected} aria-hidden tabIndex={-1}>
+        <button type="button" className="map-ctrl" aria-label="Zoom out">
           −
         </button>
       </div>
 
-      {connected && (
-        <div className="dash-map-coords">
-          <span>{spot.lat}</span>
-          <span>·</span>
-          <span>{spot.lng}</span>
+      <div className="dash-map-coords">
+        <span>{spot.lat}</span>
+        <span>·</span>
+        <span>{spot.lng}</span>
+      </div>
+
+      <div className="dash-map-location-bar">
+        <div className="dash-map-location-text">
+          <span className="dash-map-location-label">Selected</span>
+          <strong>{country}</strong>
         </div>
-      )}
+        <button type="button" className="btn btn-primary dash-map-apply">
+          Use this location
+        </button>
+      </div>
     </div>
   );
 }
