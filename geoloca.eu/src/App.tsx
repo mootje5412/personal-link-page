@@ -2,6 +2,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import { LanguageProvider } from './i18n/LanguageContext';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -30,11 +31,13 @@ function AppRoutes() {
 
 export default function App() {
   const app = (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
+    </LanguageProvider>
   );
 
   if (!googleClientId) return app;

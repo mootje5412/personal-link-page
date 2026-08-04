@@ -1,97 +1,185 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { COUNTRIES } from '../data/countries';
 import { MAP_SPOTS } from '../data/mapSpots';
 import type { AppliedLocation } from '../hooks/usePhoneConnection';
-import type { ConnectionStatus, IPhoneModel, SetupStep } from '../data/phones';
+import type { ConnectionStatus, DetectedDevice, SetupStep } from '../data/phones';
+import { useLanguage } from '../i18n/LanguageContext';
 import { countryCoords } from '../utils/countryCoords';
 import PhoneConnection from './PhoneConnection';
+import RealMap from './RealMap';
 import './DashboardMap.css';
 
 type Country = (typeof COUNTRIES)[number];
+
+type SearchResult = {
+  name: string;
+  lat: number;
+  lng: number;
+  label: string;
+};
 
 type Props = {
   connected: boolean;
   connectionStatus: ConnectionStatus;
   setupStep: SetupStep;
-  selectedPhone: IPhoneModel | null;
-  connectedPhone: IPhoneModel | null;
+  connectedDevice: DetectedDevice | null;
   appliedLocation: AppliedLocation | null;
   applyingLocation: boolean;
   usbError: string | null;
-  phones: IPhoneModel[];
-  onSelectPhone: (phone: IPhoneModel) => void;
+  bridgeOnline: boolean | null;
+  autoScanning: boolean;
   onNextStep: () => void;
   onPrevStep: () => void;
   onDetectUsb: () => void;
   onRetryUsb: () => void;
   onDisconnect: () => void;
-  onApplyLocation: (country: Country, lat: number, lng: number, label: string) => void;
+  onCheckBridge: () => void;
+  onApplyLocation: (country: string, lat: number, lng: number, label: string) => void;
 };
+
+async function searchPlaces(query: string): Promise<SearchResult[]> {
+  const q = query.trim();
+  if (q.length < 2) return [];
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/search');
+    url.searchParams.set('q', q);
+    url.searchParams.set('format', 'json');
+    url.searchParams.set('limit', '6');
+    url.searchParams.set('addressdetails', '0');
+    const res = await fetch(url.toString(), {
+      headers: { 'Accept-Language': 'en', 'User-Agent': 'GeoLoca/1.0 (https://geoloca.eu)' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as Array<{ display_name: string; lat: string; lon: string }>;
+    return data.map((item) => ({
+      name: item.display_name.split(',')[0],
+      lat: Number(item.lat),
+      lng: Number(item.lon),
+      label: item.display_name,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 export default function DashboardMap({
   connected,
   connectionStatus,
   setupStep,
-  selectedPhone,
-  connectedPhone,
+  connectedDevice,
   appliedLocation,
   applyingLocation,
   usbError,
-  phones,
-  onSelectPhone,
+  bridgeOnline,
+  autoScanning,
   onNextStep,
   onPrevStep,
   onDetectUsb,
   onRetryUsb,
   onDisconnect,
+  onCheckBridge,
   onApplyLocation,
 }: Props) {
+  const { t } = useLanguage();
   const [country, setCountry] = useState<Country>('Netherlands');
   const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showPhonePanel, setShowPhonePanel] = useState(false);
+  const [mapZoom, setMapZoom] = useState(4);
+  const [pin, setPin] = useState(() => {
+    const c = countryCoords('Netherlands');
+    return { lat: c.lat, lng: c.lng, label: 'Netherlands' };
+  });
+
   const spot = MAP_SPOTS[country];
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return COUNTRIES;
-    return COUNTRIES.filter((c) => c.toLowerCase().includes(q));
+  useEffect(() => {
+    const c = countryCoords(country);
+    setPin({ lat: c.lat, lng: c.lng, label: country });
+    setMapZoom(5);
+  }, [country]);
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void searchPlaces(query).then(setSearchResults);
+    }, 350);
+    return () => window.clearTimeout(timer);
   }, [query]);
 
-  const pick = (c: Country) => {
+  const filteredCountries = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return COUNTRIES.slice(0, 8);
+    return COUNTRIES.filter((c) => c.toLowerCase().includes(q)).slice(0, 8);
+  }, [query]);
+
+  const pickCountry = (c: Country) => {
     setCountry(c);
     setQuery('');
+    setSearchResults([]);
   };
 
-  const handleApply = async () => {
+  const pickSearch = (result: SearchResult) => {
+    setPin({ lat: result.lat, lng: result.lng, label: result.name });
+    setCountry(country);
+    setQuery('');
+    setSearchResults([]);
+    setMapZoom(8);
+  };
+
+  const handleMapPick = useCallback(
+    (lat: number, lng: number) => {
+      if (!connected) {
+        setShowPhonePanel(true);
+        return;
+      }
+      setPin({ lat, lng, label: `${lat.toFixed(4)}, ${lng.toFixed(4)}` });
+      setMapZoom(8);
+    },
+    [connected],
+  );
+
+  const handleApply = () => {
     if (!connected) {
       setShowPhonePanel(true);
       return;
     }
-    const coords = countryCoords(country);
-    onApplyLocation(country, coords.lat, coords.lng, coords.label);
+    onApplyLocation(pin.label, pin.lat, pin.lng, `${pin.lat.toFixed(3)}°, ${pin.lng.toFixed(3)}°`);
   };
 
   const statusLabel =
     connectionStatus === 'connected'
-      ? 'iPhone · USB connected'
+      ? t('conn.usb_connected')
       : connectionStatus === 'detecting_usb'
-        ? 'Scanning USB…'
+        ? t('conn.scanning')
         : connectionStatus === 'connecting'
-          ? 'Pairing iPhone…'
+          ? t('conn.pairing')
           : connectionStatus === 'usb_not_found'
-            ? 'USB not found'
-            : 'Connect iPhone via USB';
+            ? t('conn.not_found')
+            : t('conn.connect_usb');
 
   return (
     <div className="dash-map">
+      <RealMap
+        lat={pin.lat}
+        lng={pin.lng}
+        zoom={mapZoom}
+        interactive={connected}
+        onPick={handleMapPick}
+      />
+
       <button
         type="button"
         className={`dash-map-conn ${connectionStatus}`}
         onClick={() => setShowPhonePanel(true)}
-        aria-label="iPhone USB connection status"
+        aria-label="iPhone USB connection"
       >
         <span className="dash-map-conn-dot" aria-hidden />
-        {connectionStatus === 'connected' && <span className="dash-map-conn-usb">USB</span>}
+        {connectionStatus === 'connected' && <span className="dash-map-conn-usb">{t('conn.usb')}</span>}
         {statusLabel}
       </button>
 
@@ -105,115 +193,64 @@ export default function DashboardMap({
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search country…"
-            aria-label="Search country"
+            placeholder={t('map.search')}
+            aria-label={t('map.search')}
             disabled={!connected}
           />
         </label>
-        <span className="dash-map-layer">Satellite</span>
+        <div className="dash-map-zoom">
+          <button type="button" className="map-ctrl" onClick={() => setMapZoom((z) => Math.min(z + 1, 18))} disabled={!connected}>+</button>
+          <button type="button" className="map-ctrl" onClick={() => setMapZoom((z) => Math.max(z - 1, 2))} disabled={!connected}>−</button>
+        </div>
       </div>
 
-      {query && filtered.length > 0 && (
+      {query && (searchResults.length > 0 || filteredCountries.length > 0) && (
         <ul className="dash-map-results">
-          {filtered.slice(0, 6).map((c) => (
-            <li key={c}>
-              <button type="button" onClick={() => pick(c)} disabled={!connected}>
-                {c}
+          {searchResults.map((r) => (
+            <li key={`${r.lat}-${r.lng}`}>
+              <button type="button" onClick={() => pickSearch(r)} disabled={!connected}>
+                {r.label}
               </button>
             </li>
           ))}
+          {searchResults.length === 0 &&
+            filteredCountries.map((c) => (
+              <li key={c}>
+                <button type="button" onClick={() => pickCountry(c)} disabled={!connected}>
+                  {c}
+                </button>
+              </li>
+            ))}
         </ul>
       )}
-
-      <svg className="dash-map-svg" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden>
-        <defs>
-          <linearGradient id="dash-map-water" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#12161f" />
-            <stop offset="100%" stopColor="#0a0d14" />
-          </linearGradient>
-          <linearGradient id="dash-map-land" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#2a3140" />
-            <stop offset="100%" stopColor="#1c222d" />
-          </linearGradient>
-          <radialGradient id="dash-map-glow">
-            <stop offset="0%" stopColor="rgba(99,102,241,0.28)" />
-            <stop offset="100%" stopColor="rgba(99,102,241,0)" />
-          </radialGradient>
-          <pattern id="dash-map-grid" width="24" height="24" patternUnits="userSpaceOnUse">
-            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
-          </pattern>
-        </defs>
-
-        <rect width="400" height="240" fill="url(#dash-map-water)" />
-        <rect width="400" height="240" fill="url(#dash-map-grid)" />
-
-        <g opacity="0.95">
-          <path
-            d="M0 52 Q48 38 96 44 T192 40 T288 46 T400 52 L400 240 L0 240 Z"
-            fill="url(#dash-map-land)"
-            stroke="rgba(255,255,255,0.05)"
-          />
-          <path
-            d="M48 128 Q100 118 140 128 T210 134 T290 126 T368 132 L380 240 L36 240 Z"
-            fill="#1a2030"
-            opacity="0.88"
-          />
-          <path
-            d="M300 56 Q330 48 368 62 L382 128 Q352 138 320 128 T288 118 Z"
-            fill="#1e2533"
-            opacity="0.9"
-          />
-        </g>
-
-        <g stroke="rgba(255,255,255,0.04)" strokeWidth="0.8">
-          <path d="M0 88 H400 M0 128 H400 M0 168 H400" />
-          <path d="M80 0 V240 M160 0 V240 M240 0 V240 M320 0 V240" />
-        </g>
-
-        <g className="dash-map-pin" style={{ transform: `translate(${spot.x}px, ${spot.y}px)` }}>
-          <circle cx="0" cy="0" r="32" fill="url(#dash-map-glow)" className="dash-pin-glow" />
-          <circle cx="0" cy="0" r="18" fill="none" stroke="rgba(99,102,241,0.4)" strokeWidth="1.2" />
-          <circle cx="0" cy="0" r="6" fill="#6366f1" stroke="#fff" strokeWidth="2.5" />
-          <path d="M0 7 L-5 17 L5 17 Z" fill="#6366f1" />
-        </g>
-      </svg>
 
       {applyingLocation && (
         <div className="dash-map-spoof-badge dash-map-spoof-badge--applying">
           <span className="dash-map-spoof-spinner" aria-hidden />
-          Changing iPhone location via USB…
+          {t('map.applying')}
         </div>
       )}
 
       {appliedLocation && connected && !applyingLocation && (
         <div className="dash-map-spoof-badge">
           <span className="dash-map-spoof-dot" />
-          iPhone location changed · {appliedLocation.country}
+          {t('map.changed', { country: appliedLocation.country })}
           <span className="dash-map-spoof-device"> · {appliedLocation.label}</span>
         </div>
       )}
 
       <div className="dash-map-countries">
-        {COUNTRIES.slice(0, 10).map((c) => (
+        {COUNTRIES.slice(0, 8).map((c) => (
           <button
             key={c}
             type="button"
             className={`dash-map-tag ${country === c ? 'active' : ''}`}
-            onClick={() => pick(c)}
+            onClick={() => pickCountry(c)}
             disabled={!connected}
           >
             {c}
           </button>
         ))}
-      </div>
-
-      <div className="dash-map-controls">
-        <button type="button" className="map-ctrl" aria-label="Zoom in" disabled={!connected}>
-          +
-        </button>
-        <button type="button" className="map-ctrl" aria-label="Zoom out" disabled={!connected}>
-          −
-        </button>
       </div>
 
       <div className="dash-map-coords">
@@ -224,11 +261,11 @@ export default function DashboardMap({
 
       <div className="dash-map-location-bar">
         <div className="dash-map-location-text">
-          <span className="dash-map-location-label">Selected</span>
-          <strong>{country}</strong>
-          {connected && connectedPhone && (
+          <span className="dash-map-location-label">{t('map.selected')}</span>
+          <strong>{pin.label}</strong>
+          {connected && connectedDevice && (
             <span className="dash-map-location-device">
-              → {connectedPhone.name} via USB
+              {t('map.via_usb', { device: connectedDevice.name })}
             </span>
           )}
         </div>
@@ -239,21 +276,20 @@ export default function DashboardMap({
           disabled={applyingLocation}
         >
           {applyingLocation
-            ? 'Updating iPhone…'
+            ? t('map.updating')
             : connected
-              ? 'Change iPhone location'
-              : 'Connect iPhone via USB'}
+              ? t('map.change_location')
+              : t('map.connect_first')}
         </button>
       </div>
 
       <PhoneConnection
         status={connectionStatus}
         setupStep={setupStep}
-        phones={phones}
-        selectedPhone={selectedPhone}
-        connectedPhone={connectedPhone}
+        connectedDevice={connectedDevice}
         usbError={usbError}
-        onSelectPhone={onSelectPhone}
+        bridgeOnline={bridgeOnline}
+        autoScanning={autoScanning}
         onNextStep={onNextStep}
         onPrevStep={onPrevStep}
         onDetectUsb={onDetectUsb}
@@ -262,6 +298,7 @@ export default function DashboardMap({
           onDisconnect();
           setShowPhonePanel(true);
         }}
+        onCheckBridge={onCheckBridge}
         open={connectionStatus !== 'connected' || showPhonePanel}
         onClose={connectionStatus === 'connected' ? () => setShowPhonePanel(false) : undefined}
       />

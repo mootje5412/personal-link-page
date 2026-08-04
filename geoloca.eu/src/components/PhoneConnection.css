@@ -506,6 +506,50 @@
   min-height: 44px;
 }
 
+.phone-helper-banner {
+  margin-bottom: 0.85rem;
+  padding: 0.75rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: var(--radius-sm);
+}
+
+.phone-helper-banner p {
+  margin: 0 0 0.45rem;
+  font-size: 0.78rem;
+  color: #fca5a5;
+  line-height: 1.45;
+}
+
+.phone-helper-banner code {
+  display: block;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.72rem;
+  color: var(--accent-bright);
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  word-break: break-all;
+}
+
+.phone-helper-refresh {
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.phone-auto-scan {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-bright);
+  animation: phone-pulse 2s var(--ease-smooth) infinite;
+}
+
 .phone-usb-fail {
   display: grid;
   gap: 0.75rem;

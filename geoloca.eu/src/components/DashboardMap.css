@@ -9,7 +9,7 @@
   position: absolute;
   top: 5.25rem;
   right: 1rem;
-  z-index: 6;
+  z-index: 8;
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -92,7 +92,7 @@
   position: absolute;
   top: 7.5rem;
   left: 50%;
-  z-index: 5;
+  z-index: 8;
   transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
@@ -182,12 +182,18 @@
   top: 5rem;
   left: 1rem;
   right: 1rem;
-  z-index: 4;
+  z-index: 8;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
   pointer-events: none;
+}
+
+.dash-map-zoom {
+  display: flex;
+  gap: 0.35rem;
+  pointer-events: auto;
 }
 
 .dash-map-search {
@@ -228,7 +234,7 @@
   position: absolute;
   top: 8.5rem;
   left: 1rem;
-  z-index: 5;
+  z-index: 9;
   width: min(320px, calc(100% - 2rem));
   margin: 0;
   padding: 0.35rem;
@@ -296,7 +302,7 @@
   position: absolute;
   left: 1rem;
   bottom: 5.5rem;
-  z-index: 4;
+  z-index: 8;
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
@@ -368,7 +374,7 @@
   position: absolute;
   right: 1rem;
   top: 5rem;
-  z-index: 4;
+  z-index: 8;
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -388,7 +394,7 @@
   left: 1rem;
   right: 1rem;
   bottom: 1rem;
-  z-index: 4;
+  z-index: 8;
   display: flex;
   align-items: center;
   justify-content: space-between;

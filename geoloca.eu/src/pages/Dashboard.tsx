@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext';
 import DashboardMap from '../components/DashboardMap';
 import DashboardSettings from '../components/DashboardSettings';
 import { usePhoneConnection } from '../hooks/usePhoneConnection';
+import { useLanguage } from '../i18n/LanguageContext';
 import './Dashboard.css';
 
 function trialDaysLeft(iso: string) {
@@ -15,6 +16,7 @@ type Tab = 'map' | 'settings';
 
 export default function Dashboard() {
   const { user, loading, logout } = useAuth();
+  const { t } = useLanguage();
   const [tab, setTab] = useState<Tab>('map');
   const [showWelcome, setShowWelcome] = useState(true);
   const [welcomeLeaving, setWelcomeLeaving] = useState(false);
@@ -52,18 +54,18 @@ export default function Dashboard() {
             connected={phone.connected}
             connectionStatus={phone.status}
             setupStep={phone.setupStep}
-            selectedPhone={phone.selectedPhone}
-            connectedPhone={phone.connectedPhone}
+            connectedDevice={phone.connectedDevice}
             appliedLocation={phone.appliedLocation}
             applyingLocation={phone.applyingLocation}
             usbError={phone.usbError}
-            phones={phone.phones}
-            onSelectPhone={phone.selectPhone}
+            bridgeOnline={phone.bridgeOnline}
+            autoScanning={phone.autoScanning}
             onNextStep={phone.nextStep}
             onPrevStep={phone.prevStep}
             onDetectUsb={phone.detectUsb}
             onRetryUsb={phone.retryUsb}
             onDisconnect={phone.disconnect}
+            onCheckBridge={phone.checkBridge}
             onApplyLocation={phone.applyLocation}
           />
           {showWelcome && (
@@ -76,14 +78,16 @@ export default function Dashboard() {
               </p>
               {user.trialActive && (
                 <span>
-                  {daysLeft} day{daysLeft === 1 ? '' : 's'} left on trial
+                  {daysLeft === 1
+                    ? t('welcome.trial', { days: daysLeft })
+                    : t('welcome.trial_plural', { days: daysLeft })}
                 </span>
               )}
               <button
                 type="button"
                 className="dash-welcome-close"
                 onClick={() => setShowWelcome(false)}
-                aria-label="Dismiss welcome"
+                aria-label="Dismiss"
               >
                 ×
               </button>
@@ -108,7 +112,7 @@ export default function Dashboard() {
               <path d="M2 5l6-3 6 3v8l-6 3-6-3V5Z" stroke="currentColor" strokeWidth="1.3" />
               <path d="M8 2v12M2 5l6 3 6-3" stroke="currentColor" strokeWidth="1.2" />
             </svg>
-            Map
+            {t('nav.map')}
           </button>
           <button
             type="button"
@@ -124,7 +128,7 @@ export default function Dashboard() {
                 strokeLinecap="round"
               />
             </svg>
-            Settings
+            {t('nav.settings')}
           </button>
         </div>
       </nav>

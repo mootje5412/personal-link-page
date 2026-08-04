@@ -127,6 +127,50 @@
   width: 100%;
 }
 
+.lang-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.lang-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-normal) var(--ease-smooth),
+    background var(--duration-normal) var(--ease-smooth),
+    color var(--duration-normal) var(--ease-smooth);
+}
+
+.lang-option:hover {
+  color: var(--text);
+  border-color: var(--accent-border);
+}
+
+.lang-option.active {
+  color: var(--text);
+  border-color: var(--accent-border);
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.lang-flag {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.settings-block--language {
+  background: linear-gradient(160deg, rgba(99, 102, 241, 0.06), var(--surface));
+}
+
 @media (max-width: 768px) {
   .dash-settings-inner {
     padding: 5rem 1rem calc(6.5rem + env(safe-area-inset-bottom, 0px));
