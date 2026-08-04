@@ -1,0 +1,39 @@
+.countries {
+  border-top: 1px solid var(--border);
+}
+
+.country-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  justify-content: center;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+}
+
+.country-tag {
+  padding: 0.48rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition:
+    color var(--duration-normal) var(--ease-smooth),
+    border-color var(--duration-normal) var(--ease-smooth),
+    background var(--duration-normal) var(--ease-smooth),
+    transform var(--duration-normal) var(--ease-out);
+}
+
+.country-tag:hover {
+  color: var(--text);
+  border-color: var(--accent-border);
+  background: var(--accent-dim);
+  transform: translateY(-1px);
+}

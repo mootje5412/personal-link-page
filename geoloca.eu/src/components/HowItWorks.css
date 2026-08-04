@@ -1,0 +1,86 @@
+.how {
+  background: var(--bg-soft);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.steps {
+  display: grid;
+  gap: 1rem;
+  position: relative;
+}
+
+.step-card {
+  position: relative;
+  padding: 1.5rem 1.5rem 1.5rem 4rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition:
+    border-color var(--duration-normal) var(--ease-smooth),
+    transform var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-smooth);
+}
+
+.step-card:hover {
+  border-color: var(--accent-border);
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.2);
+}
+
+.step-num {
+  position: absolute;
+  left: 1.25rem;
+  top: 1.35rem;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--accent-bright);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-border);
+  border-radius: 9px;
+}
+
+.step-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.step-card p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+@media (min-width: 768px) {
+  .steps {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+  }
+
+  .steps::before {
+    content: '';
+    position: absolute;
+    top: 2.5rem;
+    left: 18%;
+    right: 18%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-border), transparent);
+    pointer-events: none;
+  }
+
+  .step-card {
+    padding: 1.5rem;
+    padding-top: 3.35rem;
+  }
+
+  .step-num {
+    left: 1.25rem;
+    top: 1.25rem;
+  }
+}

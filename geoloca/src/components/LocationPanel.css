@@ -1,0 +1,127 @@
+.location-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.panel-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-status {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: var(--text-2);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.dot.live {
+  background: var(--go);
+  box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.2);
+}
+
+.source-tag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.location-info {
+  padding: 0.65rem 0.7rem;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.coords {
+  margin: 0;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.88rem;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.address {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-2);
+}
+
+.empty-hint {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--text-2);
+}
+
+.scope-line {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-3);
+  line-height: 1.35;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.btn {
+  border-radius: 10px;
+  padding: 0.72rem 0.85rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition: opacity 0.12s;
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn:active:not(:disabled) {
+  opacity: 0.8;
+}
+
+.btn.main {
+  background: var(--go);
+  color: #0d0d0d;
+}
+
+.btn.stop {
+  background: var(--stop);
+  color: #fff;
+}
+
+.btn.subtle {
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-weight: 500;
+}
+
+.location-panel.is-active .location-info {
+  border-color: rgba(46, 204, 113, 0.35);
+}

@@ -1,0 +1,73 @@
+.scope-notice {
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.scope-notice summary {
+  font-size: 0.78rem;
+  color: var(--text-2);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.scope-notice summary::-webkit-details-marker {
+  display: none;
+}
+
+.scope-notice summary::after {
+  content: ' +';
+  color: var(--text-3);
+}
+
+.scope-notice[open] summary::after {
+  content: ' −';
+}
+
+.scope-body {
+  margin-top: 0.65rem;
+  padding: 0.75rem;
+  background: var(--surface-raised);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.scope-body p {
+  margin: 0 0 0.55rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.scope-body p:last-child {
+  margin-bottom: 0;
+}
+
+.scope-body strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.scope-sub {
+  margin-top: 0.35rem !important;
+  color: var(--text) !important;
+  font-weight: 500;
+}
+
+.scope-foot {
+  margin-top: 0.5rem !important;
+  font-size: 0.72rem !important;
+  color: var(--text-3) !important;
+}
+
+.scope-body ol {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.1rem;
+  font-size: 0.76rem;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.scope-body li + li {
+  margin-top: 0.2rem;
+}
