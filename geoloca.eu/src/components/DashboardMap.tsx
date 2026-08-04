@@ -27,6 +27,8 @@ type Props = {
   linkOnline: boolean;
   bridgeStarting: boolean;
   locationError: string | null;
+  developerStatus: { required: boolean; enabled: boolean | null; message: string; ios?: string; canUsbEnable?: boolean } | null;
+  onEnableDevMode: () => void;
   needsStartLink: boolean;
   onDisconnect: () => void;
   onConnect: () => void;
@@ -69,6 +71,8 @@ export default function DashboardMap({
   linkOnline,
   bridgeStarting,
   locationError,
+  developerStatus,
+  onEnableDevMode,
   needsStartLink,
   onDisconnect,
   onConnect,
@@ -251,8 +255,19 @@ export default function DashboardMap({
         </div>
       )}
 
-      {connected && !applyingLocation && (
-        <div className="dash-map-dev-hint">{t('map.dev_mode_hint')}</div>
+      {connected && developerStatus?.required && developerStatus.enabled === false && !applyingLocation && (
+        <div className="dash-map-dev-hint">
+          <p>{developerStatus.message}</p>
+          {developerStatus.canUsbEnable && (
+            <button type="button" className="btn btn-secondary dash-map-dev-btn" onClick={onEnableDevMode}>
+              {t('map.enable_dev_mode')}
+            </button>
+          )}
+        </div>
+      )}
+
+      {connected && developerStatus?.required && developerStatus.enabled === true && !applyingLocation && (
+        <div className="dash-map-dev-hint dash-map-dev-hint--ok">{developerStatus.message}</div>
       )}
 
       <div className="dash-map-countries">

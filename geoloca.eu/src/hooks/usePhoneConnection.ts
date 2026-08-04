@@ -4,6 +4,8 @@ import {
   burstScanLocal,
   isLinkOnline,
   isMacDesktop,
+  enableDeveloperMode,
+  fetchDeveloperStatus,
   prepareLocationTools,
   requestWebUsb,
   scanLocalUsb,
@@ -29,6 +31,13 @@ export function usePhoneConnection() {
   const [linkOnline, setLinkOnline] = useState(false);
   const [bridgeStarting, setBridgeStarting] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [developerStatus, setDeveloperStatus] = useState<{
+    required: boolean;
+    enabled: boolean | null;
+    message: string;
+    ios?: string;
+    canUsbEnable?: boolean;
+  } | null>(null);
   const scanRef = useRef<number | null>(null);
   const connectedRef = useRef(false);
 
@@ -48,7 +57,17 @@ export function usePhoneConnection() {
       setAppliedLocation(null);
       setLocationError(null);
       stopScan();
-      void prepareLocationTools();
+      void prepareLocationTools().then(() =>
+        fetchDeveloperStatus().then((s) => {
+          if (s) setDeveloperStatus({
+            required: Boolean(s.required),
+            enabled: s.enabled ?? null,
+            message: s.message || '',
+            ios: s.ios,
+            canUsbEnable: s.can_usb_enable,
+          });
+        }),
+      );
     },
     [stopScan],
   );
@@ -159,6 +178,20 @@ export function usePhoneConnection() {
     [startScan],
   );
 
+  const enableDevMode = useCallback(async () => {
+    const result = await enableDeveloperMode();
+    if (result?.message) setLocationError(result.ok ? null : result.message);
+    const status = await fetchDeveloperStatus();
+    if (status) setDeveloperStatus({
+      required: Boolean(status.required),
+      enabled: status.enabled ?? null,
+      message: status.message || '',
+      ios: status.ios,
+      canUsbEnable: status.can_usb_enable,
+    });
+    return Boolean(result?.ok);
+  }, []);
+
   return {
     status,
     connectedDevice,
@@ -167,11 +200,13 @@ export function usePhoneConnection() {
     linkOnline,
     bridgeStarting,
     locationError,
+    developerStatus,
     needsStartLink: !linkOnline && isMacDesktop(),
     connected: status === 'connected',
     disconnect,
     applyLocation,
     connectIphone,
     waitForBridge,
+    enableDevMode,
   };
 }

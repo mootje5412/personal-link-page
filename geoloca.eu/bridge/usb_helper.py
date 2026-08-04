@@ -18,7 +18,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
 PORT = 7429
-VERSION = 8
+VERSION = 9
 _SCAN_CACHE: tuple[float, dict] | None = None
 _SCAN_CACHE_TTL = 0.5
 _TOOLS_READY = False
@@ -337,6 +337,75 @@ def developer_mode_hint(text: str) -> bool:
     )
 
 
+def developer_mode_status() -> dict:
+    ios = get_ios_version()
+    if ios and ios[0] < 16:
+        return {"required": False, "enabled": True, "ios": f"{ios[0]}.{ios[1]}", "message": "Developer Mode not needed on your iOS version"}
+
+    if not pmd3_ready():
+        return {"required": True, "enabled": None, "message": "Connect GeoLoca Link first"}
+
+    code, out = run_cmd(pmd3_cmd("mounter", "query-developer-mode-status"), timeout=25)
+    enabled = code == 0 and "enabled" in out.lower() and "disabled" not in out.lower()
+    if code == 0 and "disabled" in out.lower():
+        enabled = False
+
+    ios_label = f"{ios[0]}.{ios[1]}" if ios else "unknown"
+    if enabled:
+        return {"required": True, "enabled": True, "ios": ios_label, "message": "Developer Mode is ON — ready to change GPS"}
+
+    if ios and ios[0] >= 17:
+        msg = (
+            "Developer Mode is hidden until you open Xcode once (free from App Store), "
+            "plug in your iPhone, and accept the prompt. Then it appears under "
+            "Settings → Privacy & Security → Developer Mode."
+        )
+    else:
+        msg = "Developer Mode is OFF — tap Enable via USB below (iPhone will restart)"
+
+    return {"required": True, "enabled": False, "ios": ios_label, "message": msg, "raw": out}
+
+
+def enable_developer_mode() -> dict:
+    ios = get_ios_version()
+    if ios and ios[0] < 16:
+        return {"ok": True, "message": "Your iPhone does not need Developer Mode"}
+
+    if not pmd3_ready():
+        return {"ok": False, "message": "Start GeoLoca Link in Terminal first"}
+
+    status = developer_mode_status()
+    if status.get("enabled"):
+        return {"ok": True, "message": "Developer Mode is already on"}
+
+    if ios and ios[0] >= 17:
+        return {
+            "ok": False,
+            "needs_xcode": True,
+            "message": (
+                "On iOS 17+, Apple requires Xcode once: install Xcode from App Store (free), "
+                "open it, plug in iPhone via USB — Xcode will ask to enable Developer Mode. "
+                "After that it shows in Settings → Privacy & Security."
+            ),
+        }
+
+    code, out = run_cmd(pmd3_cmd("amfi", "enable-developer-mode"), timeout=90)
+    if code == 0:
+        return {
+            "ok": True,
+            "message": "iPhone is restarting. After reboot: Settings → Privacy & Security → Developer Mode → ON",
+        }
+
+    lower = out.lower()
+    if "passcode" in lower:
+        return {
+            "ok": False,
+            "message": "Remove iPhone passcode temporarily, try again, then turn passcode back on after Developer Mode is enabled",
+        }
+
+    return {"ok": False, "message": out or "Could not enable — open Xcode on your Mac and plug in iPhone once"}
+
+
 def set_via_pymobiledevice3(lat: float, lng: float, lat_s: str, lng_s: str) -> tuple[bool, str]:
     if not pmd3_ready():
         return False, "Location tools missing"
@@ -348,6 +417,11 @@ def set_via_pymobiledevice3(lat: float, lng: float, lat_s: str, lng_s: str) -> t
     ios = get_ios_version()
     ios_major = ios[0] if ios else 17
     use_dvt = ios_major >= 17
+
+    if ios_major >= 16:
+        dm = developer_mode_status()
+        if dm.get("required") and dm.get("enabled") is False:
+            return False, dm.get("message") or "Developer Mode must be ON to change iPhone GPS"
 
     ok, mount_out = mount_developer_image()
     if not ok:
@@ -468,10 +542,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, detect_iphone_usb())
         if path in ("/tools/prepare", "/api/tools/prepare"):
             return self._json(200, prepare_location())
+        if path in ("/developer/status", "/api/developer/status"):
+            return self._json(200, developer_mode_status())
         return self._json(404, {"error": "not_found"})
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if path in ("/developer/enable", "/api/developer/enable"):
+            return self._json(200, enable_developer_mode())
         if path not in ("/location", "/api/location"):
             return self._json(404, {"error": "not_found"})
         length = int(self.headers.get("Content-Length", 0))

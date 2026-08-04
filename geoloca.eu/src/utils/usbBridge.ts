@@ -91,6 +91,23 @@ export async function prepareLocationTools(): Promise<void> {
   await localFetch('/tools/prepare');
 }
 
+export type DeveloperStatus = {
+  required?: boolean;
+  enabled?: boolean | null;
+  ios?: string;
+  can_usb_enable?: boolean;
+  message?: string;
+  needs_xcode?: boolean;
+};
+
+export async function fetchDeveloperStatus(): Promise<DeveloperStatus | null> {
+  return localFetch<DeveloperStatus>('/developer/status');
+}
+
+export async function enableDeveloperMode(): Promise<{ ok?: boolean; message?: string; needs_xcode?: boolean } | null> {
+  return localFetch('/developer/enable', { method: 'POST', body: '{}' });
+}
+
 function deviceFromUsb(usbDevice: USBDevice): DetectedDevice {
   const name = usbDevice.productName || 'iPhone';
   return { name, model: name, connection: 'usb' };

@@ -31,6 +31,7 @@ const en = {
   'map.applying': 'Changing iPhone location via USB…',
   'map.changed': 'iPhone location changed · {country}',
   'map.dev_mode_hint': 'iOS 17+ needs Developer Mode ON (Settings → Privacy & Security → Developer Mode). Restart iPhone after enabling. Then check Apple Maps first.',
+  'map.enable_dev_mode': 'Enable Developer Mode via USB',
   'map.your_location': 'Your location',
   'settings.title': 'Settings',
   'settings.subtitle': 'Manage your GeoLoca account',
