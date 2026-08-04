@@ -5,10 +5,10 @@
   right: 0;
   height: calc(56px + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
-  background: rgba(0, 0, 0, 0.92);
+  background: rgba(0, 0, 0, 0.95);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: space-around;
@@ -20,7 +20,7 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.45);
   text-decoration: none;
   font-size: 10px;
   font-weight: 500;
@@ -45,14 +45,14 @@
 .create-btn {
   width: 44px;
   height: 30px;
-  background: linear-gradient(135deg, #25f4ee 0%, #fe2c55 100%);
+  background: #fff;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 22px;
   font-weight: 300;
-  color: #fff;
+  color: #000;
   line-height: 1;
 }
 
@@ -61,7 +61,8 @@
   height: 26px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  filter: grayscale(100%);
 }
 
 .nav-item.active .nav-avatar {

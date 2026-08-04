@@ -9,8 +9,8 @@
 }
 
 .feed-state button {
-  background: #fe2c55;
-  color: #fff;
+  background: #fff;
+  color: #000;
   border: none;
   padding: 10px 24px;
   border-radius: 4px;
@@ -22,7 +22,7 @@
   width: 36px;
   height: 36px;
   border: 3px solid rgba(255, 255, 255, 0.15);
-  border-top-color: #fe2c55;
+  border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -54,9 +54,10 @@
 }
 
 .guest-banner a {
-  color: #fe2c55;
+  color: #fff;
   font-weight: 700;
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
   font-size: 14px;
   white-space: nowrap;
 }

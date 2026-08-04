@@ -15,8 +15,8 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse at 20% 20%, rgba(254, 44, 85, 0.25) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, rgba(37, 244, 238, 0.2) 0%, transparent 50%),
+    radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, 0.04) 0%, transparent 55%),
+    radial-gradient(ellipse at 70% 80%, rgba(255, 255, 255, 0.03) 0%, transparent 55%),
     #000;
 }
 
@@ -24,11 +24,10 @@
   position: relative;
   width: 100%;
   max-width: 400px;
-  background: rgba(22, 24, 35, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0a0a0a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   padding: 32px 24px;
-  backdrop-filter: blur(20px);
 }
 
 .auth-logo {
@@ -42,10 +41,7 @@
 .logo-icon {
   font-size: 36px;
   font-weight: 300;
-  background: linear-gradient(135deg, #25f4ee, #fe2c55);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #fff;
 }
 
 .auth-logo h1 {
@@ -53,11 +49,12 @@
   font-size: 32px;
   font-weight: 800;
   letter-spacing: -0.5px;
+  color: #fff;
 }
 
 .auth-subtitle {
   text-align: center;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.55);
   margin: 0 0 28px;
   font-size: 15px;
 }
@@ -83,12 +80,12 @@
 .auth-form label em {
   font-style: normal;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.35);
 }
 
 .auth-form input {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #111;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   padding: 12px 14px;
   color: #fff;
@@ -98,17 +95,17 @@
 }
 
 .auth-form input:focus {
-  border-color: rgba(254, 44, 85, 0.6);
+  border-color: #fff;
 }
 
 .auth-form input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.25);
 }
 
 .auth-error {
-  background: rgba(254, 44, 85, 0.15);
-  border: 1px solid rgba(254, 44, 85, 0.4);
-  color: #ff6b8a;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
   padding: 10px 14px;
   border-radius: 8px;
   font-size: 14px;
@@ -116,8 +113,8 @@
 
 .auth-submit {
   margin-top: 8px;
-  background: #fe2c55;
-  color: #fff;
+  background: #fff;
+  color: #000;
   border: none;
   border-radius: 4px;
   padding: 14px;
@@ -128,7 +125,7 @@
 }
 
 .auth-submit:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -140,11 +137,12 @@
   text-align: center;
   margin: 24px 0 0;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .auth-switch a {
-  color: #fe2c55;
+  color: #fff;
   font-weight: 600;
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }

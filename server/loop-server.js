@@ -67,6 +67,8 @@ app.use(cors({
   origin: process.env.CLIENT_ORIGIN?.split(',') || [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
+    'https://109.71.252.128',
+    'http://109.71.252.128',
   ],
   credentials: true,
 }))
@@ -112,7 +114,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(trimmedPass, 12)
-    const avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(trimmedUser)}`
+    const avatarUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(trimmedUser)}&backgroundColor=000000&textColor=ffffff`
 
     const user = createUser({
       username: trimmedUser,

@@ -75,8 +75,8 @@
   transform: translateX(-50%);
   width: 22px;
   height: 22px;
-  background: #fe2c55;
-  color: #fff;
+  background: #fff;
+  color: #000;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -109,7 +109,11 @@
 }
 
 .sidebar-action.liked {
-  color: #fe2c55;
+  color: #fff;
+}
+
+.sidebar-action.liked svg {
+  fill: #fff;
 }
 
 .video-info {

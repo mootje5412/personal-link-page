@@ -9,7 +9,7 @@
     "dev:all": "npm run dev:server --prefix server & npm run dev",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview",
+    "deploy:loop": "python3 deploy_loop.py",
     "start:server": "node loop-server.js"
   },
   "dependencies": {
