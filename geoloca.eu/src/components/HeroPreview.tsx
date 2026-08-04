@@ -23,7 +23,7 @@ export default function HeroPreview({ country }: Props) {
 
       <div className="hero-card-header">
         <span className="hero-card-title">GeoLoca desktop</span>
-        <span className="hero-card-status">Connected</span>
+        <span className="hero-card-status">USB connected</span>
       </div>
 
       <div className="hero-preview-rows">

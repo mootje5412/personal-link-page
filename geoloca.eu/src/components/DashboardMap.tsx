@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { COUNTRIES } from '../data/countries';
 import { MAP_SPOTS } from '../data/mapSpots';
-import type { ConnectionStatus, PhoneDevice } from '../data/phones';
+import type { AppliedLocation } from '../hooks/usePhoneConnection';
+import type { ConnectionStatus, IPhoneModel, SetupStep } from '../data/phones';
+import { countryCoords } from '../utils/countryCoords';
 import PhoneConnection from './PhoneConnection';
 import './DashboardMap.css';
 
@@ -10,25 +12,37 @@ type Country = (typeof COUNTRIES)[number];
 type Props = {
   connected: boolean;
   connectionStatus: ConnectionStatus;
-  selectedPhone: PhoneDevice | null;
-  connectedPhone: PhoneDevice | null;
-  appliedCountry: string | null;
-  phones: PhoneDevice[];
-  onSelectPhone: (phone: PhoneDevice) => void;
-  onConnect: () => void;
+  setupStep: SetupStep;
+  selectedPhone: IPhoneModel | null;
+  connectedPhone: IPhoneModel | null;
+  appliedLocation: AppliedLocation | null;
+  applyingLocation: boolean;
+  usbError: string | null;
+  phones: IPhoneModel[];
+  onSelectPhone: (phone: IPhoneModel) => void;
+  onNextStep: () => void;
+  onPrevStep: () => void;
+  onDetectUsb: () => void;
+  onRetryUsb: () => void;
   onDisconnect: () => void;
-  onApplyLocation: (country: Country) => void;
+  onApplyLocation: (country: Country, lat: number, lng: number, label: string) => void;
 };
 
 export default function DashboardMap({
   connected,
   connectionStatus,
+  setupStep,
   selectedPhone,
   connectedPhone,
-  appliedCountry,
+  appliedLocation,
+  applyingLocation,
+  usbError,
   phones,
   onSelectPhone,
-  onConnect,
+  onNextStep,
+  onPrevStep,
+  onDetectUsb,
+  onRetryUsb,
   onDisconnect,
   onApplyLocation,
 }: Props) {
@@ -48,20 +62,25 @@ export default function DashboardMap({
     setQuery('');
   };
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!connected) {
       setShowPhonePanel(true);
       return;
     }
-    onApplyLocation(country);
+    const coords = countryCoords(country);
+    onApplyLocation(country, coords.lat, coords.lng, coords.label);
   };
 
   const statusLabel =
     connectionStatus === 'connected'
-      ? 'Successfully connected'
-      : connectionStatus === 'connecting'
-        ? 'Connecting…'
-        : 'Waiting to be connected';
+      ? 'iPhone · USB connected'
+      : connectionStatus === 'detecting_usb'
+        ? 'Scanning USB…'
+        : connectionStatus === 'connecting'
+          ? 'Pairing iPhone…'
+          : connectionStatus === 'usb_not_found'
+            ? 'USB not found'
+            : 'Connect iPhone via USB';
 
   return (
     <div className="dash-map">
@@ -69,9 +88,10 @@ export default function DashboardMap({
         type="button"
         className={`dash-map-conn ${connectionStatus}`}
         onClick={() => setShowPhonePanel(true)}
-        aria-label="Phone connection status"
+        aria-label="iPhone USB connection status"
       >
         <span className="dash-map-conn-dot" aria-hidden />
+        {connectionStatus === 'connected' && <span className="dash-map-conn-usb">USB</span>}
         {statusLabel}
       </button>
 
@@ -158,11 +178,18 @@ export default function DashboardMap({
         </g>
       </svg>
 
-      {appliedCountry && connected && (
+      {applyingLocation && (
+        <div className="dash-map-spoof-badge dash-map-spoof-badge--applying">
+          <span className="dash-map-spoof-spinner" aria-hidden />
+          Changing iPhone location via USB…
+        </div>
+      )}
+
+      {appliedLocation && connected && !applyingLocation && (
         <div className="dash-map-spoof-badge">
           <span className="dash-map-spoof-dot" />
-          Spoofing {appliedCountry}
-          {connectedPhone && <span className="dash-map-spoof-device"> · {connectedPhone.name}</span>}
+          iPhone location changed · {appliedLocation.country}
+          <span className="dash-map-spoof-device"> · {appliedLocation.label}</span>
         </div>
       )}
 
@@ -199,28 +226,43 @@ export default function DashboardMap({
         <div className="dash-map-location-text">
           <span className="dash-map-location-label">Selected</span>
           <strong>{country}</strong>
+          {connected && connectedPhone && (
+            <span className="dash-map-location-device">
+              → {connectedPhone.name} via USB
+            </span>
+          )}
         </div>
         <button
           type="button"
           className={`btn btn-primary dash-map-apply ${connected ? 'ready' : ''}`}
           onClick={handleApply}
+          disabled={applyingLocation}
         >
-          {connected ? 'Use this location' : 'Connect phone first'}
+          {applyingLocation
+            ? 'Updating iPhone…'
+            : connected
+              ? 'Change iPhone location'
+              : 'Connect iPhone via USB'}
         </button>
       </div>
 
       <PhoneConnection
         status={connectionStatus}
+        setupStep={setupStep}
         phones={phones}
         selectedPhone={selectedPhone}
         connectedPhone={connectedPhone}
+        usbError={usbError}
         onSelectPhone={onSelectPhone}
-        onConnect={onConnect}
+        onNextStep={onNextStep}
+        onPrevStep={onPrevStep}
+        onDetectUsb={onDetectUsb}
+        onRetryUsb={onRetryUsb}
         onDisconnect={() => {
           onDisconnect();
           setShowPhonePanel(true);
         }}
-        open={connectionStatus === 'waiting' || showPhonePanel}
+        open={connectionStatus !== 'connected' || showPhonePanel}
         onClose={connectionStatus === 'connected' ? () => setShowPhonePanel(false) : undefined}
       />
     </div>

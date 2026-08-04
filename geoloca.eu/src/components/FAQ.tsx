@@ -16,12 +16,12 @@ const faqs = [
     a: 'Yes. GeoLoca changes your phone GPS. Any app that reads location will show where you picked.',
   },
   {
-    q: 'Why do I need a laptop?',
-    a: 'GeoLoca runs on your laptop and sends the location to your phone over USB or Wi‑Fi. Both devices work together.',
+    q: 'Why USB only?',
+    a: 'iPhone location spoofing only works over a USB cable. Connect your iPhone, tap Trust, and GeoLoca sends the new GPS coordinates directly — Wi‑Fi connections are not supported.',
   },
   {
-    q: 'Android and iPhone?',
-    a: 'Both supported. Android has full features. iPhone works over USB with the desktop app.',
+    q: 'Does it work with iPhone?',
+    a: 'Yes — iPhone only. Plug in with USB, follow the 4 setup steps in the dashboard, then pick any country. Snap, Maps, and every other app follow your spoofed location.',
   },
   {
     q: 'Can I cancel?',

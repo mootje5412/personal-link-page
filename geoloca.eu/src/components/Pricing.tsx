@@ -6,7 +6,7 @@ const plans = [
     price: '€0',
     period: '3 days',
     desc: 'Full access. No credit card to start.',
-    features: ['All countries', 'Snap & Google Maps', 'USB + Wi‑Fi', 'Every feature unlocked'],
+    features: ['All countries', 'Snap & Google Maps', 'iPhone · USB only', 'Every feature unlocked'],
     cta: 'Start free trial',
     featured: true,
     badge: 'Start here',
@@ -86,7 +86,7 @@ export default function Pricing() {
         </div>
 
         <p className="pricing-foot">
-          Android &amp; iPhone · EUR pricing · Cancel anytime from your account
+          iPhone · USB only · EUR pricing · Cancel anytime from your account
         </p>
       </div>
     </section>

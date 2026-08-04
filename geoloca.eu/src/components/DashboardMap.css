@@ -38,6 +38,27 @@
   border-color: rgba(34, 197, 94, 0.3);
 }
 
+.dash-map-conn-usb {
+  padding: 0.12rem 0.4rem;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #052e16;
+  background: #22c55e;
+  border-radius: 4px;
+}
+
+.dash-map-conn.detecting_usb,
+.dash-map-conn.connecting {
+  color: var(--accent-bright);
+  border-color: rgba(99, 102, 241, 0.35);
+}
+
+.dash-map-conn.usb_not_found {
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
 .dash-map-conn-dot {
   width: 7px;
   height: 7px;
@@ -95,9 +116,31 @@
   box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
 }
 
+.dash-map-spoof-badge--applying {
+  color: var(--accent-bright);
+  border-color: rgba(99, 102, 241, 0.35);
+}
+
+.dash-map-spoof-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent-light);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
 .dash-map-spoof-device {
   color: var(--muted);
   font-weight: 500;
+}
+
+.dash-map-location-device {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #86efac;
 }
 
 .dash-map-lock {

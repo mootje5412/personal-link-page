@@ -39,8 +39,8 @@ const items = [
         <rect x="6" y="6" width="8" height="8" rx="2" stroke="currentColor" strokeWidth="1.4" />
       </svg>
     ),
-    title: 'USB or Wi‑Fi',
-    text: 'Cable or same network — your choice.',
+    title: 'USB only',
+    text: 'iPhone must be connected with a USB cable — Wi‑Fi won\'t work for location spoofing.',
   },
   {
     icon: (

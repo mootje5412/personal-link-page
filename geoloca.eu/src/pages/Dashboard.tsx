@@ -51,12 +51,18 @@ export default function Dashboard() {
           <DashboardMap
             connected={phone.connected}
             connectionStatus={phone.status}
+            setupStep={phone.setupStep}
             selectedPhone={phone.selectedPhone}
             connectedPhone={phone.connectedPhone}
-            appliedCountry={phone.appliedCountry}
+            appliedLocation={phone.appliedLocation}
+            applyingLocation={phone.applyingLocation}
+            usbError={phone.usbError}
             phones={phone.phones}
             onSelectPhone={phone.selectPhone}
-            onConnect={phone.connect}
+            onNextStep={phone.nextStep}
+            onPrevStep={phone.prevStep}
+            onDetectUsb={phone.detectUsb}
+            onRetryUsb={phone.retryUsb}
             onDisconnect={phone.disconnect}
             onApplyLocation={phone.applyLocation}
           />
