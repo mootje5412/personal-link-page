@@ -1,0 +1,49 @@
+.install-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.install-banner p {
+  flex: 1;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.install-banner strong {
+  color: var(--text);
+}
+
+.install-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.install-go {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--purple-fab);
+  color: #1a1030;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.install-close,
+.install-banner > button {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
