@@ -56,9 +56,11 @@ export default function Dashboard() {
             connectedDevice={phone.connectedDevice}
             appliedLocation={phone.appliedLocation}
             applyingLocation={phone.applyingLocation}
-            scanning={phone.scanning}
+            linkOnline={phone.linkOnline}
+            needsLink={phone.needsLink}
             onDisconnect={phone.disconnect}
-            onRequestAccess={() => void phone.requestAccess()}
+            onConnect={() => void phone.connectIphone()}
+            onDownloadLink={phone.downloadLink}
             onApplyLocation={phone.applyLocation}
           />
           {showWelcome && (

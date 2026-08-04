@@ -6,9 +6,11 @@ import './PhoneConnection.css';
 type Props = {
   status: ConnectionStatus;
   connectedDevice: DetectedDevice | null;
-  scanning: boolean;
+  linkOnline: boolean;
+  needsLink: boolean;
   onDisconnect: () => void;
-  onRequestAccess?: () => void;
+  onConnect: () => void;
+  onDownloadLink: () => void;
   open?: boolean;
   onClose?: () => void;
 };
@@ -16,9 +18,11 @@ type Props = {
 export default function PhoneConnection({
   status,
   connectedDevice,
-  scanning,
+  linkOnline,
+  needsLink,
   onDisconnect,
-  onRequestAccess,
+  onConnect,
+  onDownloadLink,
   open = true,
   onClose,
 }: Props) {
@@ -59,21 +63,29 @@ export default function PhoneConnection({
                 ? t('usb.establishing')
                 : status === 'detecting_usb'
                   ? t('usb.scanning_ports')
-                  : scanning
+                  : linkOnline
                     ? t('usb.listening')
-                    : t('usb.waiting_title')}
+                    : t('usb.link_offline')}
             </div>
+
+            {needsLink && !linkOnline && (
+              <div className="phone-link-banner">
+                <p>{t('usb.link_needed')}</p>
+                <button type="button" className="btn btn-secondary phone-link-btn" onClick={onDownloadLink}>
+                  {t('usb.download_link')}
+                </button>
+              </div>
+            )}
 
             <ul className="phone-waiting-tips">
               <li>{t('usb.tip_cable')}</li>
               <li>{t('usb.tip_trust')}</li>
+              <li>{t('usb.tip_same_pc')}</li>
             </ul>
 
-            {onRequestAccess && status === 'waiting' && (
-              <button type="button" className="btn btn-primary phone-allow-btn" onClick={onRequestAccess}>
-                {t('usb.allow_usb')}
-              </button>
-            )}
+            <button type="button" className="btn btn-primary phone-allow-btn" onClick={onConnect}>
+              {t('usb.connect_iphone')}
+            </button>
           </div>
         )}
 
@@ -92,12 +104,6 @@ export default function PhoneConnection({
                 <span>{deviceLabel(connectedDevice)}</span>
               </div>
               <span className="phone-usb-badge">USB</span>
-            </div>
-
-            <div className="phone-usb-visual" aria-hidden>
-              <span>💻</span>
-              <span className="phone-usb-diagram-cable">━━ USB ━━</span>
-              <span>📱</span>
             </div>
 
             <p className="phone-connected-hint">{t('usb.connected_hint')}</p>

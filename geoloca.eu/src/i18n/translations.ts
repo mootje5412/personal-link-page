@@ -88,6 +88,11 @@ const en = {
   'usb.step_next2': 'I tapped Trust',
   'usb.back': 'Back',
   'usb.auto_scan': 'Auto-scanning every 2s…',
+  'usb.connect_iphone': 'Connect iPhone',
+  'usb.link_needed': 'Run GeoLoca Link on this computer first — it detects your iPhone over USB.',
+  'usb.download_link': 'Download GeoLoca Link',
+  'usb.link_offline': 'GeoLoca Link not running on this computer',
+  'usb.tip_same_pc': 'Open the dashboard on the same PC your iPhone is plugged into',
 } as const;
 
 type Keys = keyof typeof en;

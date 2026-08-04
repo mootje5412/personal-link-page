@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ConnectionStatus, DetectedDevice } from '../data/phones';
-import { requestUsbAccess, scanUsbDevice, setDeviceLocation } from '../utils/usbBridge';
+import {
+  burstScanLocal,
+  downloadGeoLocaLink,
+  isLinkOnline,
+  openGeoLocaLink,
+  requestWebUsb,
+  scanLocalUsb,
+  setDeviceLocation,
+} from '../utils/usbBridge';
 
 export type AppliedLocation = {
   country: string;
@@ -9,47 +17,53 @@ export type AppliedLocation = {
   label: string;
 };
 
-const SCAN_INTERVAL_MS = 2500;
+const SCAN_MS = 1500;
 
 export function usePhoneConnection() {
   const [status, setStatus] = useState<ConnectionStatus>('waiting');
   const [connectedDevice, setConnectedDevice] = useState<DetectedDevice | null>(null);
   const [appliedLocation, setAppliedLocation] = useState<AppliedLocation | null>(null);
   const [applyingLocation, setApplyingLocation] = useState(false);
-  const [scanning, setScanning] = useState(true);
+  const [linkOnline, setLinkOnline] = useState(false);
+  const [needsLink, setNeedsLink] = useState(false);
   const scanRef = useRef<number | null>(null);
   const connectedRef = useRef(false);
 
-  const stopAutoScan = useCallback(() => {
+  const stopScan = useCallback(() => {
     if (scanRef.current) {
       window.clearInterval(scanRef.current);
       scanRef.current = null;
     }
-    setScanning(false);
   }, []);
 
-  const connectDevice = useCallback(
-    (device: DetectedDevice) => {
-      connectedRef.current = true;
-      setConnectedDevice(device);
-      setStatus('connected');
-      setAppliedLocation(null);
-      stopAutoScan();
-    },
-    [stopAutoScan],
-  );
+  const connectDevice = useCallback((device: DetectedDevice) => {
+    connectedRef.current = true;
+    setConnectedDevice(device);
+    setStatus('connected');
+    setNeedsLink(false);
+    setAppliedLocation(null);
+    stopScan();
+  }, [stopScan]);
 
-  const runUsbScan = useCallback(async (): Promise<boolean> => {
+  const runScan = useCallback(async (): Promise<boolean> => {
     if (connectedRef.current) return true;
 
-    setScanning(true);
-    setStatus('detecting_usb');
+    const online = await isLinkOnline();
+    setLinkOnline(online);
 
-    const scan = await scanUsbDevice();
+    if (!online) {
+      setNeedsLink(true);
+      setStatus('waiting');
+      return false;
+    }
+
+    setNeedsLink(false);
+    setStatus('detecting_usb');
+    const scan = await scanLocalUsb();
 
     if (scan.connected && scan.device) {
       setStatus('connecting');
-      await new Promise((r) => window.setTimeout(r, 500));
+      await new Promise((r) => window.setTimeout(r, 400));
       connectDevice(scan.device);
       return true;
     }
@@ -58,27 +72,50 @@ export function usePhoneConnection() {
     return false;
   }, [connectDevice]);
 
-  const startAutoScan = useCallback(() => {
-    stopAutoScan();
-    setScanning(true);
-    void runUsbScan();
-    scanRef.current = window.setInterval(() => {
-      void runUsbScan();
-    }, SCAN_INTERVAL_MS);
-  }, [runUsbScan, stopAutoScan]);
+  const startScan = useCallback(() => {
+    stopScan();
+    void runScan();
+    scanRef.current = window.setInterval(() => void runScan(), SCAN_MS);
+  }, [runScan, stopScan]);
 
   useEffect(() => {
-    startAutoScan();
-    return () => stopAutoScan();
-  }, [startAutoScan, stopAutoScan]);
+    startScan();
+    return () => stopScan();
+  }, [startScan, stopScan]);
 
-  const requestAccess = useCallback(async () => {
+  const connectIphone = useCallback(async () => {
     setStatus('detecting_usb');
-    const scan = await requestUsbAccess();
+
+    let scan = await burstScanLocal(8, 350);
     if (scan.connected && scan.device) {
       connectDevice(scan.device);
       return true;
     }
+
+    if (!scan.linkOnline) {
+      openGeoLocaLink();
+      setNeedsLink(true);
+      setStatus('waiting');
+      scan = await burstScanLocal(20, 500);
+      if (scan.connected && scan.device) {
+        connectDevice(scan.device);
+        return true;
+      }
+      return false;
+    }
+
+    const web = await requestWebUsb();
+    if (web.connected && web.device) {
+      connectDevice(web.device);
+      return true;
+    }
+
+    scan = await burstScanLocal(6, 400);
+    if (scan.connected && scan.device) {
+      connectDevice(scan.device);
+      return true;
+    }
+
     setStatus('waiting');
     return false;
   }, [connectDevice]);
@@ -89,12 +126,12 @@ export function usePhoneConnection() {
     setAppliedLocation(null);
     setApplyingLocation(false);
     setStatus('waiting');
-    startAutoScan();
-  }, [startAutoScan]);
+    startScan();
+  }, [startScan]);
 
   const applyLocation = useCallback(
     async (country: string, lat: number, lng: number, label: string) => {
-      if (!connectedRef.current || !connectedDevice) return false;
+      if (!connectedRef.current) return false;
 
       setApplyingLocation(true);
       setAppliedLocation(null);
@@ -107,7 +144,7 @@ export function usePhoneConnection() {
           connectedRef.current = false;
           setConnectedDevice(null);
           setStatus('waiting');
-          startAutoScan();
+          startScan();
         }
         return false;
       }
@@ -116,7 +153,7 @@ export function usePhoneConnection() {
       setApplyingLocation(false);
       return true;
     },
-    [connectedDevice, startAutoScan],
+    [startScan],
   );
 
   return {
@@ -124,11 +161,12 @@ export function usePhoneConnection() {
     connectedDevice,
     appliedLocation,
     applyingLocation,
-    scanning,
+    linkOnline,
+    needsLink,
     connected: status === 'connected',
     disconnect,
     applyLocation,
-    requestAccess,
-    rescan: runUsbScan,
+    connectIphone,
+    downloadLink: downloadGeoLocaLink,
   };
 }

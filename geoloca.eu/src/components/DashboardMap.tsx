@@ -24,9 +24,11 @@ type Props = {
   connectedDevice: DetectedDevice | null;
   appliedLocation: AppliedLocation | null;
   applyingLocation: boolean;
-  scanning: boolean;
+  linkOnline: boolean;
+  needsLink: boolean;
   onDisconnect: () => void;
-  onRequestAccess: () => void;
+  onConnect: () => void;
+  onDownloadLink: () => void;
   onApplyLocation: (country: string, lat: number, lng: number, label: string) => void;
 };
 
@@ -62,9 +64,11 @@ export default function DashboardMap({
   connectedDevice,
   appliedLocation,
   applyingLocation,
-  scanning,
+  linkOnline,
+  needsLink,
   onDisconnect,
-  onRequestAccess,
+  onConnect,
+  onDownloadLink,
   onApplyLocation,
 }: Props) {
   const { t } = useLanguage();
@@ -85,18 +89,14 @@ export default function DashboardMap({
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setUserPos({ lat, lng });
-        setPin({ lat, lng, label: t('map.your_location') });
-        setMapZoom(12);
+        setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       },
       () => {
         /* keep default pin */
       },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
     );
-  }, [t]);
+  }, []);
 
   useEffect(() => {
     const c = countryCoords(country);
@@ -288,12 +288,14 @@ export default function DashboardMap({
       <PhoneConnection
         status={connectionStatus}
         connectedDevice={connectedDevice}
-        scanning={scanning}
+        linkOnline={linkOnline}
+        needsLink={needsLink}
         onDisconnect={() => {
           onDisconnect();
           setShowPhonePanel(true);
         }}
-        onRequestAccess={onRequestAccess}
+        onConnect={onConnect}
+        onDownloadLink={onDownloadLink}
         open={!connected || showPhonePanel}
         onClose={connected ? () => setShowPhonePanel(false) : undefined}
       />

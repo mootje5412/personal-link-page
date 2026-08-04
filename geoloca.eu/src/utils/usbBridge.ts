@@ -7,7 +7,8 @@ export type DetectedDevice = {
 export type UsbScanResult = {
   connected: boolean;
   device?: DetectedDevice;
-  error?: 'bridge_offline' | 'no_device';
+  linkOnline?: boolean;
+  error?: 'link_offline' | 'no_device';
 };
 
 export type LocationResult = {
@@ -17,30 +18,16 @@ export type LocationResult = {
   error?: string;
 };
 
+const LOCAL = 'http://127.0.0.1:7429';
 const APPLE_VENDOR = 0x05ac;
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T | null> {
+async function localFetch<T>(path: string, init?: RequestInit): Promise<T | null> {
   try {
-    const res = await fetch(`/api/usb${path}`, {
-      ...init,
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
-      signal: AbortSignal.timeout(init?.method === 'POST' ? 15000 : 6000),
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null;
-  }
-}
-
-async function localBridgeFetch<T>(path: string, init?: RequestInit): Promise<T | null> {
-  try {
-    const res = await fetch(`http://127.0.0.1:7429${path}`, {
+    const res = await fetch(`${LOCAL}${path}`, {
       ...init,
       mode: 'cors',
       headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
-      signal: AbortSignal.timeout(init?.method === 'POST' ? 15000 : 6000),
+      signal: AbortSignal.timeout(init?.method === 'POST' ? 20000 : 5000),
     });
     if (!res.ok) return null;
     return (await res.json()) as T;
@@ -49,67 +36,69 @@ async function localBridgeFetch<T>(path: string, init?: RequestInit): Promise<T 
   }
 }
 
-async function scanWebUsb(): Promise<UsbScanResult> {
-  if (!('usb' in navigator)) return { connected: false, error: 'no_device' };
-
-  try {
-    const devices = await navigator.usb!.getDevices();
-    const apple = devices.find((d: USBDevice) => d.vendorId === APPLE_VENDOR);
-
-    if (apple) {
-      const name = apple.productName || 'iPhone';
-      return { connected: true, device: { name, model: name, connection: 'usb' } };
-    }
-  } catch {
-    /* ignore */
-  }
-
-  return { connected: false, error: 'no_device' };
+export async function isLinkOnline(): Promise<boolean> {
+  const health = await localFetch<{ ok?: boolean }>('/health');
+  return Boolean(health?.ok);
 }
 
-export async function scanUsbDevice(): Promise<UsbScanResult> {
-  const local = await localBridgeFetch<{ connected?: boolean; device?: DetectedDevice }>('/usb/scan');
-  if (local?.connected && local.device) {
-    return { connected: true, device: local.device };
+/** Only scans the computer running the browser — not the remote server. */
+export async function scanLocalUsb(): Promise<UsbScanResult> {
+  const online = await isLinkOnline();
+  if (!online) {
+    return { connected: false, linkOnline: false, error: 'link_offline' };
   }
 
-  const api = await apiFetch<{ connected?: boolean; device?: DetectedDevice }>('/scan');
-  if (api?.connected && api.device) {
-    return { connected: true, device: api.device };
+  const result = await localFetch<{ connected?: boolean; device?: DetectedDevice }>('/usb/scan');
+  if (result?.connected && result.device) {
+    return { connected: true, device: result.device, linkOnline: true };
   }
 
-  const web = await scanWebUsb();
-  if (web.connected) return web;
+  return { connected: false, linkOnline: true, error: 'no_device' };
+}
 
-  return { connected: false, error: 'no_device' };
+export async function burstScanLocal(tries = 12, gapMs = 400): Promise<UsbScanResult> {
+  for (let i = 0; i < tries; i += 1) {
+    const scan = await scanLocalUsb();
+    if (scan.connected) return scan;
+    if (scan.linkOnline && scan.error === 'no_device') {
+      await new Promise((r) => window.setTimeout(r, gapMs));
+      continue;
+    }
+    if (!scan.linkOnline) return scan;
+    await new Promise((r) => window.setTimeout(r, gapMs));
+  }
+  return scanLocalUsb();
 }
 
 export async function setDeviceLocation(lat: number, lng: number): Promise<LocationResult> {
   const body = JSON.stringify({ lat, lng });
-
-  const local = await localBridgeFetch<LocationResult>('/location', { method: 'POST', body });
-  if (local?.ok) return local;
-
-  const api = await apiFetch<LocationResult>('/location', { method: 'POST', body });
-  if (api?.ok) return api;
-
-  return api ?? local ?? { ok: false, error: 'bridge_offline' };
+  const local = await localFetch<LocationResult>('/location', { method: 'POST', body });
+  return local ?? { ok: false, error: 'link_offline' };
 }
 
-export async function requestUsbAccess(): Promise<UsbScanResult> {
+export async function requestWebUsb(): Promise<UsbScanResult> {
   if (!('usb' in navigator)) return { connected: false, error: 'no_device' };
   try {
     const device = await navigator.usb!.requestDevice({ filters: [{ vendorId: APPLE_VENDOR }] });
     const name = device.productName || 'iPhone';
-    return { connected: true, device: { name, model: name, connection: 'usb' } };
+    return { connected: true, device: { name, model: name, connection: 'usb' }, linkOnline: await isLinkOnline() };
   } catch {
     return { connected: false, error: 'no_device' };
   }
 }
 
-export async function isBridgeOnline(): Promise<boolean> {
-  const health = await apiFetch<{ ok?: boolean }>('/health');
-  if (health?.ok) return true;
-  const local = await localBridgeFetch<{ ok?: boolean }>('/health');
-  return Boolean(local?.ok);
+export function downloadGeoLocaLink() {
+  const ua = navigator.userAgent.toLowerCase();
+  const base = `${window.location.origin}/connect/`;
+  const href = ua.includes('win') ? `${base}GeoLoca-Link.bat` : `${base}GeoLoca-Link.command`;
+  const a = document.createElement('a');
+  a.href = href;
+  a.download = href.includes('.bat') ? 'GeoLoca-Link.bat' : 'GeoLoca-Link.command';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+export function openGeoLocaLink() {
+  downloadGeoLocaLink();
 }
