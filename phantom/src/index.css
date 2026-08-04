@@ -7,15 +7,20 @@
 }
 
 :root {
-  --bg: #1a1025;
-  --surface: #231733;
-  --surface-2: #2d1f42;
+  --bg: #000000;
+  --surface: #161616;
+  --surface-2: #1c1c1e;
   --purple: #ab9ff2;
-  --purple-bright: #551bf9;
-  --purple-mid: #6e56cf;
+  --purple-pill: rgba(171, 159, 242, 0.18);
+  --purple-fab: #ab9ff2;
+  --green: #30d158;
+  --green-bg: rgba(48, 209, 88, 0.14);
+  --red: #ff6b6b;
+  --red-bg: rgba(255, 107, 107, 0.14);
   --text: #ffffff;
-  --text-muted: #9b8bb8;
-  --border: rgba(171, 159, 242, 0.12);
+  --text-muted: #8e8e93;
+  --text-dim: #636366;
+  --border: rgba(255, 255, 255, 0.06);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -27,7 +32,7 @@ body,
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;

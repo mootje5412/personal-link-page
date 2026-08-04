@@ -1,48 +1,49 @@
-.install-prompt {
-  margin-top: 16px;
+.install-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
-.install-btn {
-  width: 100%;
-  padding: 14px 20px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #534bb1, #551bf9);
-  color: #fff;
-  font-size: 0.9375rem;
-  font-weight: 600;
-}
-
-.install-dismiss {
-  width: 100%;
-  margin-top: 10px;
-  padding: 10px;
+.install-banner p {
+  flex: 1;
+  font-size: 0.8125rem;
+  line-height: 1.4;
   color: var(--text-muted);
-  font-size: 0.875rem;
 }
 
-.install-fallback {
-  color: var(--text-muted);
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-
-.ios-steps {
-  margin-left: 18px;
-  color: var(--text-muted);
-  font-size: 0.875rem;
-  line-height: 1.6;
-}
-
-.ios-steps li + li {
-  margin-top: 8px;
-}
-
-.ios-steps strong {
+.install-banner strong {
   color: var(--text);
 }
 
-.ios-icon {
-  display: inline-block;
-  margin: 0 2px;
-  font-size: 1rem;
+.install-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.install-go {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--purple-fab);
+  color: #1a1030;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.install-close,
+.install-banner > button {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  flex-shrink: 0;
 }

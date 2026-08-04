@@ -6,29 +6,19 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+interface InstallPromptProps {
+  onDismiss?: () => void;
+}
+
 function isIos() {
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
-function isStandalone() {
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
-  );
-}
-
-export default function InstallPrompt() {
+export default function InstallPrompt({ onDismiss }: InstallPromptProps) {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showIos, setShowIos] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    if (isStandalone()) return;
-
-    if (isIos()) {
-      setShowIos(true);
-      return;
-    }
+    if (isIos()) return;
 
     const onBeforeInstall = (e: Event) => {
       e.preventDefault();
@@ -39,24 +29,14 @@ export default function InstallPrompt() {
     return () => window.removeEventListener('beforeinstallprompt', onBeforeInstall);
   }, []);
 
-  if (dismissed || isStandalone()) return null;
-
-  if (showIos) {
+  if (isIos()) {
     return (
-      <div className="install-prompt">
-        <ol className="ios-steps">
-          <li>
-            Tap <strong>Share</strong> <span className="ios-icon">⎋</span> in Safari
-          </li>
-          <li>
-            Scroll and tap <strong>Add to Home Screen</strong>
-          </li>
-          <li>
-            Tap <strong>Add</strong> — the Phantom icon appears on your home screen
-          </li>
-        </ol>
-        <button type="button" className="install-dismiss" onClick={() => setDismissed(true)}>
-          Got it
+      <div className="install-banner">
+        <p>
+          <strong>Add to Home Screen</strong> — Share → Add to Home Screen
+        </p>
+        <button type="button" onClick={onDismiss}>
+          ✕
         </button>
       </div>
     );
@@ -64,31 +44,36 @@ export default function InstallPrompt() {
 
   if (!deferred) {
     return (
-      <div className="install-prompt">
-        <p className="install-fallback">
-          Open this page in Chrome on your phone, then use the browser menu →{' '}
-          <strong>Install app</strong> or <strong>Add to Home screen</strong>.
+      <div className="install-banner">
+        <p>
+          <strong>Add to Home Screen</strong> for the full app experience
         </p>
+        <button type="button" onClick={onDismiss}>
+          ✕
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="install-prompt">
-      <button
-        type="button"
-        className="install-btn"
-        onClick={async () => {
-          await deferred.prompt();
-          await deferred.userChoice;
-          setDeferred(null);
-        }}
-      >
-        Add Phantom to Home Screen
-      </button>
-      <button type="button" className="install-dismiss" onClick={() => setDismissed(true)}>
-        Not now
-      </button>
+    <div className="install-banner">
+      <p>Add Phantom to your home screen</p>
+      <div className="install-actions">
+        <button
+          type="button"
+          className="install-go"
+          onClick={async () => {
+            await deferred.prompt();
+            await deferred.userChoice;
+            onDismiss?.();
+          }}
+        >
+          Add
+        </button>
+        <button type="button" className="install-close" onClick={onDismiss}>
+          ✕
+        </button>
+      </div>
     </div>
   );
 }
