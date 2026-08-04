@@ -1,23 +1,28 @@
 export type CoinId = 'ethereum' | 'solana' | 'bitcoin';
 
 export interface TokenDef {
-  id: CoinId | 'hype';
+  id: CoinId;
   name: string;
   symbol: string;
   logo: string;
-  coingeckoId?: CoinId;
+  verified?: boolean;
+}
+
+export interface PerpDef {
+  id: CoinId | 'skhx';
+  symbol: string;
+  leverage: string;
+  logo: string;
 }
 
 export const TOKEN_DEFS: TokenDef[] = [
-  { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', logo: '/logos/eth.png', coingeckoId: 'ethereum' },
-  { id: 'solana', name: 'Solana', symbol: 'SOL', logo: '/logos/sol.png', coingeckoId: 'solana' },
+  { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', logo: '/logos/eth.png', verified: true },
+  { id: 'solana', name: 'Solana', symbol: 'SOL', logo: '/logos/sol.png', verified: true },
 ];
 
-export const PERP_DEFS = [
-  { id: 'bitcoin' as CoinId, symbol: 'BTC', leverage: '40x', logo: '/logos/btc.png' },
-  { id: 'ethereum' as CoinId, symbol: 'ETH', leverage: '25x', logo: '/logos/eth.png' },
-  { id: 'solana' as CoinId, symbol: 'SOL', leverage: '20x', logo: '/logos/sol.png' },
-  { id: 'hype' as const, symbol: 'HYPE', leverage: '10x', logo: '/logos/hype.png' },
+export const PERP_DEFS: PerpDef[] = [
+  { id: 'bitcoin', symbol: 'BTC', leverage: '40x', logo: '/logos/btc.png' },
+  { id: 'skhx', symbol: 'SKHX', leverage: '10x', logo: '/logos/skhx.png' },
 ];
 
 export interface WalletState {
@@ -25,23 +30,27 @@ export interface WalletState {
   holdings: Record<string, number>;
 }
 
-const STORAGE_KEY = 'phantom-wallet-v1';
+const STORAGE_KEY = 'phantom-wallet-v2';
 
 export function defaultWallet(): WalletState {
   return {
     cash: 0,
     holdings: {
-      ethereum: 0.0001,
-      solana: 0.0078,
+      ethereum: 0.00047,
+      solana: 0.0074,
     },
   };
 }
 
 export function loadWallet(): WalletState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('phantom-wallet-v1');
     if (!raw) return defaultWallet();
-    return { ...defaultWallet(), ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    return {
+      cash: parsed.cash ?? 0,
+      holdings: { ...defaultWallet().holdings, ...parsed.holdings },
+    };
   } catch {
     return defaultWallet();
   }
@@ -68,29 +77,38 @@ export async function fetchPrices(): Promise<Prices> {
     ethereum: { eur: data.ethereum.eur, change24h: data.ethereum.eur_24h_change ?? 0 },
     solana: { eur: data.solana.eur, change24h: data.solana.eur_24h_change ?? 0 },
     bitcoin: { eur: data.bitcoin.eur, change24h: data.bitcoin.eur_24h_change ?? 0 },
-    hype: { eur: 28.5, change24h: 0.05 },
+    skhx: { eur: 0.42, change24h: -3.2 },
   };
 }
 
-export function formatEur(value: number, maxFrac = 2): string {
-  if (value >= 1000) {
-    return `€${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  }
-  if (value >= 1) {
-    return `€${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  }
-  return `€${value.toFixed(Math.min(8, Math.max(2, maxFrac)))}`;
+export function formatEur(value: number): string {
+  return `€${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export function formatChange(change: number): string {
+export function formatPnlEur(value: number): string {
+  const sign = value >= 0 ? '+' : '-';
+  return `${sign}€${Math.abs(value).toFixed(8)}`;
+}
+
+export function formatChangePct(change: number): string {
   const sign = change >= 0 ? '+' : '';
   return `${sign}${change.toFixed(2)}%`;
 }
 
-export function formatAmount(amount: number, symbol: string): string {
-  if (amount === 0) return `0 ${symbol}`;
-  if (amount >= 1) return `${amount.toLocaleString('en-US', { maximumFractionDigits: 4 })} ${symbol}`;
-  return `${amount.toFixed(amount < 0.0001 ? 8 : 4)} ${symbol}`;
+export function formatEurDelta(tokenValue: number, change24h: number): string {
+  const delta = tokenValue * (change24h / 100);
+  const sign = delta >= 0 ? '+' : '-';
+  const abs = Math.abs(delta);
+  if (abs < 0.01) return `${sign}<€0.01`;
+  return `${sign}${formatEur(abs)}`;
+}
+
+export function formatTokenAmount(amount: number, symbol: string): string {
+  if (amount >= 1) {
+    return `${amount.toLocaleString('en-US', { maximumFractionDigits: 4 })} ${symbol}`;
+  }
+  const decimals = amount < 0.001 ? 5 : 4;
+  return `${amount.toFixed(decimals)} ${symbol}`;
 }
 
 export function calcPortfolio(
@@ -109,4 +127,8 @@ export function calcPortfolio(
   const total = wallet.cash + tokenValue;
   const pnlPct = total > 0 ? (pnlEur / total) * 100 : 0;
   return { total, tokenValue, pnlEur, pnlPct };
+}
+
+export function tokenDayDelta(tokenValue: number, change24h: number): number {
+  return tokenValue * (change24h / 100);
 }

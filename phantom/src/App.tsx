@@ -6,9 +6,11 @@ import {
   TOKEN_DEFS,
   calcPortfolio,
   fetchPrices,
-  formatAmount,
-  formatChange,
+  formatChangePct,
   formatEur,
+  formatEurDelta,
+  formatPnlEur,
+  formatTokenAmount,
   loadWallet,
   saveWallet,
   type Prices,
@@ -17,6 +19,22 @@ import {
 import './App.css';
 
 const TABS = ['Home', 'Trade', 'Predict', 'Explore'] as const;
+
+function VerifiedBadge() {
+  return (
+    <svg className="verified" width="16" height="16" viewBox="0 0 16 16" aria-label="Verified">
+      <circle cx="8" cy="8" r="8" fill="#AB9FF2" />
+      <path
+        d="M4.5 8.2L6.8 10.5L11.5 5.8"
+        stroke="#fff"
+        strokeWidth="1.6"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Home');
@@ -27,8 +45,7 @@ export default function App() {
 
   const refreshPrices = useCallback(async () => {
     try {
-      const p = await fetchPrices();
-      setPrices(p);
+      setPrices(await fetchPrices());
     } catch {
       /* keep last prices */
     }
@@ -52,18 +69,13 @@ export default function App() {
   }, [wallet]);
 
   const portfolio = prices ? calcPortfolio(wallet, prices) : null;
-
-  const handleSaveWallet = (next: WalletState) => {
-    setWallet(next);
-  };
-
   const pnlUp = (portfolio?.pnlEur ?? 0) >= 0;
 
   return (
     <div className="app">
       <header className="top-bar">
         <button type="button" className="avatar" aria-label="Account">
-          <img src="/logos/phantom-icon-128.png" alt="" className="avatar-img" />
+          <span className="avatar-gradient" />
         </button>
 
         <nav className="tab-pills" aria-label="Sections">
@@ -92,17 +104,16 @@ export default function App() {
           <p className="balance">{portfolio ? formatEur(portfolio.total) : '—'}</p>
           {portfolio && (
             <span className={`pnl ${pnlUp ? 'up' : 'down'}`}>
-              {pnlUp ? '+' : ''}
-              {formatEur(portfolio.pnlEur, 8)} {formatChange(portfolio.pnlPct)}
+              {formatPnlEur(portfolio.pnlEur)} {formatChangePct(portfolio.pnlPct)}
             </span>
           )}
         </div>
 
         <button type="button" className="cash-card" onClick={() => setShowAddFunds(true)}>
           <div className="cash-icon" aria-hidden>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="6" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.5" />
-              <circle cx="16" cy="12.5" r="1.5" fill="currentColor" />
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <rect x="2" y="5" width="20" height="14" rx="3" stroke="currentColor" strokeWidth="1.5" />
+              <circle cx="17" cy="12" r="1.5" fill="currentColor" />
             </svg>
           </div>
           <span className="cash-label">Cash</span>
@@ -111,9 +122,9 @@ export default function App() {
 
         <section className="section">
           <button type="button" className="section-head">
-            Tokens
-            <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden>
-              <path d="M1.5 1L6.5 6L1.5 11" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+            <span>Tokens</span>
+            <svg width="7" height="11" viewBox="0 0 8 12" aria-hidden>
+              <path d="M1.5 1L6.5 6L1.5 11" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" />
             </svg>
           </button>
 
@@ -123,7 +134,7 @@ export default function App() {
               const price = prices?.[token.id];
               const value = price ? amount * price.eur : 0;
               const up = (price?.change24h ?? 0) >= 0;
-              if (amount <= 0 && value <= 0) return null;
+              if (amount <= 0) return null;
               return (
                 <button
                   key={token.id}
@@ -133,14 +144,17 @@ export default function App() {
                 >
                   <img src={token.logo} alt="" className="coin-logo" />
                   <div className="token-main">
-                    <span className="token-name">{token.name}</span>
-                    <span className="token-amount">{formatAmount(amount, token.symbol)}</span>
+                    <span className="token-name-row">
+                      <span className="token-name">{token.name}</span>
+                      {token.verified && <VerifiedBadge />}
+                    </span>
+                    <span className="token-amount">{formatTokenAmount(amount, token.symbol)}</span>
                   </div>
                   <div className="token-right">
                     <span className="token-value">{price ? formatEur(value) : '—'}</span>
                     {price && (
                       <span className={`token-change ${up ? 'up' : 'down'}`}>
-                        {formatChange(price.change24h)}
+                        {formatEurDelta(value, price.change24h)}
                       </span>
                     )}
                   </div>
@@ -152,9 +166,9 @@ export default function App() {
 
         <section className="section">
           <button type="button" className="section-head">
-            Perps
-            <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden>
-              <path d="M1.5 1L6.5 6L1.5 11" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+            <span>Perps</span>
+            <svg width="7" height="11" viewBox="0 0 8 12" aria-hidden>
+              <path d="M1.5 1L6.5 6L1.5 11" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" />
             </svg>
           </button>
 
@@ -165,11 +179,12 @@ export default function App() {
               return (
                 <div key={perp.symbol} className="perp-card">
                   <img src={perp.logo} alt="" className="perp-logo" />
-                  <span className="perp-symbol">{perp.symbol}</span>
-                  <span className="perp-lev">{perp.leverage}</span>
+                  <span className="perp-title">
+                    {perp.symbol} {perp.leverage}
+                  </span>
                   {price && (
                     <span className={`perp-change ${up ? 'up' : 'down'}`}>
-                      {formatChange(price.change24h)}
+                      {formatChangePct(price.change24h)}
                     </span>
                   )}
                 </div>
@@ -181,7 +196,7 @@ export default function App() {
 
       <footer className="bottom-bar">
         <div className="search-pill">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
             <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="2" />
             <path d="M16 16L20 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
@@ -196,7 +211,7 @@ export default function App() {
         open={showAddFunds}
         onClose={() => setShowAddFunds(false)}
         wallet={wallet}
-        onSave={handleSaveWallet}
+        onSave={setWallet}
       />
 
       {showInstall && (

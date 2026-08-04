@@ -8,17 +8,17 @@
 
 :root {
   --bg: #000000;
-  --surface: #161616;
-  --surface-2: #1c1c1e;
+  --surface: #1a1a1a;
+  --surface-2: #242424;
   --purple: #ab9ff2;
-  --purple-pill: rgba(171, 159, 242, 0.18);
+  --purple-active: #ab9ff2;
   --purple-fab: #ab9ff2;
-  --green: #30d158;
-  --green-bg: rgba(48, 209, 88, 0.14);
-  --red: #ff6b6b;
-  --red-bg: rgba(255, 107, 107, 0.14);
+  --green: #41d17a;
+  --green-bg: rgba(65, 209, 122, 0.16);
+  --red: #ff7a7a;
+  --red-bg: rgba(255, 122, 122, 0.14);
   --text: #ffffff;
-  --text-muted: #8e8e93;
+  --text-muted: #98989f;
   --text-dim: #636366;
   --border: rgba(255, 255, 255, 0.06);
   --safe-top: env(safe-area-inset-top, 0px);
