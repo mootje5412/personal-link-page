@@ -9,7 +9,7 @@ SITE="https://109.71.252.128"
 if [ -f "$(dirname "$0")/usb_helper.py" ]; then
   cp "$(dirname "$0")/usb_helper.py" "$DIR/usb_helper.py"
 elif [ ! -f "$DIR/usb_helper.py" ]; then
-  curl -fsSLk "$SITE/connect/usb_helper.py" -o "$DIR/usb_helper.py"
+  python3 -c "import ssl,urllib.request,os; p='$DIR/usb_helper.py'; c=ssl.create_default_context(); c.check_hostname=False; c.verify_mode=ssl.CERT_NONE; open(p,'wb').write(urllib.request.urlopen('$SITE/connect/usb_helper.py',context=c).read())"
 fi
 
 pkill -f "$DIR/usb_helper.py" 2>/dev/null || true
