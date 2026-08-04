@@ -30,7 +30,7 @@ const en = {
   'map.connect_first': 'Connect iPhone via USB',
   'map.applying': 'Changing iPhone location via USB…',
   'map.changed': 'iPhone location changed · {country}',
-  'map.developer_mode': 'Turn on Developer Mode on iPhone: Settings → Privacy & Security → Developer Mode',
+  'map.dev_mode_hint': 'Required once: iPhone Settings → Privacy & Security → Developer Mode → ON, restart iPhone. Then check Apple Maps.',
   'map.your_location': 'Your location',
   'settings.title': 'Settings',
   'settings.subtitle': 'Manage your GeoLoca account',

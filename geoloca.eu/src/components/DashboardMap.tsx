@@ -251,6 +251,10 @@ export default function DashboardMap({
         </div>
       )}
 
+      {connected && !applyingLocation && (
+        <div className="dash-map-dev-hint">{t('map.dev_mode_hint')}</div>
+      )}
+
       <div className="dash-map-countries">
         {COUNTRIES.slice(0, 8).map((c) => (
           <button

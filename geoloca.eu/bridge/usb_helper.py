@@ -9,7 +9,6 @@ import os
 import platform
 import plistlib
 import re
-import shutil
 import socket
 import struct
 import subprocess
@@ -19,7 +18,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
 PORT = 7429
-VERSION = 6
+VERSION = 7
 _SCAN_CACHE: tuple[float, dict] | None = None
 _SCAN_CACHE_TTL = 0.5
 _TOOLS_READY = False
@@ -82,20 +81,19 @@ def ensure_location_tools() -> tuple[bool, str]:
         return True, ""
 
     sys.stderr.write("[GeoLoca Link] Installing location tools (one time)…\n")
-    code, out = run_cmd(
+    last_out = ""
+    for args in (
         [sys.executable, "-m", "pip", "install", "--user", "pymobiledevice3"],
-        timeout=240,
-    )
-    if code != 0:
-        return False, out or "Could not install location tools"
+        [sys.executable, "-m", "pip", "install", "--user", "--break-system-packages", "pymobiledevice3"],
+    ):
+        code, out = run_cmd(args, timeout=300)
+        last_out = out
+        if code == 0 and run_cmd(pmd3_cmd("--help"), timeout=20)[0] == 0:
+            _TOOLS_READY = True
+            sys.stderr.write("[GeoLoca Link] Location tools ready\n")
+            return True, ""
 
-    code, _ = run_cmd(pmd3_cmd("--help"), timeout=20)
-    if code != 0:
-        return False, "Location tools installed but not working — restart GeoLoca Link"
-
-    _TOOLS_READY = True
-    sys.stderr.write("[GeoLoca Link] Location tools ready\n")
-    return True, ""
+    return False, last_out or "Could not install location tools"
 
 
 def cors_headers(handler: BaseHTTPRequestHandler) -> None:
@@ -276,9 +274,92 @@ def detect_iphone_usb() -> dict:
     return result
 
 
+def pmd3_ready() -> bool:
+    return run_cmd(pmd3_cmd("--help"), timeout=15)[0] == 0
+
+
+def mount_developer_image() -> tuple[bool, str]:
+    if not pmd3_ready():
+        return False, "Location tools not installed"
+    for _ in range(2):
+        code, out = run_cmd(pmd3_cmd("mounter", "auto"), timeout=120)
+        if code == 0:
+            return True, out
+        time.sleep(1.5)
+    return False, out
+
+
+def read_simulated_coords() -> tuple[float, float] | None:
+    code, out = run_cmd(pmd3_cmd("developer", "simulate-location", "get"), timeout=20)
+    if code != 0 or not out:
+        return None
+    nums = re.findall(r"-?\d+\.\d+", out)
+    if len(nums) >= 2:
+        lat, lng = float(nums[0]), float(nums[1])
+        if abs(lat) <= 90 and abs(lng) <= 180:
+            return lat, lng
+    return None
+
+
+def coords_match(want_lat: float, want_lng: float, got_lat: float, got_lng: float) -> bool:
+    return abs(want_lat - got_lat) < 0.02 and abs(want_lng - got_lng) < 0.02
+
+
+def developer_mode_hint(text: str) -> bool:
+    lower = text.lower()
+    return any(k in lower for k in ("developer mode", "developer disk", "development", "pairing dialog"))
+
+
+def set_via_pymobiledevice3(lat: float, lng: float, lat_s: str, lng_s: str) -> tuple[bool, str]:
+    if not pmd3_ready():
+        return False, "Location tools missing"
+
+    code, list_out = run_cmd(pmd3_cmd("usbmux", "list"), timeout=20)
+    if code != 0 or not list_out.strip():
+        return False, "iPhone not paired — unlock, tap Trust, replug USB"
+
+    ok, mount_out = mount_developer_image()
+    if not ok and developer_mode_hint(mount_out):
+        return False, mount_out
+
+    attempts = (
+        pmd3_cmd("developer", "simulate-location", "set", "--", lat_s, lng_s),
+        pmd3_cmd("developer", "simulate-location", "set", lat_s, lng_s),
+    )
+    last = mount_out
+    for cmd in attempts:
+        code, out = run_cmd(cmd, timeout=50)
+        last = out or last
+        if code != 0:
+            continue
+        got = read_simulated_coords()
+        if got and coords_match(lat, lng, got[0], got[1]):
+            return True, f"GPS set to {got[0]:.4f}, {got[1]:.4f}"
+        if code == 0:
+            return True, out or "GPS override sent to iPhone"
+
+    return False, last or "Could not override iPhone GPS"
+
+
+def prepare_location() -> dict:
+    ready, msg = ensure_location_tools()
+    if not ready:
+        return {"ok": False, "message": msg}
+    if not detect_iphone_usb().get("connected"):
+        return {"ok": True, "message": "Tools ready — plug in iPhone"}
+    ok, mount_msg = mount_developer_image()
+    if not ok and developer_mode_hint(mount_msg):
+        return {
+            "ok": False,
+            "error": "developer_mode",
+            "message": "Turn on Developer Mode: iPhone Settings → Privacy & Security → Developer Mode → ON, restart iPhone",
+        }
+    return {"ok": True, "message": "Ready to change iPhone GPS"}
+
+
 def set_location(lat: float, lng: float) -> dict:
     if not detect_iphone_usb().get("connected"):
-        return {"ok": False, "error": "iphone_not_connected"}
+        return {"ok": False, "error": "iphone_not_connected", "message": "iPhone not found on USB"}
 
     ready, tool_err = ensure_location_tools()
     if not ready:
@@ -287,27 +368,33 @@ def set_location(lat: float, lng: float) -> dict:
     lat_s = f"{lat:.6f}"
     lng_s = f"{lng:.6f}"
 
-    if which("idevicesetlocation"):
-        code, out = run_cmd(["idevicesetlocation", lat_s, lng_s], timeout=25)
+    idevice = which("idevicesetlocation")
+    if idevice:
+        code, out = run_cmd([idevice, lat_s, lng_s], timeout=35)
         if code == 0:
-            return {"ok": True, "method": "idevicesetlocation"}
+            if pmd3_ready():
+                got = read_simulated_coords()
+                if got and coords_match(lat, lng, got[0], got[1]):
+                    return {"ok": True, "method": "idevicesetlocation", "message": "iPhone GPS updated"}
+            else:
+                return {"ok": True, "method": "idevicesetlocation", "message": "Location command sent — check Apple Maps"}
 
-    run_cmd(pmd3_cmd("mounter", "auto"), timeout=90)
+    success, detail = set_via_pymobiledevice3(lat, lng, lat_s, lng_s)
+    if success:
+        return {
+            "ok": True,
+            "method": "pymobiledevice3",
+            "message": detail or "iPhone GPS updated — open Apple Maps to confirm",
+        }
 
-    code, out = run_cmd(pmd3_cmd("developer", "simulate-location", "set", "--", lat_s, lng_s), timeout=40)
-    if code == 0:
-        return {"ok": True, "method": "pymobiledevice3"}
-
-    detail = out.strip() or "Could not change iPhone GPS"
-    lower = detail.lower()
-    if "developer mode" in lower or "developer disk" in lower or "development" in lower:
+    if developer_mode_hint(detail):
         return {
             "ok": False,
             "error": "developer_mode",
-            "message": "On iPhone: Settings → Privacy & Security → Developer Mode → ON, then restart iPhone",
+            "message": "On iPhone: Settings → Privacy & Security → Developer Mode → ON, then restart iPhone and try again",
         }
 
-    return {"ok": False, "error": "location_failed", "message": detail}
+    return {"ok": False, "error": "location_failed", "message": detail or "Could not change iPhone GPS"}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -335,8 +422,7 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/usb/scan", "/api/usb/scan"):
             return self._json(200, detect_iphone_usb())
         if path in ("/tools/prepare", "/api/tools/prepare"):
-            ready, msg = ensure_location_tools()
-            return self._json(200, {"ok": ready, "message": msg})
+            return self._json(200, prepare_location())
         return self._json(404, {"error": "not_found"})
 
     def do_POST(self):
