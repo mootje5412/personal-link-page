@@ -5,6 +5,7 @@ import {
   isLinkOnline,
   isMacDesktop,
   launchGeoLocaLink,
+  prepareLocationTools,
   requestWebUsb,
   scanLocalUsb,
   setDeviceLocation,
@@ -28,6 +29,7 @@ export function usePhoneConnection() {
   const [applyingLocation, setApplyingLocation] = useState(false);
   const [linkOnline, setLinkOnline] = useState(false);
   const [bridgeStarting, setBridgeStarting] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const scanRef = useRef<number | null>(null);
   const connectedRef = useRef(false);
   const launchedRef = useRef(false);
@@ -46,7 +48,9 @@ export function usePhoneConnection() {
       setStatus('connected');
       setBridgeStarting(false);
       setAppliedLocation(null);
+      setLocationError(null);
       stopScan();
+      void prepareLocationTools();
     },
     [stopScan],
   );
@@ -145,11 +149,13 @@ export function usePhoneConnection() {
 
       setApplyingLocation(true);
       setAppliedLocation(null);
+      setLocationError(null);
 
       const result = await setDeviceLocation(lat, lng);
 
       if (!result.ok) {
         setApplyingLocation(false);
+        setLocationError(result.message || result.error || 'Location failed');
         if (result.error === 'iphone_not_connected') {
           connectedRef.current = false;
           setConnectedDevice(null);
@@ -173,6 +179,7 @@ export function usePhoneConnection() {
     applyingLocation,
     linkOnline,
     bridgeStarting,
+    locationError,
     connected: status === 'connected',
     disconnect,
     applyLocation,

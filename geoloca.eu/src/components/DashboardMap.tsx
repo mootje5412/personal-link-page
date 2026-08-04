@@ -26,6 +26,7 @@ type Props = {
   applyingLocation: boolean;
   linkOnline: boolean;
   bridgeStarting: boolean;
+  locationError: string | null;
   onDisconnect: () => void;
   onConnect: () => void;
   onApplyLocation: (country: string, lat: number, lng: number, label: string) => void;
@@ -65,6 +66,7 @@ export default function DashboardMap({
   applyingLocation,
   linkOnline,
   bridgeStarting,
+  locationError,
   onDisconnect,
   onConnect,
   onApplyLocation,
@@ -231,7 +233,13 @@ export default function DashboardMap({
         </div>
       )}
 
-      {appliedLocation && connected && !applyingLocation && (
+      {locationError && connected && !applyingLocation && (
+        <div className="dash-map-spoof-badge dash-map-spoof-badge--error">
+          {locationError}
+        </div>
+      )}
+
+      {appliedLocation && connected && !applyingLocation && !locationError && (
         <div className="dash-map-spoof-badge">
           <span className="dash-map-spoof-dot" />
           {t('map.changed', { country: appliedLocation.country })}

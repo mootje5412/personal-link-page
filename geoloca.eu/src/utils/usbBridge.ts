@@ -23,7 +23,9 @@ const APPLE_VENDOR = 0x05ac;
 
 async function localFetch<T>(path: string, init?: RequestInit): Promise<T | null> {
   const isScan = path.includes('/usb/scan');
-  const timeoutMs = init?.method === 'POST' ? 20000 : isScan ? 35000 : 6000;
+  const isLocation = path.includes('/location') || path.includes('/tools/prepare');
+  const timeoutMs =
+    init?.method === 'POST' && isLocation ? 180000 : isScan ? 35000 : isLocation ? 180000 : 6000;
   try {
     const res = await fetch(`${LOCAL}${path}`, {
       ...init,
@@ -83,6 +85,10 @@ export async function setDeviceLocation(lat: number, lng: number): Promise<Locat
   const body = JSON.stringify({ lat, lng });
   const local = await localFetch<LocationResult>('/location', { method: 'POST', body });
   return local ?? { ok: false, error: 'link_offline' };
+}
+
+export async function prepareLocationTools(): Promise<void> {
+  await localFetch('/tools/prepare');
 }
 
 function deviceFromUsb(usbDevice: USBDevice): DetectedDevice {

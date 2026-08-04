@@ -58,6 +58,7 @@ export default function Dashboard() {
             applyingLocation={phone.applyingLocation}
             linkOnline={phone.linkOnline}
             bridgeStarting={phone.bridgeStarting}
+            locationError={phone.locationError}
             onDisconnect={phone.disconnect}
             onConnect={() => void phone.connectIphone()}
             onApplyLocation={phone.applyLocation}

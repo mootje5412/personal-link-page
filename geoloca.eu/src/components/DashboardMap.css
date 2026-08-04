@@ -116,6 +116,15 @@
   border-color: rgba(99, 102, 241, 0.35);
 }
 
+.dash-map-spoof-badge--error {
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.35);
+  white-space: normal;
+  max-width: min(92vw, 420px);
+  text-align: center;
+  line-height: 1.4;
+}
+
 .dash-map-spoof-spinner {
   width: 12px;
   height: 12px;

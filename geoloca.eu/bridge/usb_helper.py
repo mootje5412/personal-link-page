@@ -9,6 +9,7 @@ import os
 import platform
 import plistlib
 import re
+import shutil
 import socket
 import struct
 import subprocess
@@ -18,9 +19,83 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
 PORT = 7429
-VERSION = 5
+VERSION = 6
 _SCAN_CACHE: tuple[float, dict] | None = None
 _SCAN_CACHE_TTL = 0.5
+_TOOLS_READY = False
+
+
+def run(cmd: list[str], timeout: int = 10) -> str:
+    code, out = run_cmd(cmd, timeout=timeout)
+    return out if code == 0 else ""
+
+
+def run_cmd(cmd: list[str], timeout: int = 30) -> tuple[int, str]:
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env={**os.environ, "PATH": _extended_path()},
+        )
+        out = (proc.stdout or "") + (proc.stderr or "")
+        return proc.returncode, out.strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+        return 1, str(exc)
+
+
+def _extended_path() -> str:
+    extra = [
+        os.path.expanduser("~/.local/bin"),
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+    ]
+    current = os.environ.get("PATH", "")
+    return os.pathsep.join(extra + [current])
+
+
+def pmd3_cmd(*args: str) -> list[str]:
+    return [sys.executable, "-m", "pymobiledevice3", *args]
+
+
+def which(cmd: str) -> str | None:
+    for folder in _extended_path().split(os.pathsep):
+        path = os.path.join(folder, cmd)
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return None
+
+
+def ensure_location_tools() -> tuple[bool, str]:
+    global _TOOLS_READY
+    if _TOOLS_READY:
+        return True, ""
+
+    if which("idevicesetlocation"):
+        _TOOLS_READY = True
+        return True, ""
+
+    code, _ = run_cmd(pmd3_cmd("--help"), timeout=15)
+    if code == 0:
+        _TOOLS_READY = True
+        return True, ""
+
+    sys.stderr.write("[GeoLoca Link] Installing location tools (one time)…\n")
+    code, out = run_cmd(
+        [sys.executable, "-m", "pip", "install", "--user", "pymobiledevice3"],
+        timeout=240,
+    )
+    if code != 0:
+        return False, out or "Could not install location tools"
+
+    code, _ = run_cmd(pmd3_cmd("--help"), timeout=20)
+    if code != 0:
+        return False, "Location tools installed but not working — restart GeoLoca Link"
+
+    _TOOLS_READY = True
+    sys.stderr.write("[GeoLoca Link] Location tools ready\n")
+    return True, ""
 
 
 def cors_headers(handler: BaseHTTPRequestHandler) -> None:
@@ -28,13 +103,6 @@ def cors_headers(handler: BaseHTTPRequestHandler) -> None:
     handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
     handler.send_header("Access-Control-Allow-Headers", "Content-Type")
     handler.send_header("Access-Control-Allow-Private-Network", "true")
-
-
-def run(cmd: list[str], timeout: int = 10) -> str:
-    try:
-        return subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True, timeout=timeout).strip()
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        return ""
 
 
 def device(name: str, model: str | None = None) -> dict:
@@ -212,19 +280,34 @@ def set_location(lat: float, lng: float) -> dict:
     if not detect_iphone_usb().get("connected"):
         return {"ok": False, "error": "iphone_not_connected"}
 
+    ready, tool_err = ensure_location_tools()
+    if not ready:
+        return {"ok": False, "error": "tools_failed", "message": tool_err}
+
     lat_s = f"{lat:.6f}"
     lng_s = f"{lng:.6f}"
 
-    if run(["which", "idevicesetlocation"], timeout=2):
-        run(["idevicesetlocation", lat_s, lng_s], timeout=20)
-        return {"ok": True, "method": "idevicesetlocation"}
+    if which("idevicesetlocation"):
+        code, out = run_cmd(["idevicesetlocation", lat_s, lng_s], timeout=25)
+        if code == 0:
+            return {"ok": True, "method": "idevicesetlocation"}
 
-    if run(["which", "pymobiledevice3"], timeout=2):
-        out = run(["pymobiledevice3", "developer", "simulate-location", "set", "--", lat_s, lng_s], timeout=25)
-        if "error" not in out.lower():
-            return {"ok": True, "method": "pymobiledevice3"}
+    run_cmd(pmd3_cmd("mounter", "auto"), timeout=90)
 
-    return {"ok": True, "method": "usb", "message": "Location sent to iPhone over USB"}
+    code, out = run_cmd(pmd3_cmd("developer", "simulate-location", "set", "--", lat_s, lng_s), timeout=40)
+    if code == 0:
+        return {"ok": True, "method": "pymobiledevice3"}
+
+    detail = out.strip() or "Could not change iPhone GPS"
+    lower = detail.lower()
+    if "developer mode" in lower or "developer disk" in lower or "development" in lower:
+        return {
+            "ok": False,
+            "error": "developer_mode",
+            "message": "On iPhone: Settings → Privacy & Security → Developer Mode → ON, then restart iPhone",
+        }
+
+    return {"ok": False, "error": "location_failed", "message": detail}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -251,6 +334,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, {"ok": True, "service": "geoloca-link", "version": VERSION})
         if path in ("/usb/scan", "/api/usb/scan"):
             return self._json(200, detect_iphone_usb())
+        if path in ("/tools/prepare", "/api/tools/prepare"):
+            ready, msg = ensure_location_tools()
+            return self._json(200, {"ok": ready, "message": msg})
         return self._json(404, {"error": "not_found"})
 
     def do_POST(self):
