@@ -188,6 +188,13 @@
   min-height: 42px;
 }
 
+.phone-link-mac-tip {
+  margin: 0.55rem 0 0;
+  font-size: 0.72rem;
+  color: var(--dim);
+  line-height: 1.45;
+}
+
 /* ── Connected state ── */
 
 .phone-connected {

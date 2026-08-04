@@ -74,6 +74,9 @@ export default function PhoneConnection({
                 <button type="button" className="btn btn-secondary phone-link-btn" onClick={onDownloadLink}>
                   {t('usb.download_link')}
                 </button>
+                {/mac|iphone|ipad/i.test(navigator.userAgent) && (
+                  <p className="phone-link-mac-tip">{t('usb.mac_steps')}</p>
+                )}
               </div>
             )}
 

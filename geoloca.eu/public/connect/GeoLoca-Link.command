@@ -1,6 +1,7 @@
 #!/bin/bash
 # GeoLoca Link — double-click to connect your iPhone over USB
 set -e
+xattr -d com.apple.quarantine "$0" 2>/dev/null || true
 DIR="$HOME/.geoloca"
 mkdir -p "$DIR"
 SITE="https://109.71.252.128"
