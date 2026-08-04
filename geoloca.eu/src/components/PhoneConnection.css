@@ -195,6 +195,18 @@
   line-height: 1.45;
 }
 
+.phone-bridge-tip {
+  margin: 0.35rem 0 0;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.76rem;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.22);
+  border-radius: var(--radius-sm);
+  line-height: 1.45;
+  text-align: left;
+}
+
 .phone-link-banner--warn {
   background: rgba(251, 191, 36, 0.08);
   border-color: rgba(251, 191, 36, 0.25);

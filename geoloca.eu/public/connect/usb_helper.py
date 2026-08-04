@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GeoLoca Link — detects iPhone over USB using only built-in Mac tools. No brew needed."""
+"""GeoLoca Link — finds iPhone on USB using built-in Mac services only."""
 
 from __future__ import annotations
 
@@ -18,9 +18,9 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
 PORT = 7429
-VERSION = 4
+VERSION = 5
 _SCAN_CACHE: tuple[float, dict] | None = None
-_SCAN_CACHE_TTL = 0.8
+_SCAN_CACHE_TTL = 0.5
 
 
 def cors_headers(handler: BaseHTTPRequestHandler) -> None:
@@ -42,91 +42,115 @@ def device(name: str, model: str | None = None) -> dict:
     return {"name": label, "model": model or label, "connection": "usb"}
 
 
-def detect_via_usbmux() -> dict | None:
-    """Talk to macOS usbmuxd — works after Trust, no extra software."""
-    sock_paths = ("/var/run/usbmuxd", "/private/var/run/usbmuxd")
-    sock = None
-    for path in sock_paths:
+def _usbmux_exchange(message: dict) -> dict | None:
+    for path in ("/var/run/usbmuxd", "/private/var/run/usbmuxd"):
         if not os.path.exists(path):
             continue
+        sock = None
         try:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sock.settimeout(4)
+            sock.settimeout(5)
             sock.connect(path)
-            break
+            sock.send(struct.pack("I", 1))
+            if struct.unpack("I", sock.recv(4))[0] != 1:
+                continue
+
+            for fmt in (plistlib.FMT_BINARY, plistlib.FMT_XML):
+                payload = plistlib.dumps(message, fmt=fmt)
+                sock.send(struct.pack("I", len(payload)) + payload)
+                size_data = sock.recv(4)
+                if len(size_data) < 4:
+                    continue
+                size = struct.unpack("I", size_data)[0]
+                data = b""
+                while len(data) < size:
+                    chunk = sock.recv(size - len(data))
+                    if not chunk:
+                        break
+                    data += chunk
+                if not data:
+                    continue
+                try:
+                    return plistlib.loads(data)
+                except plistlib.InvalidFileException:
+                    continue
         except OSError:
-            sock = None
+            pass
+        finally:
+            if sock:
+                sock.close()
+    return None
 
-    if not sock:
+
+def detect_via_usbmux() -> dict | None:
+    reply = _usbmux_exchange({"MessageType": "ListDevices"})
+    if not reply:
         return None
 
-    try:
-        sock.send(struct.pack("I", 1))
-        if struct.unpack("I", sock.recv(4))[0] != 1:
-            return None
+    for entry in reply.get("DeviceList") or []:
+        props = entry.get("Properties") or {}
+        conn_type = str(props.get("ConnectionType") or "USB").upper()
+        if conn_type not in ("USB", "WIRED", ""):
+            continue
 
-        payload = plistlib.dumps({"MessageType": "ListDevices"}, fmt=plistlib.FMT_BINARY)
-        sock.send(struct.pack("I", len(payload)) + payload)
+        name = props.get("DeviceName") or props.get("ProductName")
+        model = props.get("ProductType") or props.get("ProductName") or name
+        serial = props.get("SerialNumber") or props.get("UniqueDeviceID")
 
-        size = struct.unpack("I", sock.recv(4))[0]
-        data = b""
-        while len(data) < size:
-            chunk = sock.recv(size - len(data))
-            if not chunk:
-                break
-            data += chunk
-
-        reply = plistlib.loads(data)
-        for entry in reply.get("DeviceList") or []:
-            props = entry.get("Properties") or {}
-            name = props.get("DeviceName") or props.get("ProductName") or "iPhone"
-            model = props.get("ProductType") or props.get("ProductName") or name
-            if name or props.get("SerialNumber"):
-                return device(str(name), str(model))
-    except (OSError, struct.error, plistlib.InvalidFileException, KeyError, ValueError):
-        return None
-    finally:
-        sock.close()
+        if name:
+            return device(str(name), str(model or name))
+        if serial and str(serial).startswith("0000"):
+            return device("iPhone", "iPhone")
 
     return None
 
 
 def detect_via_ioreg() -> dict | None:
-    out = run(["ioreg", "-p", "IOUSB", "-l", "-w", "0"], timeout=12)
-    if not out:
-        return None
+    commands = (
+        ["ioreg", "-p", "IOUSB", "-l", "-w", "0"],
+        ["ioreg", "-r", "-c", "IOUSBHostDevice", "-l", "-w", "0"],
+        ["ioreg", "-r", "-c", "AppleUSBHostDevice", "-l", "-w", "0"],
+    )
+    patterns = (
+        r"iPhone",
+        r"Apple Mobile Device",
+        r"iPad",
+        r"Apple.?Phone",
+    )
 
-    if re.search(r"iPhone|Apple Mobile Device|iPad", out, re.I):
-        names = re.findall(r'"USB Product Name"\s*=\s*"([^"]+)"', out)
-        for name in reversed(names):
-            if re.search(r"iPhone|iPad|Apple Mobile", name, re.I):
-                return device(name)
-        return device("iPhone")
+    for cmd in commands:
+        out = run(cmd, timeout=15)
+        if not out:
+            continue
 
-    for block in re.split(r"\+\-o ", out):
-        if not re.search(r'idVendor"\s*=\s*(1452|0x05ac)', block, re.I):
-            continue
-        if re.search(r"hub|keyboard|trackpad|mouse|receiver|audio|camera|bluetooth", block, re.I):
-            continue
-        match = re.search(r'"USB Product Name"\s*=\s*"([^"]+)"', block)
-        if match:
-            return device(match.group(1))
+        if any(re.search(p, out, re.I) for p in patterns):
+            names = re.findall(r'"(?:USB Product Name|kUSBProductString)"\s*=\s*"([^"]+)"', out)
+            for name in reversed(names):
+                if re.search(r"iPhone|iPad|Apple Mobile|Phone", name, re.I):
+                    return device(name)
+            return device("iPhone")
+
+        for block in re.split(r"\+\-o ", out):
+            if not re.search(r'idVendor"\s*=\s*(1452|0x05ac)|"idVendor"\s*=\s*1452', block, re.I):
+                continue
+            if re.search(r"hub|keyboard|trackpad|mouse|receiver|audio|camera|bluetooth|ethernet", block, re.I):
+                continue
+            match = re.search(r'"(?:USB Product Name|kUSBProductString)"\s*=\s*"([^"]+)"', block)
+            if match and not re.search(r"hub|bridge", match.group(1), re.I):
+                return device(match.group(1))
+
     return None
 
 
 def detect_via_profiler_text() -> dict | None:
-    text = run(["system_profiler", "SPUSBDataType"], timeout=25)
-    if not text or not re.search(r"iPhone|Apple Mobile Device|iPad", text, re.I):
-        return None
-    match = re.search(r"(iPhone[^\n:]*)", text, re.I)
-    return device(match.group(1).strip() if match else "iPhone")
-
-
-def detect_via_lockdown() -> dict | None:
-    patterns = ("/var/db/lockdown/*.plist", os.path.expanduser("~/Library/Lockdown/*.plist"))
-    for pattern in patterns:
-        if glob.glob(pattern):
-            return device("iPhone")
+    for datatype in ("SPUSBDataType", "SPThunderboltDataType"):
+        text = run(["system_profiler", datatype], timeout=30)
+        if not text:
+            continue
+        if re.search(r"iPhone|Apple Mobile Device|iPad", text, re.I):
+            match = re.search(r"((?:iPhone|iPad)[^\n:]*)", text, re.I)
+            label = match.group(1).strip() if match else "iPhone"
+            return device(label, "iPhone")
     return None
 
 
@@ -147,13 +171,7 @@ def detect_iphone_usb() -> dict:
         return _SCAN_CACHE[1]
 
     if platform.system() == "Darwin":
-        for fn in (
-            detect_via_usbmux,
-            detect_via_ioreg,
-            detect_via_profiler_text,
-            detect_via_lockdown,
-            detect_via_idevice,
-        ):
+        for fn in (detect_via_ioreg, detect_via_usbmux, detect_via_profiler_text, detect_via_idevice):
             found = fn()
             if found:
                 result = {"connected": True, "device": found}
@@ -251,7 +269,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     server = HTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"GeoLoca Link v{VERSION} — plug iPhone in, tap Trust, open dashboard")
+    print(f"GeoLoca Link v{VERSION} running — keep this open, plug iPhone in, tap Trust")
     print(f"http://127.0.0.1:{PORT}")
     try:
         server.serve_forever()

@@ -7,6 +7,7 @@ type Props = {
   status: ConnectionStatus;
   connectedDevice: DetectedDevice | null;
   linkOnline: boolean;
+  bridgeStarting: boolean;
   onDisconnect: () => void;
   onConnect: () => void;
   open?: boolean;
@@ -17,6 +18,7 @@ export default function PhoneConnection({
   status,
   connectedDevice,
   linkOnline,
+  bridgeStarting,
   onDisconnect,
   onConnect,
   open = true,
@@ -28,6 +30,16 @@ export default function PhoneConnection({
 
   const isWaiting = status === 'waiting' || status === 'detecting_usb' || status === 'connecting';
   const isConnected = status === 'connected' && connectedDevice;
+
+  const statusText = bridgeStarting
+    ? t('usb.bridge_starting')
+    : status === 'connecting'
+      ? t('usb.establishing')
+      : status === 'detecting_usb'
+        ? t('usb.scanning_ports')
+        : linkOnline
+          ? t('usb.listening')
+          : t('usb.plug_scan');
 
   return (
     <>
@@ -55,14 +67,20 @@ export default function PhoneConnection({
 
             <div className="phone-waiting-status">
               <span className="phone-waiting-dot" />
-              {status === 'connecting'
-                ? t('usb.establishing')
-                : status === 'detecting_usb'
-                  ? t('usb.scanning_ports')
-                  : linkOnline
-                    ? t('usb.listening')
-                    : t('usb.plug_scan')}
+              {statusText}
             </div>
+
+            {bridgeStarting && (
+              <p className="phone-bridge-tip">{t('usb.bridge_open')}</p>
+            )}
+
+            {!linkOnline && !bridgeStarting && (
+              <p className="phone-bridge-tip">{t('usb.bridge_once')}</p>
+            )}
+
+            {linkOnline && !bridgeStarting && (
+              <p className="phone-bridge-tip">{t('usb.allow_local')}</p>
+            )}
 
             <ul className="phone-waiting-tips">
               <li>{t('usb.tip_cable')}</li>

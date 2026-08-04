@@ -25,6 +25,7 @@ type Props = {
   appliedLocation: AppliedLocation | null;
   applyingLocation: boolean;
   linkOnline: boolean;
+  bridgeStarting: boolean;
   onDisconnect: () => void;
   onConnect: () => void;
   onApplyLocation: (country: string, lat: number, lng: number, label: string) => void;
@@ -63,6 +64,7 @@ export default function DashboardMap({
   appliedLocation,
   applyingLocation,
   linkOnline,
+  bridgeStarting,
   onDisconnect,
   onConnect,
   onApplyLocation,
@@ -285,6 +287,7 @@ export default function DashboardMap({
         status={connectionStatus}
         connectedDevice={connectedDevice}
         linkOnline={linkOnline}
+        bridgeStarting={bridgeStarting}
         onDisconnect={() => {
           onDisconnect();
           setShowPhonePanel(true);

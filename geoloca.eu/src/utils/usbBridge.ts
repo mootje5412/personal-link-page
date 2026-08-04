@@ -23,7 +23,7 @@ const APPLE_VENDOR = 0x05ac;
 
 async function localFetch<T>(path: string, init?: RequestInit): Promise<T | null> {
   const isScan = path.includes('/usb/scan');
-  const timeoutMs = init?.method === 'POST' ? 20000 : isScan ? 30000 : 5000;
+  const timeoutMs = init?.method === 'POST' ? 20000 : isScan ? 35000 : 6000;
   try {
     const res = await fetch(`${LOCAL}${path}`, {
       ...init,
@@ -57,18 +57,26 @@ export async function scanLocalUsb(): Promise<UsbScanResult> {
   return { connected: false, linkOnline: true, error: 'no_device' };
 }
 
-export async function burstScanLocal(tries = 12, gapMs = 400): Promise<UsbScanResult> {
+export async function burstScanLocal(tries = 20, gapMs = 350): Promise<UsbScanResult> {
   for (let i = 0; i < tries; i += 1) {
     const scan = await scanLocalUsb();
     if (scan.connected) return scan;
-    if (scan.linkOnline && scan.error === 'no_device') {
+    if (scan.linkOnline) {
       await new Promise((r) => window.setTimeout(r, gapMs));
       continue;
     }
-    if (!scan.linkOnline) return scan;
-    await new Promise((r) => window.setTimeout(r, gapMs));
+    return scan;
   }
   return scanLocalUsb();
+}
+
+export async function waitForLink(seconds = 25): Promise<boolean> {
+  const tries = seconds * 2;
+  for (let i = 0; i < tries; i += 1) {
+    if (await isLinkOnline()) return true;
+    await new Promise((r) => window.setTimeout(r, 500));
+  }
+  return false;
 }
 
 export async function setDeviceLocation(lat: number, lng: number): Promise<LocationResult> {
@@ -103,22 +111,25 @@ export async function requestWebUsb(): Promise<UsbScanResult> {
   if (existing.connected) return existing;
 
   try {
-    const device = await navigator.usb!.requestDevice({
-      filters: [{ vendorId: APPLE_VENDOR }],
-    });
+    const device = await navigator.usb!.requestDevice({ filters: [{ vendorId: APPLE_VENDOR }] });
     return { connected: true, device: deviceFromUsb(device), linkOnline: await isLinkOnline() };
   } catch {
-    /* try showing all USB devices so user can pick iPhone */
-  }
-
-  try {
-    const device = await navigator.usb!.requestDevice({ filters: [] });
-    if (device.vendorId === APPLE_VENDOR) {
-      return { connected: true, device: deviceFromUsb(device), linkOnline: await isLinkOnline() };
-    }
-  } catch {
-    /* user cancelled or no device */
+    /* fall through */
   }
 
   return { connected: false, error: 'no_device' };
+}
+
+export function launchGeoLocaLink() {
+  const href = `${window.location.origin}/connect/GeoLoca-Link.command`;
+  const a = document.createElement('a');
+  a.href = href;
+  a.download = 'GeoLoca-Link.command';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+export function isMacDesktop() {
+  return /macintosh|mac os x/i.test(navigator.userAgent) && !/iphone|ipad/i.test(navigator.userAgent);
 }

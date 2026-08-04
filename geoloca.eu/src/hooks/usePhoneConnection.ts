@@ -3,10 +3,13 @@ import type { ConnectionStatus, DetectedDevice } from '../data/phones';
 import {
   burstScanLocal,
   isLinkOnline,
+  isMacDesktop,
+  launchGeoLocaLink,
   requestWebUsb,
   scanLocalUsb,
   setDeviceLocation,
   tryExistingWebUsb,
+  waitForLink,
 } from '../utils/usbBridge';
 
 export type AppliedLocation = {
@@ -16,7 +19,7 @@ export type AppliedLocation = {
   label: string;
 };
 
-const SCAN_MS = 800;
+const SCAN_MS = 600;
 
 export function usePhoneConnection() {
   const [status, setStatus] = useState<ConnectionStatus>('waiting');
@@ -24,8 +27,10 @@ export function usePhoneConnection() {
   const [appliedLocation, setAppliedLocation] = useState<AppliedLocation | null>(null);
   const [applyingLocation, setApplyingLocation] = useState(false);
   const [linkOnline, setLinkOnline] = useState(false);
+  const [bridgeStarting, setBridgeStarting] = useState(false);
   const scanRef = useRef<number | null>(null);
   const connectedRef = useRef(false);
+  const launchedRef = useRef(false);
 
   const stopScan = useCallback(() => {
     if (scanRef.current) {
@@ -39,16 +44,35 @@ export function usePhoneConnection() {
       connectedRef.current = true;
       setConnectedDevice(device);
       setStatus('connected');
+      setBridgeStarting(false);
       setAppliedLocation(null);
       stopScan();
     },
     [stopScan],
   );
 
+  const ensureBridge = useCallback(async () => {
+    if (await isLinkOnline()) return true;
+
+    if (isMacDesktop() && !launchedRef.current) {
+      launchedRef.current = true;
+      setBridgeStarting(true);
+      launchGeoLocaLink();
+      const ready = await waitForLink(30);
+      setBridgeStarting(false);
+      return ready;
+    }
+
+    return false;
+  }, []);
+
   const runScan = useCallback(async (): Promise<boolean> => {
     if (connectedRef.current) return true;
 
-    const online = await isLinkOnline();
+    let online = await isLinkOnline();
+    if (!online && isMacDesktop()) {
+      online = await ensureBridge();
+    }
     setLinkOnline(online);
 
     setStatus('detecting_usb');
@@ -63,7 +87,7 @@ export function usePhoneConnection() {
       const scan = await scanLocalUsb();
       if (scan.connected && scan.device) {
         setStatus('connecting');
-        await new Promise((r) => window.setTimeout(r, 300));
+        await new Promise((r) => window.setTimeout(r, 250));
         connectDevice(scan.device);
         return true;
       }
@@ -71,7 +95,7 @@ export function usePhoneConnection() {
 
     setStatus('waiting');
     return false;
-  }, [connectDevice]);
+  }, [connectDevice, ensureBridge]);
 
   const startScan = useCallback(() => {
     stopScan();
@@ -87,13 +111,16 @@ export function usePhoneConnection() {
   const connectIphone = useCallback(async () => {
     setStatus('detecting_usb');
 
+    await ensureBridge();
+    setLinkOnline(await isLinkOnline());
+
     const web = await requestWebUsb();
     if (web.connected && web.device) {
       connectDevice(web.device);
       return true;
     }
 
-    let scan = await burstScanLocal(10, 300);
+    const scan = await burstScanLocal(25, 300);
     if (scan.connected && scan.device) {
       connectDevice(scan.device);
       return true;
@@ -101,7 +128,7 @@ export function usePhoneConnection() {
 
     setStatus('waiting');
     return false;
-  }, [connectDevice]);
+  }, [connectDevice, ensureBridge]);
 
   const disconnect = useCallback(() => {
     connectedRef.current = false;
@@ -145,6 +172,7 @@ export function usePhoneConnection() {
     appliedLocation,
     applyingLocation,
     linkOnline,
+    bridgeStarting,
     connected: status === 'connected',
     disconnect,
     applyLocation,

