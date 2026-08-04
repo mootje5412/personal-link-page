@@ -1,71 +1,38 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import AddFundsModal from './components/AddFundsModal';
 import InstallPrompt from './components/InstallPrompt';
+import {
+  PERP_DEFS,
+  TOKEN_DEFS,
+  calcPortfolio,
+  fetchPrices,
+  formatAmount,
+  formatChange,
+  formatEur,
+  loadWallet,
+  saveWallet,
+  type Prices,
+  type WalletState,
+} from './utils/wallet';
 import './App.css';
 
 const TABS = ['Home', 'Trade', 'Predict', 'Explore'] as const;
 
-const TOKENS = [
-  {
-    name: 'Ethereum',
-    symbol: 'ETH',
-    amount: '0.0001',
-    value: '€0.18',
-    change: '-0.01%',
-    up: false,
-    icon: 'eth' as const,
-  },
-  {
-    name: 'Solana',
-    symbol: 'SOL',
-    amount: '0.0078',
-    value: '€0.69',
-    change: '+0.41%',
-    up: true,
-    icon: 'sol' as const,
-  },
-];
-
-const PERPS = [
-  { symbol: 'BTC', leverage: '40x', change: '+0.01%', up: true, color: '#f7931a' },
-  { symbol: 'ETH', leverage: '25x', change: '-0.02%', up: false, color: '#627eea' },
-  { symbol: 'SOL', leverage: '20x', change: '+0.41%', up: true, color: '#9945ff' },
-  { symbol: 'HYPE', leverage: '10x', change: '+0.05%', up: true, color: '#50fa7b' },
-];
-
-function TokenIcon({ type }: { type: 'eth' | 'sol' }) {
-  if (type === 'eth') {
-    return (
-      <svg className="token-svg" viewBox="0 0 32 32" aria-hidden>
-        <circle cx="16" cy="16" r="16" fill="#627eea" />
-        <path fill="#fff" d="M16.5 4v8.9l7.2 3.1L16.5 4zm0 0L9.3 15.9l7.2-3V4zm0 18.1V28l7.2-10.1-7.2 4.2zm0 0l-7.2-10.1 7.2 4.2v5.9z" opacity=".95" />
-      </svg>
-    );
-  }
-  return (
-    <svg className="token-svg" viewBox="0 0 32 32" aria-hidden>
-      <defs>
-        <linearGradient id="sol-g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#9945ff" />
-          <stop offset="100%" stopColor="#14f195" />
-        </linearGradient>
-      </defs>
-      <circle cx="16" cy="16" r="16" fill="url(#sol-g)" />
-      <path fill="#fff" d="M10 20.5l6.2-1.1 2.8-6.8-6.2 1.1L10 20.5zm12-8.2l-6.2 1.1-2.8 6.8 6.2-1.1 2.8-6.8z" />
-    </svg>
-  );
-}
-
-function PerpIcon({ symbol, color }: { symbol: string; color: string }) {
-  return (
-    <div className="perp-icon" style={{ background: color }}>
-      {symbol.slice(0, 1)}
-    </div>
-  );
-}
-
 export default function App() {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('Home');
   const [showInstall, setShowInstall] = useState(false);
+  const [showAddFunds, setShowAddFunds] = useState(false);
+  const [wallet, setWallet] = useState<WalletState>(loadWallet);
+  const [prices, setPrices] = useState<Prices | null>(null);
+
+  const refreshPrices = useCallback(async () => {
+    try {
+      const p = await fetchPrices();
+      setPrices(p);
+    } catch {
+      /* keep last prices */
+    }
+  }, []);
 
   useEffect(() => {
     const standalone =
@@ -74,11 +41,29 @@ export default function App() {
     setShowInstall(!standalone);
   }, []);
 
+  useEffect(() => {
+    refreshPrices();
+    const id = window.setInterval(refreshPrices, 60_000);
+    return () => window.clearInterval(id);
+  }, [refreshPrices]);
+
+  useEffect(() => {
+    saveWallet(wallet);
+  }, [wallet]);
+
+  const portfolio = prices ? calcPortfolio(wallet, prices) : null;
+
+  const handleSaveWallet = (next: WalletState) => {
+    setWallet(next);
+  };
+
+  const pnlUp = (portfolio?.pnlEur ?? 0) >= 0;
+
   return (
     <div className="app">
       <header className="top-bar">
         <button type="button" className="avatar" aria-label="Account">
-          <span className="avatar-inner" />
+          <img src="/logos/phantom-icon-128.png" alt="" className="avatar-img" />
         </button>
 
         <nav className="tab-pills" aria-label="Sections">
@@ -104,11 +89,16 @@ export default function App() {
         </button>
 
         <div className="balance-block">
-          <p className="balance">€1.24</p>
-          <span className="pnl up">+€0.00494214 +0.40%</span>
+          <p className="balance">{portfolio ? formatEur(portfolio.total) : '—'}</p>
+          {portfolio && (
+            <span className={`pnl ${pnlUp ? 'up' : 'down'}`}>
+              {pnlUp ? '+' : ''}
+              {formatEur(portfolio.pnlEur, 8)} {formatChange(portfolio.pnlPct)}
+            </span>
+          )}
         </div>
 
-        <div className="cash-card">
+        <button type="button" className="cash-card" onClick={() => setShowAddFunds(true)}>
           <div className="cash-icon" aria-hidden>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
               <rect x="3" y="6" width="18" height="13" rx="2" stroke="currentColor" strokeWidth="1.5" />
@@ -116,8 +106,8 @@ export default function App() {
             </svg>
           </div>
           <span className="cash-label">Cash</span>
-          <span className="cash-value">€0.00</span>
-        </div>
+          <span className="cash-value">{formatEur(wallet.cash)}</span>
+        </button>
 
         <section className="section">
           <button type="button" className="section-head">
@@ -128,21 +118,35 @@ export default function App() {
           </button>
 
           <div className="token-list">
-            {TOKENS.map((token) => (
-              <div key={token.symbol} className="token-row">
-                <TokenIcon type={token.icon} />
-                <div className="token-main">
-                  <span className="token-name">{token.name}</span>
-                  <span className="token-amount">
-                    {token.amount} {token.symbol}
-                  </span>
-                </div>
-                <div className="token-right">
-                  <span className="token-value">{token.value}</span>
-                  <span className={`token-change ${token.up ? 'up' : 'down'}`}>{token.change}</span>
-                </div>
-              </div>
-            ))}
+            {TOKEN_DEFS.map((token) => {
+              const amount = wallet.holdings[token.id] ?? 0;
+              const price = prices?.[token.id];
+              const value = price ? amount * price.eur : 0;
+              const up = (price?.change24h ?? 0) >= 0;
+              if (amount <= 0 && value <= 0) return null;
+              return (
+                <button
+                  key={token.id}
+                  type="button"
+                  className="token-row"
+                  onClick={() => setShowAddFunds(true)}
+                >
+                  <img src={token.logo} alt="" className="coin-logo" />
+                  <div className="token-main">
+                    <span className="token-name">{token.name}</span>
+                    <span className="token-amount">{formatAmount(amount, token.symbol)}</span>
+                  </div>
+                  <div className="token-right">
+                    <span className="token-value">{price ? formatEur(value) : '—'}</span>
+                    {price && (
+                      <span className={`token-change ${up ? 'up' : 'down'}`}>
+                        {formatChange(price.change24h)}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </section>
 
@@ -155,14 +159,22 @@ export default function App() {
           </button>
 
           <div className="perps-scroll">
-            {PERPS.map((perp) => (
-              <div key={perp.symbol} className="perp-card">
-                <PerpIcon symbol={perp.symbol} color={perp.color} />
-                <span className="perp-symbol">{perp.symbol}</span>
-                <span className="perp-lev">{perp.leverage}</span>
-                <span className={`perp-change ${perp.up ? 'up' : 'down'}`}>{perp.change}</span>
-              </div>
-            ))}
+            {PERP_DEFS.map((perp) => {
+              const price = prices?.[perp.id];
+              const up = (price?.change24h ?? 0) >= 0;
+              return (
+                <div key={perp.symbol} className="perp-card">
+                  <img src={perp.logo} alt="" className="perp-logo" />
+                  <span className="perp-symbol">{perp.symbol}</span>
+                  <span className="perp-lev">{perp.leverage}</span>
+                  {price && (
+                    <span className={`perp-change ${up ? 'up' : 'down'}`}>
+                      {formatChange(price.change24h)}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
       </main>
@@ -175,10 +187,17 @@ export default function App() {
           </svg>
           <span>Search Phantom</span>
         </div>
-        <button type="button" className="fab" aria-label="Add">
+        <button type="button" className="fab" aria-label="Add funds" onClick={() => setShowAddFunds(true)}>
           +
         </button>
       </footer>
+
+      <AddFundsModal
+        open={showAddFunds}
+        onClose={() => setShowAddFunds(false)}
+        wallet={wallet}
+        onSave={handleSaveWallet}
+      />
 
       {showInstall && (
         <div className="install-overlay">

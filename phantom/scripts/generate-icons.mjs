@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -6,59 +6,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const iconsDir = join(__dirname, '../public/icons');
 mkdirSync(iconsDir, { recursive: true });
 
-function createSvg(size) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#534BB1"/>
-      <stop offset="50%" stop-color="#6E56CF"/>
-      <stop offset="100%" stop-color="#551BF9"/>
-    </linearGradient>
-    <linearGradient id="shine" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <rect width="512" height="512" rx="112" fill="url(#shine)"/>
-  <g transform="translate(256 248)">
-    <path
-      fill="#FFFFFF"
-      d="M-78 -92
-         C-78 -132 -44 -158 0 -158
-         C44 -158 78 -132 78 -92
-         C78 -72 68 -54 52 -42
-         C68 -28 78 -8 78 14
-         C78 54 44 80 0 80
-         C-44 80 -78 54 -78 14
-         C-78 -8 -68 -28 -52 -42
-         C-68 -54 -78 -72 -78 -92 Z"
-    />
-    <circle cx="-28" cy="-78" r="16" fill="#534BB1"/>
-    <circle cx="28" cy="-78" r="16" fill="#534BB1"/>
-    <path
-      fill="#FFFFFF"
-      d="M-52 42
-         C-36 58 -18 66 0 66
-         C18 66 36 58 52 42
-         C44 52 30 58 0 58
-         C-30 58 -44 52 -52 42 Z"
-    />
-  </g>
-</svg>`;
-}
-
-writeFileSync(join(iconsDir, 'icon.svg'), createSvg(512));
-
 async function generate() {
   const sharp = (await import('sharp')).default;
-  for (const size of [192, 512]) {
-    await sharp(Buffer.from(createSvg(size)))
-      .resize(size, size)
-      .png()
-      .toFile(join(iconsDir, `icon-${size}.png`));
-  }
-  console.log('Phantom icons generated in public/icons');
+  const source512 = join(iconsDir, 'icon-512.png');
+
+  await sharp(source512).resize(192, 192).png().toFile(join(iconsDir, 'icon-192.png'));
+  console.log('PWA icons ready from official Phantom assets');
 }
 
 generate().catch((err) => {
