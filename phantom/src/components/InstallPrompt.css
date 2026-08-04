@@ -1,0 +1,48 @@
+.install-prompt {
+  margin-top: 16px;
+}
+
+.install-btn {
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #534bb1, #551bf9);
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.install-dismiss {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.install-fallback {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.ios-steps {
+  margin-left: 18px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.ios-steps li + li {
+  margin-top: 8px;
+}
+
+.ios-steps strong {
+  color: var(--text);
+}
+
+.ios-icon {
+  display: inline-block;
+  margin: 0 2px;
+  font-size: 1rem;
+}
