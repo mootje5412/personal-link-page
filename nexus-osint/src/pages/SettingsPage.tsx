@@ -9,16 +9,15 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
   return (
     <button
       onClick={() => onChange(!on)}
-      className={`relative w-12 h-7 rounded-full transition-colors ${on ? "bg-blue-500" : "bg-white/10"}`}
+      className={`relative w-11 h-6 rounded-full transition-colors ${on ? "bg-white" : "bg-white/10"}`}
     >
-      <span className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : "translate-x-0.5"}`} />
+      <span className={`absolute top-0.5 w-5 h-5 rounded-full transition-all ${on ? "translate-x-[22px] bg-black" : "translate-x-0.5 bg-zinc-600"}`} />
     </button>
   );
 }
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings>(getSettings());
-
   useEffect(() => { setSettings(getSettings()); }, []);
 
   const update = (key: keyof AppSettings, val: boolean) => {
@@ -28,37 +27,33 @@ export default function SettingsPage() {
   };
 
   const items = [
-    { key: "notifications" as const, icon: Bell, label: "Notifications", desc: "Search alerts & updates" },
-    { key: "keyboardShortcuts" as const, icon: Keyboard, label: "Keyboard Shortcuts", desc: "⌘K to focus search" },
-    { key: "haptics" as const, icon: Vibrate, label: "Haptic Feedback", desc: "Vibration on actions" },
+    { key: "notifications" as const, icon: Bell, label: "Notifications", desc: "Search alerts" },
+    { key: "keyboardShortcuts" as const, icon: Keyboard, label: "Shortcuts", desc: "⌘K to search" },
+    { key: "haptics" as const, icon: Vibrate, label: "Haptics", desc: "Touch feedback" },
   ];
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-sm text-zinc-500 mt-0.5">Configure your experience</p>
+        <h1 className="text-2xl font-light tracking-tight">Settings</h1>
       </header>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {items.map(({ key, icon: Icon, label, desc }) => (
           <GlassCard key={key} className="!p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-              <Icon className="w-5 h-5 text-blue-400" />
-            </div>
+            <Icon className="w-4 h-4 text-zinc-600 shrink-0" strokeWidth={1.5} />
             <div className="flex-1">
-              <p className="text-sm font-medium">{label}</p>
-              <p className="text-xs text-zinc-500">{desc}</p>
+              <p className="text-sm font-light">{label}</p>
+              <p className="text-xs text-zinc-700">{desc}</p>
             </div>
             <Toggle on={settings[key]} onChange={(v) => update(key, v)} />
           </GlassCard>
         ))}
       </div>
 
-      <GlassCard className="text-center py-6">
-        <Shield className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-        <p className="text-sm font-medium">Nexus OSINT v1.0</p>
-        <p className="text-xs text-zinc-500 mt-1">Enterprise Intelligence Platform</p>
+      <GlassCard className="text-center py-5">
+        <Shield className="w-5 h-5 text-zinc-600 mx-auto mb-2" strokeWidth={1.5} />
+        <p className="text-xs text-zinc-600 font-light">Nexus OSINT v1.0</p>
       </GlassCard>
     </div>
   );

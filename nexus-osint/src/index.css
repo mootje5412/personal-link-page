@@ -1,12 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #030308;
-  --surface: rgba(255, 255, 255, 0.04);
-  --border: rgba(255, 255, 255, 0.08);
-  --blue: #3b82f6;
-  --purple: #8b5cf6;
-  --cyan: #06b6d4;
+  --bg: #000000;
+  --surface: rgba(255, 255, 255, 0.03);
+  --border: rgba(255, 255, 255, 0.1);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -24,9 +21,10 @@ body {
   margin: 0;
   min-height: 100%;
   background: var(--bg);
-  color: #f4f4f5;
+  color: #fafafa;
   font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
   overscroll-behavior: none;
 }
 
@@ -35,56 +33,28 @@ body {
 }
 
 .cyber-bg {
-  background:
-    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(59, 130, 246, 0.18), transparent),
-    radial-gradient(ellipse 50% 40% at 90% 20%, rgba(139, 92, 246, 0.12), transparent),
-    radial-gradient(ellipse 40% 30% at 10% 80%, rgba(6, 182, 212, 0.08), transparent),
-    var(--bg);
+  background: var(--bg);
 }
 
 .glass {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .glass-strong {
-  background: rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(32px);
-  -webkit-backdrop-filter: blur(32px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.neon-blue {
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.35), 0 0 60px rgba(59, 130, 246, 0.1);
-}
-
-.neon-purple {
-  box-shadow: 0 0 20px rgba(139, 92, 246, 0.35), 0 0 60px rgba(139, 92, 246, 0.1);
-}
-
-.gradient-text {
-  background: linear-gradient(135deg, #60a5fa, #a78bfa, #22d3ee);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .grid-bg {
   background-image:
-    linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
-  background-size: 48px 48px;
-}
-
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 3s ease-in-out infinite;
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 64px 64px;
 }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }

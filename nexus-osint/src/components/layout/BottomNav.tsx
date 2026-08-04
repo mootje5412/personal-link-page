@@ -18,7 +18,7 @@ export function BottomNav() {
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 pb-[var(--safe-bottom)]">
       <div className="mx-auto max-w-lg px-4 pb-3">
-        <div className="glass-strong rounded-[28px] px-2 py-2 shadow-2xl shadow-black/50">
+        <div className="glass-strong rounded-2xl px-1 py-1">
           <div className="flex justify-around">
             {nav.map((item) => {
               const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -28,19 +28,19 @@ export function BottomNav() {
                   key={item.href}
                   to={item.href}
                   className={cn(
-                    "relative flex flex-col items-center gap-0.5 px-3 py-2 rounded-2xl min-w-[56px] transition-colors",
+                    "relative flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl min-w-[56px] transition-colors",
                     active ? "text-white" : "text-zinc-600"
                   )}
                 >
                   {active && (
                     <motion.div
                       layoutId="nav-bg"
-                      className="absolute inset-0 bg-blue-500/15 rounded-2xl border border-blue-500/20"
-                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      className="absolute inset-0 bg-white/10 rounded-xl"
+                      transition={{ type: "spring", stiffness: 500, damping: 35 }}
                     />
                   )}
-                  <Icon className="w-5 h-5 relative z-10" strokeWidth={active ? 2.5 : 2} />
-                  <span className="text-[10px] font-medium relative z-10">{item.label}</span>
+                  <Icon className="w-[18px] h-[18px] relative z-10" strokeWidth={active ? 2 : 1.5} />
+                  <span className="text-[9px] font-medium relative z-10 tracking-wide">{item.label}</span>
                 </Link>
               );
             })}
@@ -52,10 +52,19 @@ export function BottomNav() {
 }
 
 export function Logo({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
-  const sizes = { sm: "w-8 h-8 text-sm", md: "w-11 h-11 text-lg", lg: "w-16 h-16 text-2xl" };
+  const sizes = {
+    sm: "w-8 h-8",
+    md: "w-10 h-10",
+    lg: "w-14 h-14",
+  };
+  const iconSizes = {
+    sm: "w-4 h-4",
+    md: "w-5 h-5",
+    lg: "w-7 h-7",
+  };
   return (
-    <div className={cn("rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30 neon-blue", sizes[size])}>
-      <Shield className={size === "lg" ? "w-8 h-8" : size === "md" ? "w-5 h-5" : "w-4 h-4"} />
+    <div className={cn("rounded-xl border border-white/15 flex items-center justify-center bg-white/[0.03]", sizes[size])}>
+      <Shield className={cn("text-white", iconSizes[size])} strokeWidth={1.5} />
     </div>
   );
 }

@@ -4,21 +4,12 @@ import type { ReactNode } from "react";
 export function GlassCard({
   children,
   className,
-  glow,
 }: {
   children: ReactNode;
   className?: string;
-  glow?: "blue" | "purple";
 }) {
   return (
-    <div
-      className={cn(
-        "glass rounded-3xl p-5 transition-all duration-300",
-        glow === "blue" && "neon-blue",
-        glow === "purple" && "neon-purple",
-        className
-      )}
-    >
+    <div className={cn("glass rounded-2xl p-5 transition-colors duration-200", className)}>
       {children}
     </div>
   );

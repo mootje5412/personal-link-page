@@ -1,23 +1,10 @@
 "use client";
 
+import { useToast } from "@/contexts/ToastContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, AlertCircle, Info, X } from "lucide-react";
-import { useToast } from "@/contexts/ToastContext";
-import { cn } from "@/lib/utils";
 
-const icons = {
-  info: Info,
-  success: CheckCircle,
-  error: AlertCircle,
-  warning: AlertCircle,
-};
-
-const colors = {
-  info: "text-blue-400 border-blue-500/30",
-  success: "text-emerald-400 border-emerald-500/30",
-  error: "text-red-400 border-red-500/30",
-  warning: "text-amber-400 border-amber-500/30",
-};
+const icons = { info: Info, success: CheckCircle, error: AlertCircle, warning: AlertCircle };
 
 export function ToastContainer() {
   const { toasts, dismiss } = useToast();
@@ -30,18 +17,15 @@ export function ToastContainer() {
           return (
             <motion.div
               key={t.id}
-              initial={{ opacity: 0, y: -20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.95 }}
-              className={cn(
-                "pointer-events-auto glass-strong rounded-2xl px-4 py-3 flex items-center gap-3 min-w-[280px] max-w-md border shadow-xl",
-                colors[t.type]
-              )}
+              initial={{ opacity: 0, y: -12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="pointer-events-auto glass-strong rounded-xl px-4 py-3 flex items-center gap-3 min-w-[280px] max-w-md border border-white/10"
             >
-              <Icon className="w-4 h-4 shrink-0" />
-              <p className="text-sm flex-1">{t.message}</p>
-              <button onClick={() => dismiss(t.id)} className="p-1 rounded-lg hover:bg-white/5">
-                <X className="w-3.5 h-3.5 text-zinc-500" />
+              <Icon className="w-4 h-4 text-zinc-400 shrink-0" strokeWidth={1.5} />
+              <p className="text-sm text-zinc-300 font-light flex-1">{t.message}</p>
+              <button onClick={() => dismiss(t.id)} className="p-1 rounded hover:bg-white/5">
+                <X className="w-3.5 h-3.5 text-zinc-600" />
               </button>
             </motion.div>
           );

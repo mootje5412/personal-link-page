@@ -22,44 +22,31 @@ export default function HomePage() {
   return (
     <div className="min-h-[calc(100dvh-8rem)] flex flex-col items-center justify-center">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-8"
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="text-center mb-10"
       >
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 200 }}
-          className="flex justify-center mb-5"
-        >
+        <div className="flex justify-center mb-6">
           <Logo size="lg" />
-        </motion.div>
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight gradient-text mb-2">
+        </div>
+        <h1 className="text-4xl sm:text-[2.75rem] font-light tracking-tight text-white mb-2">
           Nexus OSINT
         </h1>
-        <p className="text-sm sm:text-base text-zinc-400 max-w-xs mx-auto">
-          Professional Open Source Intelligence Platform
+        <p className="text-sm text-zinc-500 font-light max-w-xs mx-auto">
+          Open Source Intelligence Platform
         </p>
       </motion.div>
 
       <motion.div
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-        className="w-full space-y-5"
+        transition={{ delay: 0.1, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="w-full space-y-4"
       >
         <SearchTabs active={type} onChange={setType} />
         <SearchPanel type={type} onSearch={handleSearch} />
       </motion.div>
-
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.4 }}
-        className="text-[10px] text-zinc-600 mt-8 text-center"
-      >
-        Enterprise-grade intelligence · Encrypted · GDPR compliant
-      </motion.p>
     </div>
   );
 }

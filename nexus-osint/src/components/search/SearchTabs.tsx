@@ -25,26 +25,24 @@ interface SearchTabsProps {
 
 export function SearchTabs({ active, onChange }: SearchTabsProps) {
   return (
-    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
+    <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
       {tabs.map(({ type, icon: Icon }) => (
         <button
           key={type}
           onClick={() => onChange(type)}
           className={cn(
-            "relative flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs font-medium whitespace-nowrap transition-all shrink-0",
-            active === type
-              ? "text-white"
-              : "text-zinc-500 hover:text-zinc-300 glass"
+            "relative flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap shrink-0 transition-colors",
+            active === type ? "text-white" : "text-zinc-600 hover:text-zinc-400"
           )}
         >
           {active === type && (
             <motion.div
               layoutId="tab-bg"
-              className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 rounded-2xl"
-              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              className="absolute inset-0 bg-white/10 rounded-xl border border-white/10"
+              transition={{ type: "spring", stiffness: 500, damping: 35 }}
             />
           )}
-          <Icon className="w-3.5 h-3.5 relative z-10" />
+          <Icon className="w-3.5 h-3.5 relative z-10" strokeWidth={1.5} />
           <span className="relative z-10">{SEARCH_LABELS[type]}</span>
         </button>
       ))}
