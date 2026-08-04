@@ -133,6 +133,12 @@ def main() -> int:
     archive.unlink()
 
     run(client, "systemctl stop viralai 2>/dev/null || true")
+    run(client, "systemctl stop geoloca-api geoloca-usb-helper search-api 2>/dev/null || true")
+    run(client, "systemctl disable geoloca-api geoloca-usb-helper search-api 2>/dev/null || true")
+    run(client, "pkill -9 -f geoloca 2>/dev/null || true; pkill -9 -f usb_helper.py 2>/dev/null || true")
+    run(client, "rm -rf /opt/geoloca-api /opt/geoloca-bridge /var/www/phantom /var/lib/geoloca")
+    run(client, "rm -f /etc/systemd/system/geoloca-api.service /etc/systemd/system/geoloca-usb-helper.service /etc/systemd/system/search-api.service")
+    run(client, "systemctl daemon-reload")
     run(client, f"rm -rf {REMOTE_DIR} && mkdir -p {REMOTE_DIR}")
     run(client, f"tar -xzf {remote_archive} -C /root")
     run(client, f"test -d /root/viralai && test -f /root/viralai/package.json")
