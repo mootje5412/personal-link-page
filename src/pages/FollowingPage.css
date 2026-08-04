@@ -1,0 +1,103 @@
+.following-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  text-align: center;
+  padding: calc(14px + env(safe-area-inset-top)) 16px 10px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent);
+  pointer-events: none;
+}
+
+.following-header h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.following-state {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.following-state button {
+  background: var(--tt-red);
+  color: #fff;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--tt-red);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.following-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  text-align: center;
+  gap: 8px;
+}
+
+.following-empty.in-feed {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+}
+
+.following-empty-icon {
+  font-size: 56px;
+  margin-bottom: 8px;
+}
+
+.following-empty h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.following-empty p {
+  margin: 0 0 16px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 15px;
+  line-height: 1.4;
+  max-width: 280px;
+}
+
+.following-cta {
+  background: var(--tt-red);
+  color: #fff;
+  text-decoration: none;
+  padding: 12px 32px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.following-link {
+  color: var(--tt-cyan);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+}

@@ -1,160 +1,145 @@
 import { FormEvent, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
-import SiteHeader from '../components/SiteHeader'
-import AuthBrand from '../components/AuthBrand'
-import ApiKeyReveal from '../components/ApiKeyReveal'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { register } from '../services/authApi'
-import { validateUsername } from '../services/validation'
 import './AuthPages.css'
 
-const TERMS_TEXT = `
-VeriPanel Kullanım Şartları v1.0
-
-1. Hesabınız benzersiz API anahtarı ile korunur. Anahtarınızı güvenli tutmak sizin sorumluluğunuzdadır.
-2. Platform yalnızca yasal ve yetkili amaçlarla kullanılmalıdır.
-3. Sorgu limitleri paketinize göre uygulanır.
-4. Kötüye kullanım tespit edildiğinde hesap askıya alınabilir.
-5. API anahtarları güvenli şekilde şifrelenerek saklanır. Düz metin asla tutulmaz.
-6. Anahtarınızı kaybederseniz kurtarma mümkün değildir — yeni hesap oluşturmanız gerekir.
-`.trim()
-
-const RegisterPage = () => {
+export default function RegisterPage() {
+  const { register } = useAuth()
   const navigate = useNavigate()
-  const { user, loginSuccess } = useAuth()
+  const [step, setStep] = useState(1)
   const [username, setUsername] = useState('')
-  const [acceptedTerms, setAcceptedTerms] = useState(false)
-  const [showTerms, setShowTerms] = useState(false)
+  const [displayName, setDisplayName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [birthday, setBirthday] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [issuedKey, setIssuedKey] = useState<string | null>(null)
-  const [pendingSession, setPendingSession] = useState<{ user: Parameters<typeof loginSuccess>[0]; token: string } | null>(null)
 
-  if (user) return <Navigate to="/panel" replace />
-
-  async function handleSubmit(e: FormEvent) {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    if (step === 1) {
+      if (!username || !displayName) {
+        setError('Username and display name are required.')
+        return
+      }
+      setError('')
+      setStep(2)
+      return
+    }
+
     setError('')
-
-    if (!acceptedTerms) {
-      setError('Devam etmek için kullanım şartlarını kabul etmelisiniz.')
-      return
-    }
-
-    const usernameError = validateUsername(username)
-    if (usernameError) {
-      setError(usernameError)
-      return
-    }
-
     setLoading(true)
     try {
-      const data = await register(username.trim(), true)
-      setIssuedKey(data.apiKey)
-      setPendingSession({ user: data.user, token: data.token })
+      await register({
+        username: username.toLowerCase(),
+        displayName,
+        email: email || undefined,
+        phone: phone || undefined,
+        password,
+      })
+      navigate('/create')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Kayıt başarısız.')
+      setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
       setLoading(false)
     }
   }
 
-  function handleKeySaved() {
-    if (pendingSession) {
-      loginSuccess(pendingSession.user, pendingSession.token)
-    }
-    navigate('/panel')
-  }
-
   return (
-    <div className="auth-page">
-      <SiteHeader />
-      <main className="auth-shell">
-        <AuthBrand
-          title="Anahtar ile kayıt"
-          subtitle="Kullanıcı adını seç, sana özel bir API anahtarı oluşturulsun. Şifre yok, e-posta yok."
-        />
+    <div className="tt-auth">
+      <div className="tt-auth-glow tt-glow-cyan" />
+      <div className="tt-auth-glow tt-glow-red" />
 
-        <div className="auth-panel">
-          <div className="auth-card">
-            {issuedKey ? (
-              <ApiKeyReveal apiKey={issuedKey} onContinue={handleKeySaved} />
-            ) : (
-              <>
-                <h1>Kayıt ol</h1>
-                <p className="auth-lead">
-                  Sadece <strong>kullanıcı adı</strong> yeterli. Sistem otomatik olarak güvenli bir
-                  API anahtarı üretir ve şifreli olarak saklar.
-                </p>
-
-                <div className="auth-key-badge">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M12 2 4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6l-8-4Z" stroke="currentColor" strokeWidth="1.75" />
-                  </svg>
-                  Anahtar tabanlı — şifre gerekmez
-                </div>
-
-                <form className="auth-form" noValidate onSubmit={handleSubmit}>
-                  {error && <p className="auth-error" role="alert">{error}</p>}
-
-                  <div className="auth-field">
-                    <label htmlFor="register-username">Kullanıcı adı</label>
-                    <input
-                      id="register-username"
-                      type="text"
-                      autoComplete="username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))}
-                      placeholder="kullanici_adi"
-                      minLength={3}
-                      maxLength={32}
-                      required
-                    />
-                    <p className="auth-field-hint">3-32 karakter · harf, rakam ve _</p>
-                  </div>
-
-                  <div className="auth-terms">
-                    <label className="auth-terms-label">
-                      <input
-                        type="checkbox"
-                        checked={acceptedTerms}
-                        onChange={(e) => setAcceptedTerms(e.target.checked)}
-                        required
-                      />
-                      <span>
-                        <button
-                          type="button"
-                          className="auth-terms-link"
-                          onClick={() => setShowTerms((v) => !v)}
-                        >
-                          Kullanım şartlarını
-                        </button>
-                        {' '}okudum ve kabul ediyorum.
-                      </span>
-                    </label>
-
-                    {showTerms && (
-                      <div className="auth-terms-box" role="region" aria-label="Kullanım şartları">
-                        <pre>{TERMS_TEXT}</pre>
-                      </div>
-                    )}
-                  </div>
-
-                  <button type="submit" className="btn auth-submit" disabled={loading || !acceptedTerms}>
-                    {loading ? 'Anahtar oluşturuluyor…' : 'API anahtarı oluştur'}
-                  </button>
-                </form>
-
-                <p className="auth-footer">
-                  Zaten hesabın var mı? <Link to="/giris">Anahtar ile giriş yap</Link>
-                </p>
-              </>
-            )}
+      <div className="tt-auth-body">
+        <div className="tt-logo-wrap">
+          <div className="tt-logo">
+            <span className="tt-logo-note">♪</span>
           </div>
+          <h1 className="tt-brand">Loop</h1>
         </div>
-      </main>
+
+        <h2 className="tt-title">Sign up for Loop</h2>
+        <p className="tt-step-label">Step {step} of 2</p>
+
+        <form onSubmit={handleSubmit} className="tt-form">
+          {error && <div className="tt-error">{error}</div>}
+
+          {step === 1 && (
+            <>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_.]/g, ''))}
+                placeholder="Username"
+                required
+                minLength={3}
+                maxLength={24}
+                className="tt-input"
+              />
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Display name"
+                required
+                maxLength={50}
+                className="tt-input"
+              />
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Phone number (optional)"
+                className="tt-input"
+              />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email (optional)"
+                className="tt-input"
+              />
+              <button type="submit" className="tt-btn-primary">Next</button>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              <input
+                type="date"
+                value={birthday}
+                onChange={(e) => setBirthday(e.target.value)}
+                className="tt-input tt-input-date"
+              />
+              <p className="tt-hint">Your birthday won&apos;t be shown publicly.</p>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password (6+ characters)"
+                required
+                minLength={6}
+                className="tt-input"
+              />
+              <p className="tt-terms">
+                By continuing, you agree to Loop&apos;s Terms of Service and Privacy Policy.
+              </p>
+              <button type="submit" className="tt-btn-primary" disabled={loading}>
+                {loading ? 'Creating account...' : 'Create account'}
+              </button>
+              <button type="button" className="tt-btn-ghost" onClick={() => setStep(1)}>
+                Back
+              </button>
+            </>
+          )}
+        </form>
+
+        <p className="tt-footer">
+          Already have an account?{' '}
+          <Link to="/login">Log in</Link>
+        </p>
+      </div>
     </div>
   )
 }
-
-export default RegisterPage

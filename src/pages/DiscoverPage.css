@@ -1,0 +1,127 @@
+.discover-page {
+  min-height: 100%;
+  background: #fff;
+  color: #161823;
+  overflow-y: auto;
+  padding: calc(16px + env(safe-area-inset-top)) 16px 24px;
+}
+
+.discover-header h1 {
+  margin: 0 0 4px;
+  font-size: 28px;
+  font-weight: 800;
+  background: linear-gradient(90deg, var(--tt-red), #ff6b8a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.discover-header p {
+  margin: 0 0 20px;
+  color: #8a8b91;
+  font-size: 14px;
+}
+
+.discover-loading {
+  text-align: center;
+  padding: 40px;
+  color: #8a8b91;
+}
+
+.discover-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.discover-empty {
+  text-align: center;
+  padding: 60px 24px;
+}
+
+.discover-empty span {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.discover-empty h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.discover-empty p {
+  color: var(--tt-gray);
+  margin: 0 0 20px;
+}
+
+.discover-cta {
+  display: inline-block;
+  background: var(--tt-red);
+  color: #fff;
+  text-decoration: none;
+  padding: 12px 28px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.discover-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top-color: var(--tt-red);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 40px auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.discover-card {
+  break-inside: avoid;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.discover-thumb {
+  position: relative;
+  aspect-ratio: 9 / 14;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+}
+
+.discover-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.discover-overlay {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.discover-caption {
+  font-size: 13px;
+  margin: 8px 0 2px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.discover-author {
+  font-size: 12px;
+  color: #8a8b91;
+  margin: 0;
+}

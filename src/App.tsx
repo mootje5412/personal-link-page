@@ -1,33 +1,41 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import BottomNav from './components/BottomNav'
 import { AuthProvider } from './context/AuthContext'
-import ProtectedRoute from './components/ProtectedRoute'
-import DashboardLayout from './components/DashboardLayout'
-import HomePage from './pages/HomePage'
+import CreatePage from './pages/CreatePage'
+import DiscoverPage from './pages/DiscoverPage'
+import EditProfilePage from './pages/EditProfilePage'
+import FollowingPage from './pages/FollowingPage'
+import InboxPage from './pages/InboxPage'
 import LoginPage from './pages/LoginPage'
+import ProfilePage from './pages/ProfilePage'
 import RegisterPage from './pages/RegisterPage'
-import DashboardPage from './pages/DashboardPage'
+import WatchPage from './pages/WatchPage'
+
+function AppLayout() {
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<FollowingPage />} />
+        <Route path="/discover" element={<DiscoverPage />} />
+        <Route path="/watch/:id" element={<WatchPage />} />
+        <Route path="/create" element={<CreatePage />} />
+        <Route path="/inbox" element={<InboxPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/profile/:username" element={<ProfilePage />} />
+        <Route path="/edit-profile" element={<EditProfilePage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <BottomNav />
+    </>
+  )
+}
 
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/giris" element={<LoginPage />} />
-          <Route path="/kayit" element={<RegisterPage />} />
-          <Route
-            path="/panel"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<DashboardPage />} />
-            <Route path="sorgu/*" element={<Navigate to="/panel" replace />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <AppLayout />
       </BrowserRouter>
     </AuthProvider>
   )

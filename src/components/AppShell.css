@@ -1,0 +1,78 @@
+.app-shell {
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  background: #000;
+  color: #fff;
+}
+
+.app-shell.dark {
+  background: #000;
+}
+
+.app-main {
+  height: 100dvh;
+  height: -webkit-fill-available;
+  padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  overflow: hidden;
+}
+
+.feed-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.5), transparent);
+  pointer-events: none;
+}
+
+.feed-tabs {
+  display: flex;
+  gap: 20px;
+  pointer-events: auto;
+}
+
+.feed-tab {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 17px;
+  font-weight: 600;
+  padding: 4px 0;
+  cursor: pointer;
+  position: relative;
+}
+
+.feed-tab.active {
+  color: #fff;
+}
+
+.feed-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 2px;
+  background: #fff;
+  border-radius: 1px;
+}
+
+.feed-search {
+  position: absolute;
+  right: 16px;
+  color: #fff;
+  pointer-events: auto;
+  display: flex;
+  padding: 4px;
+}
+
+.feed-search svg {
+  width: 22px;
+  height: 22px;
+}
