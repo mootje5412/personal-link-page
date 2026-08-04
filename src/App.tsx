@@ -4,18 +4,20 @@ import { AuthProvider } from './context/AuthContext'
 import CreatePage from './pages/CreatePage'
 import DiscoverPage from './pages/DiscoverPage'
 import EditProfilePage from './pages/EditProfilePage'
-import ForYouPage from './pages/ForYouPage'
+import FollowingPage from './pages/FollowingPage'
 import InboxPage from './pages/InboxPage'
 import LoginPage from './pages/LoginPage'
 import ProfilePage from './pages/ProfilePage'
 import RegisterPage from './pages/RegisterPage'
+import WatchPage from './pages/WatchPage'
 
 function AppLayout() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<ForYouPage />} />
+        <Route path="/" element={<FollowingPage />} />
         <Route path="/discover" element={<DiscoverPage />} />
+        <Route path="/watch/:id" element={<WatchPage />} />
         <Route path="/create" element={<CreatePage />} />
         <Route path="/inbox" element={<InboxPage />} />
         <Route path="/login" element={<LoginPage />} />

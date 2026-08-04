@@ -1,148 +1,254 @@
-.auth-page {
+.tt-auth {
   min-height: 100dvh;
   min-height: -webkit-fill-available;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 20px;
-  padding-top: calc(24px + env(safe-area-inset-top));
-  padding-bottom: calc(24px + env(safe-area-inset-bottom));
-  position: relative;
   background: #000;
-}
-
-.auth-bg {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, 0.04) 0%, transparent 55%),
-    radial-gradient(ellipse at 70% 80%, rgba(255, 255, 255, 0.03) 0%, transparent 55%),
-    #000;
-}
-
-.auth-card {
   position: relative;
-  width: 100%;
-  max-width: 400px;
-  background: #0a0a0a;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  padding: 32px 24px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-.auth-logo {
+.tt-auth-glow {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.tt-glow-cyan {
+  background: var(--tt-cyan);
+  top: -60px;
+  left: -80px;
+}
+
+.tt-glow-red {
+  background: var(--tt-red);
+  bottom: 80px;
+  right: -60px;
+}
+
+.tt-auth-body {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: calc(48px + env(safe-area-inset-top)) 28px calc(32px + env(safe-area-inset-bottom));
+  max-width: 420px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.tt-logo-wrap {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.tt-logo {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 12px;
+  background: linear-gradient(135deg, var(--tt-cyan), var(--tt-red));
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  margin-bottom: 8px;
+  box-shadow: 0 8px 32px rgba(254, 44, 85, 0.35);
 }
 
-.logo-icon {
+.tt-logo-note {
   font-size: 36px;
-  font-weight: 300;
   color: #fff;
 }
 
-.auth-logo h1 {
+.tt-brand {
   margin: 0;
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 800;
   letter-spacing: -0.5px;
   color: #fff;
 }
 
-.auth-subtitle {
+.tt-title {
+  margin: 0 0 20px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
   text-align: center;
-  color: rgba(255, 255, 255, 0.55);
-  margin: 0 0 28px;
-  font-size: 15px;
 }
 
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.auth-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.auth-form label span {
+.tt-step-label {
+  text-align: center;
+  color: var(--tt-gray);
   font-size: 13px;
+  margin: -12px 0 16px;
+}
+
+.tt-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.tt-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 14px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.75);
+  padding: 10px 0;
+  cursor: pointer;
+  position: relative;
 }
 
-.auth-form label em {
-  font-style: normal;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.35);
+.tt-tab.active {
+  color: #fff;
 }
 
-.auth-form input {
-  background: #111;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  padding: 12px 14px;
+.tt-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  background: var(--tt-red);
+  border-radius: 1px;
+}
+
+.tt-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tt-input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 14px 16px;
   color: #fff;
   font-size: 16px;
   outline: none;
-  transition: border-color 0.2s;
+  width: 100%;
 }
 
-.auth-form input:focus {
-  border-color: #fff;
+.tt-input:focus {
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
-.auth-form input::placeholder {
-  color: rgba(255, 255, 255, 0.25);
+.tt-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
 }
 
-.auth-error {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
+.tt-input-date {
+  color-scheme: dark;
+}
+
+.tt-hint {
+  margin: -8px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.tt-terms {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  line-height: 1.4;
+  text-align: center;
+}
+
+.tt-error {
+  background: rgba(254, 44, 85, 0.15);
+  border: 1px solid rgba(254, 44, 85, 0.4);
+  color: #ff6b8a;
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: 4px;
   font-size: 14px;
 }
 
-.auth-submit {
-  margin-top: 8px;
-  background: #fff;
-  color: #000;
+.tt-btn-primary {
+  background: var(--tt-red);
+  color: #fff;
   border: none;
   border-radius: 4px;
-  padding: 14px;
+  padding: 15px;
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
-  transition: opacity 0.2s;
+  margin-top: 4px;
 }
 
-.auth-submit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.tt-btn-primary:disabled {
+  opacity: 0.6;
 }
 
-.auth-submit:not(:disabled):active {
-  opacity: 0.85;
+.tt-btn-ghost {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 10px;
 }
 
-.auth-switch {
+.tt-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0 20px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 13px;
+}
+
+.tt-divider::before,
+.tt-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.tt-social {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.tt-social-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #fff;
+}
+
+.tt-social-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.tt-footer {
   text-align: center;
-  margin: 24px 0 0;
+  margin-top: auto;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.55);
 }
 
-.auth-switch a {
-  color: #fff;
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+.tt-footer a {
+  color: var(--tt-cyan);
+  font-weight: 700;
+  text-decoration: none;
 }

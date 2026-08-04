@@ -42,6 +42,14 @@ server {{
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
 
+    location /uploads/ {{
+        proxy_pass http://127.0.0.1:3001/uploads/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }}
+
+    client_max_body_size 85M;
+
     location /api/ {{
         proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
@@ -142,7 +150,7 @@ def main() -> int:
         run(client, f"rsync -a --delete {REMOTE_DIR}/dist/ {WEB_ROOT}/")
         run(client, f"chown -R www-data:www-data {WEB_ROOT}")
         run(client, f"cd {REMOTE_DIR}/server && npm install --omit=dev")
-        run(client, f"mkdir -p {REMOTE_DIR}/server/data")
+        run(client, f"mkdir -p {REMOTE_DIR}/server/data {REMOTE_DIR}/server/uploads")
 
         run(client, f"cat > /etc/systemd/system/loop-api.service << 'EOF'\n{SYSTEMD_UNIT}EOF")
         run(client, "systemctl daemon-reload")

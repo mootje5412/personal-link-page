@@ -5,25 +5,54 @@ import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
+import multer from 'multer'
+import path from 'path'
+import fs from 'fs'
+import { fileURLToPath } from 'url'
 import {
   createUser,
+  createVideo,
   findUserByEmail,
   findUserById,
+  findUserByPhone,
   findUserByUsername,
   getFeedVideos,
+  getFollowingFeed,
   getUserVideos,
+  getVideoById,
   toPublicUser,
   toggleFollow,
   toggleLike,
   updateUserProfile,
+  uploadsDir,
 } from './loop-db.js'
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = process.env.LOOP_PORT || process.env.PORT || 3001
 const JWT_SECRET = process.env.JWT_SECRET || 'loop-dev-secret-change-in-production'
 
 const USERNAME_RE = /^[a-zA-Z0-9_.]{3,24}$/
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE_RE = /^\+?[\d\s\-()]{7,20}$/
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.mp4'
+    const safe = ['.mp4', '.mov', '.webm', '.m4v'].includes(ext) ? ext : '.mp4'
+    cb(null, `${Date.now()}-${req.authUser?.id ?? 'anon'}${safe}`)
+  },
+})
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 80 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('video/')) cb(null, true)
+    else cb(new Error('Only video files are allowed.'))
+  },
+})
 
 function optionalAuth(req, _res, next) {
   const header = req.headers.authorization
@@ -32,7 +61,7 @@ function optionalAuth(req, _res, next) {
       const payload = jwt.verify(header.slice(7), JWT_SECRET)
       req.authUser = { id: payload.sub, username: payload.username }
     } catch {
-      // ignore invalid token for optional routes
+      // ignore
     }
   }
   next()
@@ -43,7 +72,6 @@ function authMiddleware(req, res, next) {
   if (!header?.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Please log in to continue.' })
   }
-
   try {
     const payload = jwt.verify(header.slice(7), JWT_SECRET)
     req.authUser = { id: payload.sub, username: payload.username }
@@ -61,8 +89,16 @@ function signToken(user) {
   )
 }
 
+function findUserByLogin(login) {
+  const trimmed = String(login).trim()
+  if (trimmed.includes('@')) return findUserByEmail(trimmed.toLowerCase())
+  if (PHONE_RE.test(trimmed)) return findUserByPhone(trimmed)
+  return findUserByUsername(trimmed)
+}
+
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }))
 app.use(express.json({ limit: '16kb' }))
+app.use('/uploads', express.static(uploadsDir, { maxAge: '7d' }))
 app.use(cors({
   origin: process.env.CLIENT_ORIGIN?.split(',') || [
     'http://localhost:5173',
@@ -87,10 +123,11 @@ app.get('/api/health', (_req, res) => {
 
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   try {
-    const { username, displayName, email, password } = req.body ?? {}
+    const { username, displayName, email, phone, password } = req.body ?? {}
     const trimmedUser = String(username ?? '').trim().toLowerCase()
     const trimmedDisplay = String(displayName ?? '').trim()
     const trimmedEmail = email ? String(email).trim().toLowerCase() : null
+    const trimmedPhone = phone ? String(phone).trim() : null
     const trimmedPass = String(password ?? '')
 
     if (!USERNAME_RE.test(trimmedUser)) {
@@ -102,6 +139,9 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     if (trimmedEmail && !EMAIL_RE.test(trimmedEmail)) {
       return res.status(400).json({ error: 'Invalid email address.' })
     }
+    if (trimmedPhone && !PHONE_RE.test(trimmedPhone)) {
+      return res.status(400).json({ error: 'Invalid phone number.' })
+    }
     if (trimmedPass.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters.' })
     }
@@ -112,35 +152,32 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     if (trimmedEmail && findUserByEmail(trimmedEmail)) {
       return res.status(409).json({ error: 'Email is already registered.' })
     }
+    if (trimmedPhone && findUserByPhone(trimmedPhone)) {
+      return res.status(409).json({ error: 'Phone number is already registered.' })
+    }
 
     const passwordHash = await bcrypt.hash(trimmedPass, 12)
-    const avatarUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(trimmedUser)}&backgroundColor=000000&textColor=ffffff`
+    const avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(trimmedUser)}`
 
     const user = createUser({
       username: trimmedUser,
       displayName: trimmedDisplay,
       email: trimmedEmail,
+      phone: trimmedPhone,
       passwordHash,
     })
 
-    dbUpdateAvatar(user.id, avatarUrl)
+    updateUserProfile(user.id, { avatarUrl })
 
     const fullUser = findUserById(user.id)
     const token = signToken(fullUser)
 
-    return res.status(201).json({
-      user: toPublicUser(fullUser),
-      token,
-    })
+    return res.status(201).json({ user: toPublicUser(fullUser), token })
   } catch (err) {
     console.error('Register error:', err)
     return res.status(500).json({ error: 'Registration failed.' })
   }
 })
-
-function dbUpdateAvatar(userId, avatarUrl) {
-  updateUserProfile(userId, { avatarUrl })
-}
 
 app.post('/api/auth/login', authLimiter, async (req, res) => {
   try {
@@ -149,27 +186,21 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     const trimmedPass = String(password ?? '')
 
     if (!trimmedLogin || !trimmedPass) {
-      return res.status(400).json({ error: 'Username/email and password are required.' })
+      return res.status(400).json({ error: 'Login and password are required.' })
     }
 
-    const user = trimmedLogin.includes('@')
-      ? findUserByEmail(trimmedLogin.toLowerCase())
-      : findUserByUsername(trimmedLogin)
-
+    const user = findUserByLogin(trimmedLogin)
     if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials.' })
+      return res.status(401).json({ error: 'Account not found. Check your details.' })
     }
 
     const valid = await bcrypt.compare(trimmedPass, user.password_hash)
     if (!valid) {
-      return res.status(401).json({ error: 'Invalid credentials.' })
+      return res.status(401).json({ error: 'Wrong password. Try again.' })
     }
 
     const token = signToken(user)
-    return res.json({
-      user: toPublicUser(user),
-      token,
-    })
+    return res.json({ user: toPublicUser(user), token })
   } catch (err) {
     console.error('Login error:', err)
     return res.status(500).json({ error: 'Login failed.' })
@@ -185,7 +216,6 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
 app.patch('/api/auth/profile', authMiddleware, (req, res) => {
   try {
     const { displayName, bio, avatarUrl } = req.body ?? {}
-
     if (displayName !== undefined) {
       const trimmed = String(displayName).trim()
       if (!trimmed || trimmed.length > 50) {
@@ -214,8 +244,53 @@ app.get('/api/videos/feed', optionalAuth, (req, res) => {
   const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50)
   const offset = parseInt(req.query.offset, 10) || 0
   const viewerId = req.authUser?.id ?? null
-  const videos = getFeedVideos(viewerId, limit, offset)
-  return res.json({ videos })
+  return res.json({ videos: getFeedVideos(viewerId, limit, offset) })
+})
+
+app.get('/api/videos/following', authMiddleware, (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50)
+  const offset = parseInt(req.query.offset, 10) || 0
+  return res.json({ videos: getFollowingFeed(req.authUser.id, limit, offset) })
+})
+
+app.get('/api/videos/:id', optionalAuth, (req, res) => {
+  const videoId = parseInt(req.params.id, 10)
+  if (!videoId) return res.status(400).json({ error: 'Invalid video.' })
+  const video = getVideoById(videoId, req.authUser?.id ?? null)
+  if (!video) return res.status(404).json({ error: 'Video not found.' })
+  return res.json({ video })
+})
+
+app.post('/api/videos', authMiddleware, (req, res, next) => {
+  upload.single('video')(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message || 'Upload failed.' })
+    }
+    next()
+  })
+}, (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Video file is required.' })
+    }
+
+    const caption = String(req.body.caption ?? '').trim().slice(0, 220)
+    const soundName = String(req.body.soundName ?? '').trim().slice(0, 80)
+    const videoUrl = `/uploads/${req.file.filename}`
+
+    const video = createVideo({
+      userId: req.authUser.id,
+      caption,
+      videoUrl,
+      soundName: soundName || undefined,
+    })
+
+    return res.status(201).json({ video })
+  } catch (err) {
+    if (req.file?.path) fs.unlink(req.file.path, () => {})
+    console.error('Create video error:', err)
+    return res.status(500).json({ error: 'Could not post video.' })
+  }
 })
 
 app.get('/api/users/:username', optionalAuth, (req, res) => {
@@ -223,17 +298,13 @@ app.get('/api/users/:username', optionalAuth, (req, res) => {
   if (!user) return res.status(404).json({ error: 'User not found.' })
   const viewerId = req.authUser?.id ?? null
   const videos = getUserVideos(user.username, viewerId)
-  return res.json({
-    user: toPublicUser(user, viewerId),
-    videos,
-  })
+  return res.json({ user: toPublicUser(user, viewerId), videos })
 })
 
 app.post('/api/videos/:id/like', authMiddleware, (req, res) => {
   const videoId = parseInt(req.params.id, 10)
   if (!videoId) return res.status(400).json({ error: 'Invalid video.' })
-  const result = toggleLike(req.authUser.id, videoId)
-  return res.json(result)
+  return res.json(toggleLike(req.authUser.id, videoId))
 })
 
 app.post('/api/users/:username/follow', authMiddleware, (req, res) => {

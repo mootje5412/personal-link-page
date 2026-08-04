@@ -34,8 +34,8 @@
 }
 
 .profile-action-btn.primary {
-  background: #000;
-  border-color: #000;
+  background: var(--tt-red);
+  border-color: var(--tt-red);
   color: #fff;
 }
 
@@ -54,9 +54,8 @@
   height: 96px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #000;
+  border: 3px solid var(--tt-red);
   margin-bottom: 12px;
-  filter: grayscale(100%);
 }
 
 .profile-display-name {
@@ -108,13 +107,11 @@
   margin: 0 auto 16px;
   background: none;
   border: none;
-  color: #000;
+  color: var(--tt-red);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   padding: 8px 16px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 .profile-tabs {

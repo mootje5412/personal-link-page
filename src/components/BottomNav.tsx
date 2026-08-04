@@ -6,14 +6,14 @@ export default function BottomNav() {
   const { user } = useAuth()
   const location = useLocation()
 
-  const hideOn = ['/login', '/register', '/edit-profile']
-  if (hideOn.includes(location.pathname)) return null
+  const hideOn = ['/login', '/register', '/edit-profile', '/watch']
+  if (hideOn.some((p) => location.pathname.startsWith(p))) return null
 
   return (
     <nav className="bottom-nav" aria-label="Main">
       <NavLink to="/" className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')} end>
         <HomeIcon />
-        <span>Home</span>
+        <span>Friends</span>
       </NavLink>
 
       <NavLink to="/discover" className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}>

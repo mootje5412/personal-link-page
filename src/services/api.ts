@@ -13,8 +13,9 @@ export function setToken(token: string | null) {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken()
+  const isForm = options.body instanceof FormData
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isForm ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers as Record<string, string>),
   }
   if (token) headers.Authorization = `Bearer ${token}`
@@ -29,7 +30,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  register(body: { username: string; displayName: string; email?: string; password: string }) {
+  register(body: {
+    username: string
+    displayName: string
+    email?: string
+    phone?: string
+    password: string
+  }) {
     return request<AuthResponse>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -56,6 +63,22 @@ export const api = {
 
   getFeed(limit = 20, offset = 0) {
     return request<{ videos: Video[] }>(`/api/videos/feed?limit=${limit}&offset=${offset}`)
+  },
+
+  getFollowingFeed(limit = 20, offset = 0) {
+    return request<{ videos: Video[] }>(`/api/videos/following?limit=${limit}&offset=${offset}`)
+  },
+
+  getVideo(id: number) {
+    return request<{ video: Video }>(`/api/videos/${id}`)
+  },
+
+  uploadVideo(file: File, caption: string, soundName?: string) {
+    const form = new FormData()
+    form.append('video', file)
+    form.append('caption', caption)
+    if (soundName) form.append('soundName', soundName)
+    return request<{ video: Video }>('/api/videos', { method: 'POST', body: form })
   },
 
   getUser(username: string) {

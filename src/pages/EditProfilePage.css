@@ -82,7 +82,7 @@
 
 .edit-form input:focus,
 .edit-form textarea:focus {
-  border-color: #000;
+  border-color: var(--tt-red);
 }
 
 .edit-form textarea {
@@ -106,7 +106,7 @@
 }
 
 .edit-save {
-  background: #000;
+  background: var(--tt-red);
   color: #fff;
   border: none;
   border-radius: 4px;

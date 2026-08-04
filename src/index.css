@@ -1,3 +1,12 @@
+:root {
+  --tt-red: #fe2c55;
+  --tt-cyan: #25f4ee;
+  --tt-black: #000000;
+  --tt-dark: #121212;
+  --tt-gray: #8a8b91;
+  --tt-white: #ffffff;
+}
+
 *,
 *::before,
 *::after {
@@ -14,8 +23,8 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #000;
-  color: #fff;
+  background: var(--tt-black);
+  color: var(--tt-white);
   overscroll-behavior: none;
   min-height: 100dvh;
   min-height: -webkit-fill-available;
