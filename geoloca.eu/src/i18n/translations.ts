@@ -98,6 +98,8 @@ const en = {
   'usb.mac_terminal_steps': 'Open Terminal (Spotlight → type Terminal), paste the command, press Enter. Keep that window open.',
   'usb.copy_terminal': 'Copy Terminal command',
   'usb.copied': 'Copied!',
+  'usb.no_device_title': 'GeoLoca Link is running but no iPhone was found on USB yet.',
+  'usb.restart_link': 'After installing libimobiledevice, press Ctrl+C in Terminal and run the command again to update GeoLoca Link.',
 } as const;
 
 type Keys = keyof typeof en;

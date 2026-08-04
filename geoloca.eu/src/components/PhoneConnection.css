@@ -195,6 +195,31 @@
   line-height: 1.45;
 }
 
+.phone-link-banner--warn {
+  background: rgba(251, 191, 36, 0.08);
+  border-color: rgba(251, 191, 36, 0.25);
+}
+
+.phone-link-banner--warn p {
+  color: #fcd34d;
+}
+
+.phone-hint-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  text-align: left;
+}
+
+.phone-hint-list li {
+  font-size: 0.76rem;
+  color: var(--dim);
+  line-height: 1.5;
+}
+
+.phone-hint-list li + li {
+  margin-top: 0.3rem;
+}
+
 .phone-link-cmd {
   display: block;
   margin: 0.55rem 0;

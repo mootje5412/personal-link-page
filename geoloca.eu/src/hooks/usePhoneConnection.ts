@@ -26,6 +26,7 @@ export function usePhoneConnection() {
   const [applyingLocation, setApplyingLocation] = useState(false);
   const [linkOnline, setLinkOnline] = useState(false);
   const [needsLink, setNeedsLink] = useState(false);
+  const [scanHints, setScanHints] = useState<string[]>([]);
   const scanRef = useRef<number | null>(null);
   const connectedRef = useRef(false);
 
@@ -65,9 +66,11 @@ export function usePhoneConnection() {
       setStatus('connecting');
       await new Promise((r) => window.setTimeout(r, 400));
       connectDevice(scan.device);
+      setScanHints([]);
       return true;
     }
 
+    setScanHints(scan.hints ?? []);
     setStatus('waiting');
     return false;
   }, [connectDevice]);
@@ -163,6 +166,7 @@ export function usePhoneConnection() {
     applyingLocation,
     linkOnline,
     needsLink,
+    scanHints,
     connected: status === 'connected',
     disconnect,
     applyLocation,

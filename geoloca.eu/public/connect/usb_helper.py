@@ -8,10 +8,14 @@ import platform
 import re
 import subprocess
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
 PORT = 7429
+VERSION = 3
+_SCAN_CACHE: tuple[float, dict] | None = None
+_SCAN_CACHE_TTL = 1.5
 
 
 def cors_headers(handler: BaseHTTPRequestHandler) -> None:
@@ -24,77 +28,176 @@ def cors_headers(handler: BaseHTTPRequestHandler) -> None:
 def run(cmd: list[str], timeout: int = 10) -> str:
     try:
         return subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True, timeout=timeout).strip()
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return ""
 
 
+def device(name: str, model: str | None = None) -> dict:
+    label = name.strip() or "iPhone"
+    return {"name": label, "model": model or label, "connection": "usb"}
+
+
 def detect_via_idevice() -> dict | None:
-    udid = run(["idevice_id", "-l"])
+    udid = run(["idevice_id", "-l"], timeout=8)
     if not udid:
         return None
-    name = run(["ideviceinfo", "-k", "DeviceName"]) or "iPhone"
-    model = run(["ideviceinfo", "-k", "ProductType"]) or name
-    return {"name": name, "model": model, "connection": "usb"}
+    udid_line = udid.splitlines()[0].strip()
+    name = run(["ideviceinfo", "-u", udid_line, "-k", "DeviceName"], timeout=8) or "iPhone"
+    model = run(["ideviceinfo", "-u", udid_line, "-k", "ProductType"], timeout=8) or name
+    return device(name, model)
 
 
-def parse_iphone_from_profiler(data: dict) -> dict | None:
-    def walk(items):
-        if not items:
-            return None
-        for item in items:
-            name = item.get("_name") or item.get("name") or ""
-            if re.search(r"iphone", name, re.I):
-                return {
-                    "name": name.strip(),
-                    "model": item.get("model") or name,
-                    "connection": "usb",
-                }
-            found = walk(item.get("_items") or item.get("items"))
+def walk_profiler(node) -> dict | None:
+    if isinstance(node, list):
+        for item in node:
+            found = walk_profiler(item)
             if found:
                 return found
         return None
+    if not isinstance(node, dict):
+        return None
 
-    for bus in data if isinstance(data, list) else [data]:
-        found = walk(bus.get("_items") or bus.get("items"))
+    name = str(node.get("_name") or node.get("name") or "")
+    vendor = str(node.get("vendor_id") or node.get("usb_vendor_id") or node.get("manufacturer") or "")
+    serial = str(node.get("serial_num") or node.get("serial_number") or "")
+
+    if re.search(r"iPhone|iPad|Apple Mobile Device", name, re.I):
+        return device(name, node.get("model") or name)
+    if vendor.lower() in ("0x05ac", "apple", "1452") and re.search(r"mobile|iphone|ipad", name, re.I):
+        return device(name or "iPhone", node.get("model") or name)
+    if serial and re.search(r"iPhone|iPad", name, re.I):
+        return device(name, node.get("model") or name)
+
+    for key in ("_items", "items", "_children", "children"):
+        found = walk_profiler(node.get(key))
         if found:
             return found
     return None
 
 
-def detect_iphone_usb() -> dict:
-    idevice = detect_via_idevice()
-    if idevice:
-        return {"connected": True, "device": idevice}
-
-    system = platform.system()
-
-    if system == "Darwin":
-        raw = run(["system_profiler", "SPUSBDataType", "-json"])
+def detect_via_system_profiler() -> dict | None:
+    for datatype in ("SPUSBDataType", "SPThunderboltDataType"):
+        raw = run(["system_profiler", datatype, "-json"], timeout=35)
         if raw:
             try:
                 payload = json.loads(raw)
-                device = parse_iphone_from_profiler(payload.get("SPUSBDataType") or [])
-                if device:
-                    return {"connected": True, "device": device}
             except json.JSONDecodeError:
-                pass
-        ioreg = run(["ioreg", "-p", "IOUSB", "-l", "-w", "0"])
-        if ioreg and re.search(r"iPhone", ioreg, re.I):
-            match = re.search(r'"USB Product Name"\s*=\s*"([^"]+)"', ioreg)
-            name = match.group(1) if match else "iPhone"
-            return {"connected": True, "device": {"name": name, "model": name, "connection": "usb"}}
+                payload = None
+            if payload is not None:
+                root = payload.get(datatype) if isinstance(payload, dict) else payload
+                found = walk_profiler(root)
+                if found:
+                    return found
 
-    if system == "Linux":
-        lsusb = run(["lsusb"])
+        text = run(["system_profiler", datatype], timeout=35)
+        if text and re.search(r"iPhone|Apple Mobile Device", text, re.I):
+            match = re.search(r"(iPhone[^\n:]*)", text, re.I)
+            label = match.group(1).strip() if match else "iPhone"
+            return device(label, "iPhone")
+    return None
+
+
+def detect_via_ioreg() -> dict | None:
+    commands = (
+        ["ioreg", "-p", "IOUSB", "-l", "-w", "0"],
+        ["ioreg", "-r", "-c", "AppleUSBHostDevice", "-l", "-w", "0"],
+        ["ioreg", "-r", "-c", "IOUSBHostDevice", "-l", "-w", "0"],
+    )
+    for cmd in commands:
+        out = run(cmd, timeout=20)
+        if not out:
+            continue
+
+        if re.search(r"iPhone|Apple Mobile Device|iPad", out, re.I):
+            names = re.findall(r'"USB Product Name"\s*=\s*"([^"]+)"', out)
+            for name in reversed(names):
+                if re.search(r"iPhone|iPad|Apple Mobile", name, re.I):
+                    return device(name)
+            return device("iPhone")
+
+        blocks = re.split(r"\+\-o ", out)
+        for block in blocks:
+            if not re.search(r'idVendor"\s*=\s*(1452|0x05ac)|idVendor" = 1452', block, re.I):
+                continue
+            if re.search(r"hub|keyboard|trackpad|mouse|receiver|audio|camera|bluetooth", block, re.I):
+                continue
+            match = re.search(r'"USB Product Name"\s*=\s*"([^"]+)"', block)
+            if match:
+                return device(match.group(1))
+    return None
+
+
+def detect_via_xcode_tools() -> dict | None:
+    for cmd in (
+        ["xcrun", "xctrace", "list", "devices"],
+        ["xcrun", "simctl", "list", "devices", "available"],
+        ["instruments", "-s", "devices"],
+    ):
+        out = run(cmd, timeout=15)
+        if not out:
+            continue
+        for line in out.splitlines():
+            if re.search(r"Simulator|\(null\)", line, re.I):
+                continue
+            if re.search(r"iPhone|iPad", line, re.I):
+                name = line.split("(")[0].strip(" *") or "iPhone"
+                if re.search(r"iPhone|iPad", name, re.I):
+                    return device(name)
+    return None
+
+
+def mac_hints() -> list[str]:
+    hints = [
+        "Unlock iPhone and tap Trust This Computer when prompted",
+        "Use a USB data cable (charge-only cables won't work)",
+        "Unplug and replug the cable after tapping Trust",
+    ]
+    if not run(["which", "idevice_id"], timeout=3):
+        hints.append("Install iPhone tools: brew install libimobiledevice")
+    return hints
+
+
+def detect_iphone_usb() -> dict:
+    global _SCAN_CACHE
+    now = time.time()
+    if _SCAN_CACHE and now - _SCAN_CACHE[0] < _SCAN_CACHE_TTL:
+        return _SCAN_CACHE[1]
+
+    checks: list[tuple[str, dict | None]] = []
+
+    idevice = detect_via_idevice()
+    checks.append(("idevice", idevice))
+    if idevice:
+        result = {"connected": True, "device": idevice, "method": "idevice"}
+        _SCAN_CACHE = (now, result)
+        return result
+
+    if platform.system() == "Darwin":
+        for name, fn in (
+            ("ioreg", detect_via_ioreg),
+            ("xcode", detect_via_xcode_tools),
+            ("system_profiler", detect_via_system_profiler),
+        ):
+            found = fn()
+            checks.append((name, found))
+            if found:
+                result = {"connected": True, "device": found, "method": name}
+                _SCAN_CACHE = (now, result)
+                return result
+
+    if platform.system() == "Linux":
+        lsusb = run(["lsusb"], timeout=8)
         if lsusb and ("Apple" in lsusb or "05ac:" in lsusb.lower()):
             name = "iPhone"
             for line in lsusb.splitlines():
                 if "Apple" in line or "05ac:" in line.lower():
                     name = line.split(":", 2)[-1].strip() or "iPhone"
                     break
-            return {"connected": True, "device": {"name": name, "model": name, "connection": "usb"}}
+            result = {"connected": True, "device": device(name), "method": "lsusb"}
+            _SCAN_CACHE = (now, result)
+            return result
 
-    if system == "Windows":
+    if platform.system() == "Windows":
         ps = run(
             [
                 "powershell",
@@ -105,28 +208,38 @@ def detect_iphone_usb() -> dict:
             timeout=15,
         )
         if ps:
-            return {"connected": True, "device": {"name": ps, "model": ps, "connection": "usb"}}
+            result = {"connected": True, "device": device(ps), "method": "pnp"}
+            _SCAN_CACHE = (now, result)
+            return result
 
-    return {"connected": False}
+    payload = {"connected": False, "hints": mac_hints() if platform.system() == "Darwin" else []}
+    _SCAN_CACHE = (now, payload)
+    return payload
 
 
 def set_location(lat: float, lng: float) -> dict:
     lat_s = f"{lat:.6f}"
     lng_s = f"{lng:.6f}"
 
-    if run(["which", "idevicesetlocation"]):
-        run(["idevicesetlocation", lat_s, lng_s], timeout=20)
-        return {"ok": True, "method": "idevicesetlocation"}
+    if run(["which", "idevicesetlocation"], timeout=3):
+        out = run(["idevicesetlocation", lat_s, lng_s], timeout=20)
+        if out.lower().find("error") == -1:
+            return {"ok": True, "method": "idevicesetlocation"}
 
-    if run(["which", "pymobiledevice3"]):
+    if run(["which", "pymobiledevice3"], timeout=3):
         out = run(["pymobiledevice3", "developer", "simulate-location", "set", "--", lat_s, lng_s], timeout=25)
         if "error" not in out.lower():
             return {"ok": True, "method": "pymobiledevice3"}
 
     if not detect_iphone_usb().get("connected"):
-        return {"ok": False, "error": "iphone_not_connected"}
+        return {"ok": False, "error": "iphone_not_connected", "hints": mac_hints()}
 
-    return {"ok": True, "method": "detected", "message": "iPhone on USB — install libimobiledevice for GPS override"}
+    return {
+        "ok": False,
+        "error": "tools_missing",
+        "message": "iPhone detected — run: brew install libimobiledevice",
+        "hints": mac_hints(),
+    }
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -150,7 +263,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
         if path in ("/health", "/api/health"):
-            return self._json(200, {"ok": True, "service": "geoloca-link"})
+            return self._json(200, {"ok": True, "service": "geoloca-link", "version": VERSION})
         if path in ("/usb/scan", "/api/usb/scan"):
             return self._json(200, detect_iphone_usb())
         return self._json(404, {"error": "not_found"})
@@ -171,7 +284,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     server = HTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"GeoLoca Link running on http://127.0.0.1:{PORT}")
+    print(f"GeoLoca Link v{VERSION} running on http://127.0.0.1:{PORT}")
+    print("Plug in iPhone via USB, unlock it, tap Trust, then click Connect iPhone in the dashboard.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

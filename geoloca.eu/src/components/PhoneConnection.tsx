@@ -10,6 +10,7 @@ type Props = {
   connectedDevice: DetectedDevice | null;
   linkOnline: boolean;
   needsLink: boolean;
+  scanHints: string[];
   onDisconnect: () => void;
   onConnect: () => void;
   onDownloadLink: () => void;
@@ -22,6 +23,7 @@ export default function PhoneConnection({
   connectedDevice,
   linkOnline,
   needsLink,
+  scanHints,
   onDisconnect,
   onConnect,
   onDownloadLink,
@@ -97,6 +99,20 @@ export default function PhoneConnection({
                   <button type="button" className="btn btn-secondary phone-link-btn" onClick={onDownloadLink}>
                     {t('usb.download_link')}
                   </button>
+                )}
+              </div>
+            )}
+
+            {linkOnline && !needsLink && scanHints.length > 0 && (
+              <div className="phone-link-banner phone-link-banner--warn">
+                <p>{t('usb.no_device_title')}</p>
+                <ul className="phone-hint-list">
+                  {scanHints.map((hint) => (
+                    <li key={hint}>{hint}</li>
+                  ))}
+                </ul>
+                {isMac && (
+                  <p className="phone-link-mac-tip">{t('usb.restart_link')}</p>
                 )}
               </div>
             )}

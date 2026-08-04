@@ -9,6 +9,7 @@ export type UsbScanResult = {
   device?: DetectedDevice;
   linkOnline?: boolean;
   error?: 'link_offline' | 'no_device';
+  hints?: string[];
 };
 
 export type LocationResult = {
@@ -22,12 +23,14 @@ const LOCAL = 'http://127.0.0.1:7429';
 const APPLE_VENDOR = 0x05ac;
 
 async function localFetch<T>(path: string, init?: RequestInit): Promise<T | null> {
+  const isScan = path.includes('/usb/scan');
+  const timeoutMs = init?.method === 'POST' ? 20000 : isScan ? 45000 : 8000;
   try {
     const res = await fetch(`${LOCAL}${path}`, {
       ...init,
       mode: 'cors',
       headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
-      signal: AbortSignal.timeout(init?.method === 'POST' ? 20000 : 5000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) return null;
     return (await res.json()) as T;
@@ -48,12 +51,12 @@ export async function scanLocalUsb(): Promise<UsbScanResult> {
     return { connected: false, linkOnline: false, error: 'link_offline' };
   }
 
-  const result = await localFetch<{ connected?: boolean; device?: DetectedDevice }>('/usb/scan');
+  const result = await localFetch<{ connected?: boolean; device?: DetectedDevice; hints?: string[] }>('/usb/scan');
   if (result?.connected && result.device) {
     return { connected: true, device: result.device, linkOnline: true };
   }
 
-  return { connected: false, linkOnline: true, error: 'no_device' };
+  return { connected: false, linkOnline: true, error: 'no_device', hints: result?.hints };
 }
 
 export async function burstScanLocal(tries = 12, gapMs = 400): Promise<UsbScanResult> {
