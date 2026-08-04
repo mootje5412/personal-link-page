@@ -94,6 +94,10 @@ const en = {
   'usb.link_offline': 'GeoLoca Link not running on this computer',
   'usb.tip_same_pc': 'Open the dashboard on the same PC your iPhone is plugged into',
   'usb.mac_steps': 'Mac: open Downloads → double-click GeoLoca-Link.command. If blocked, right-click → Open.',
+  'usb.mac_gatekeeper': 'Mac blocked the download? Use Terminal instead (easiest on Mac):',
+  'usb.mac_terminal_steps': 'Open Terminal (Spotlight → type Terminal), paste the command, press Enter. Keep that window open.',
+  'usb.copy_terminal': 'Copy Terminal command',
+  'usb.copied': 'Copied!',
 } as const;
 
 type Keys = keyof typeof en;

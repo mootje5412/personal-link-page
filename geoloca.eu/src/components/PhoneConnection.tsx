@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import type { ConnectionStatus, DetectedDevice } from '../data/phones';
 import { deviceLabel } from '../data/phones';
 import { useLanguage } from '../i18n/LanguageContext';
+import { copyGeoLocaLinkCommand, getGeoLocaLinkTerminalCommand } from '../utils/usbBridge';
 import './PhoneConnection.css';
 
 type Props = {
@@ -27,6 +29,8 @@ export default function PhoneConnection({
   onClose,
 }: Props) {
   const { t } = useLanguage();
+  const [copied, setCopied] = useState(false);
+  const isMac = /mac/i.test(navigator.userAgent);
 
   if (!open) return null;
 
@@ -71,11 +75,28 @@ export default function PhoneConnection({
             {needsLink && !linkOnline && (
               <div className="phone-link-banner">
                 <p>{t('usb.link_needed')}</p>
-                <button type="button" className="btn btn-secondary phone-link-btn" onClick={onDownloadLink}>
-                  {t('usb.download_link')}
-                </button>
-                {/mac|iphone|ipad/i.test(navigator.userAgent) && (
-                  <p className="phone-link-mac-tip">{t('usb.mac_steps')}</p>
+                {isMac ? (
+                  <>
+                    <p className="phone-link-mac-tip">{t('usb.mac_gatekeeper')}</p>
+                    <code className="phone-link-cmd">{getGeoLocaLinkTerminalCommand()}</code>
+                    <button
+                      type="button"
+                      className="btn btn-secondary phone-link-btn"
+                      onClick={() => {
+                        void copyGeoLocaLinkCommand().then((ok) => {
+                          setCopied(ok);
+                          if (ok) window.setTimeout(() => setCopied(false), 2500);
+                        });
+                      }}
+                    >
+                      {copied ? t('usb.copied') : t('usb.copy_terminal')}
+                    </button>
+                    <p className="phone-link-mac-tip">{t('usb.mac_terminal_steps')}</p>
+                  </>
+                ) : (
+                  <button type="button" className="btn btn-secondary phone-link-btn" onClick={onDownloadLink}>
+                    {t('usb.download_link')}
+                  </button>
                 )}
               </div>
             )}
