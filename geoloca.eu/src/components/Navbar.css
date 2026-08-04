@@ -116,6 +116,11 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
+.nav-login {
+  font-weight: 600 !important;
+  color: var(--text) !important;
+}
+
 .nav-cta {
   margin-left: 0.35rem;
   padding: 0.45rem 0.95rem !important;

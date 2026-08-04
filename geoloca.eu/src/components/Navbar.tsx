@@ -1,14 +1,17 @@
+import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { useAuth } from '../auth/AuthContext';
 import './Navbar.css';
 
 const links = [
-  { href: '#features', label: 'Features' },
-  { href: '#how', label: 'How it works' },
-  { href: '#pricing', label: 'Pricing' },
-  { href: '#faq', label: 'FAQ' },
+  { href: '/#features', label: 'Features' },
+  { href: '/#how', label: 'How it works' },
+  { href: '/#pricing', label: 'Pricing' },
+  { href: '/#faq', label: 'FAQ' },
 ];
 
 export default function Navbar() {
+  const { user } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -23,9 +26,9 @@ export default function Navbar() {
     <header className={`navbar ${scrolled ? 'scrolled' : ''}`}>
       <div className="navbar-wrap">
         <div className="container nav-inner">
-          <a href="#" className="logo">
+          <Link to="/" className="logo">
             Geo<span>Loca</span>
-          </a>
+          </Link>
 
           <button
             type="button"
@@ -44,9 +47,20 @@ export default function Navbar() {
                 {l.label}
               </a>
             ))}
-            <a href="#pricing" className="nav-cta" onClick={() => setOpen(false)}>
-              Free trial
-            </a>
+            {user ? (
+              <Link to="/dashboard" className="nav-cta" onClick={() => setOpen(false)}>
+                Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link to="/login" className="nav-login" onClick={() => setOpen(false)}>
+                  Log in
+                </Link>
+                <Link to="/register" className="nav-cta" onClick={() => setOpen(false)}>
+                  Free trial
+                </Link>
+              </>
+            )}
           </nav>
         </div>
       </div>

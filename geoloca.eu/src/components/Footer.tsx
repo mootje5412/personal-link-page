@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import './Footer.css';
 
 export default function Footer() {
@@ -21,7 +22,8 @@ export default function Footer() {
             <a href="#faq">FAQ</a>
           </nav>
           <nav className="footer-nav footer-nav-secondary">
-            <a href="#pricing">Free trial</a>
+            <Link to="/login">Log in</Link>
+            <Link to="/register">Register</Link>
             <a href="#refund-policy">Refund policy</a>
           </nav>
         </div>

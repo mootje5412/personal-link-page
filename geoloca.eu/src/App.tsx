@@ -1,31 +1,35 @@
-import CTA from './components/CTA';
-import Navbar from './components/Navbar';
-import Hero from './components/Hero';
-import TrustBar from './components/TrustBar';
-import Features from './components/Features';
-import HowItWorks from './components/HowItWorks';
-import Countries from './components/Countries';
-import Pricing from './components/Pricing';
-import RefundPolicy from './components/RefundPolicy';
-import FAQ from './components/FAQ';
-import Footer from './components/Footer';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { AuthProvider } from './auth/AuthContext';
+import Landing from './pages/Landing';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Dashboard from './pages/Dashboard';
+
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
 
 export default function App() {
-  return (
-    <>
-      <Navbar />
-      <main>
-        <Hero />
-        <TrustBar />
-        <Features />
-        <HowItWorks />
-        <Countries />
-        <Pricing />
-        <RefundPolicy />
-        <FAQ />
-        <CTA />
-      </main>
-      <Footer />
-    </>
+  const app = (
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </AuthProvider>
   );
+
+  if (!googleClientId) return app;
+
+  return <GoogleOAuthProvider clientId={googleClientId}>{app}</GoogleOAuthProvider>;
 }

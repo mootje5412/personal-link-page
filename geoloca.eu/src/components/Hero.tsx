@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useCountryRotator } from '../hooks/useCountryRotator';
 import CountryRotator from './CountryRotator';
 import HeroPreview from './HeroPreview';
@@ -33,9 +34,9 @@ export default function Hero() {
                 />
               </svg>
             </a>
-            <a href="#how" className="btn btn-secondary">
-              How it works
-            </a>
+            <Link to="/register" className="btn btn-secondary">
+              Create account
+            </Link>
           </div>
         </div>
 

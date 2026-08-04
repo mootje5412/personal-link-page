@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import './CTA.css';
 
 export default function CTA() {
@@ -17,9 +18,9 @@ export default function CTA() {
             <a href="#pricing" className="btn btn-primary">
               Start free trial
             </a>
-            <a href="#refund-policy" className="btn btn-secondary">
-              Refund policy
-            </a>
+            <Link to="/register" className="btn btn-secondary">
+              Create account
+            </Link>
           </div>
         </div>
       </div>
