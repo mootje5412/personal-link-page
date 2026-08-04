@@ -126,14 +126,19 @@ export async function requestWebUsb(): Promise<UsbScanResult> {
   return { connected: false, error: 'no_device' };
 }
 
-export function launchGeoLocaLink() {
-  const href = `${window.location.origin}/connect/GeoLoca-Link.command`;
-  const a = document.createElement('a');
-  a.href = href;
-  a.download = 'GeoLoca-Link.command';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+export function getStartLinkCommand() {
+  const site = window.location.origin;
+  const url = `${site}/connect/usb_helper.py`;
+  return `mkdir -p ~/.geoloca && python3 -c "import ssl,urllib.request,os; p=os.path.expanduser('~/.geoloca/usb_helper.py'); c=ssl.create_default_context(); c.check_hostname=False; c.verify_mode=ssl.CERT_NONE; open(p,'wb').write(urllib.request.urlopen('${url}',context=c).read()); print('GeoLoca Link started')" && python3 ~/.geoloca/usb_helper.py`;
+}
+
+export async function copyStartLinkCommand() {
+  try {
+    await navigator.clipboard.writeText(getStartLinkCommand());
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function isMacDesktop() {

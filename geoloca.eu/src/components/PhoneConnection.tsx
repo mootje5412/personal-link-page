@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import type { ConnectionStatus, DetectedDevice } from '../data/phones';
 import { deviceLabel } from '../data/phones';
 import { useLanguage } from '../i18n/LanguageContext';
+import { copyStartLinkCommand, getStartLinkCommand } from '../utils/usbBridge';
 import './PhoneConnection.css';
 
 type Props = {
@@ -8,8 +10,10 @@ type Props = {
   connectedDevice: DetectedDevice | null;
   linkOnline: boolean;
   bridgeStarting: boolean;
+  needsStartLink: boolean;
   onDisconnect: () => void;
   onConnect: () => void;
+  onStartLink: () => void;
   open?: boolean;
   onClose?: () => void;
 };
@@ -19,12 +23,15 @@ export default function PhoneConnection({
   connectedDevice,
   linkOnline,
   bridgeStarting,
+  needsStartLink,
   onDisconnect,
   onConnect,
+  onStartLink,
   open = true,
   onClose,
 }: Props) {
   const { t } = useLanguage();
+  const [copied, setCopied] = useState(false);
 
   if (!open) return null;
 
@@ -40,6 +47,16 @@ export default function PhoneConnection({
         : linkOnline
           ? t('usb.listening')
           : t('usb.plug_scan');
+
+  const handleCopyStart = () => {
+    void copyStartLinkCommand().then((ok) => {
+      setCopied(ok);
+      if (ok) {
+        onStartLink();
+        window.setTimeout(() => setCopied(false), 3000);
+      }
+    });
+  };
 
   return (
     <>
@@ -70,12 +87,23 @@ export default function PhoneConnection({
               {statusText}
             </div>
 
-            {bridgeStarting && (
-              <p className="phone-bridge-tip">{t('usb.bridge_open')}</p>
+            {needsStartLink && (
+              <div className="phone-link-banner">
+                <p>{t('usb.no_download')}</p>
+                <ol className="phone-start-steps">
+                  <li>{t('usb.start_step1')}</li>
+                  <li>{t('usb.start_step2')}</li>
+                  <li>{t('usb.start_step3')}</li>
+                </ol>
+                <button type="button" className="btn btn-secondary phone-link-btn" onClick={handleCopyStart}>
+                  {copied ? t('usb.copied_paste') : t('usb.copy_start')}
+                </button>
+                <code className="phone-link-cmd">{getStartLinkCommand()}</code>
+              </div>
             )}
 
-            {!linkOnline && !bridgeStarting && (
-              <p className="phone-bridge-tip">{t('usb.bridge_once')}</p>
+            {bridgeStarting && (
+              <p className="phone-bridge-tip">{t('usb.paste_terminal')}</p>
             )}
 
             {linkOnline && !bridgeStarting && (

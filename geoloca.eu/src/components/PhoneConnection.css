@@ -207,6 +207,19 @@
   text-align: left;
 }
 
+.phone-start-steps {
+  margin: 0.5rem 0;
+  padding-left: 1.2rem;
+  text-align: left;
+}
+
+.phone-start-steps li {
+  font-size: 0.76rem;
+  color: var(--dim);
+  line-height: 1.5;
+  margin-bottom: 0.25rem;
+}
+
 .phone-link-banner--warn {
   background: rgba(251, 191, 36, 0.08);
   border-color: rgba(251, 191, 36, 0.25);

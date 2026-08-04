@@ -27,8 +27,10 @@ type Props = {
   linkOnline: boolean;
   bridgeStarting: boolean;
   locationError: string | null;
+  needsStartLink: boolean;
   onDisconnect: () => void;
   onConnect: () => void;
+  onStartLink: () => void;
   onApplyLocation: (country: string, lat: number, lng: number, label: string) => void;
 };
 
@@ -67,8 +69,10 @@ export default function DashboardMap({
   linkOnline,
   bridgeStarting,
   locationError,
+  needsStartLink,
   onDisconnect,
   onConnect,
+  onStartLink,
   onApplyLocation,
 }: Props) {
   const { t } = useLanguage();
@@ -296,11 +300,13 @@ export default function DashboardMap({
         connectedDevice={connectedDevice}
         linkOnline={linkOnline}
         bridgeStarting={bridgeStarting}
+        needsStartLink={needsStartLink}
         onDisconnect={() => {
           onDisconnect();
           setShowPhonePanel(true);
         }}
         onConnect={onConnect}
+        onStartLink={onStartLink}
         open={!connected || showPhonePanel}
         onClose={connected ? () => setShowPhonePanel(false) : undefined}
       />
