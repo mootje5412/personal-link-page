@@ -1,2 +1,7 @@
-node_modules
-dist
+node_modules/
+dist/
+data/
+.env
+server/node_modules/
+server/data/
+*.db

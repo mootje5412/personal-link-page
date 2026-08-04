@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import AuthLayout from '../components/auth/AuthLayout';
 import AuthDivider from '../components/auth/AuthDivider';
@@ -7,7 +7,7 @@ import GoogleButton from '../components/auth/GoogleButton';
 import '../components/auth/AuthLayout.css';
 
 export default function Register() {
-  const { registerWithEmail } = useAuth();
+  const { user, loading: authLoading, registerWithEmail } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -40,6 +40,9 @@ export default function Register() {
       setLoading(false);
     }
   };
+
+  if (authLoading) return null;
+  if (user) return <Navigate to="/dashboard" replace />;
 
   return (
     <AuthLayout
@@ -89,11 +92,12 @@ export default function Register() {
             id="register-password"
             type="password"
             autoComplete="new-password"
-            placeholder="At least 8 characters"
+            placeholder="At least 8 characters, with a letter and number"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
+            pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,}"
           />
         </div>
 

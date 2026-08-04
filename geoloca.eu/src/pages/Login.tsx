@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import AuthLayout from '../components/auth/AuthLayout';
 import AuthDivider from '../components/auth/AuthDivider';
@@ -7,7 +7,7 @@ import GoogleButton from '../components/auth/GoogleButton';
 import '../components/auth/AuthLayout.css';
 
 export default function Login() {
-  const { loginWithEmail } = useAuth();
+  const { user, loading: authLoading, loginWithEmail } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,6 +27,9 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  if (authLoading) return null;
+  if (user) return <Navigate to="/dashboard" replace />;
 
   return (
     <AuthLayout

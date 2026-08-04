@@ -1,15 +1,8 @@
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
-import { jwtDecode } from 'jwt-decode';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import './GoogleButton.css';
-
-type GoogleJwt = {
-  name?: string;
-  email?: string;
-  picture?: string;
-};
 
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
@@ -21,17 +14,20 @@ export default function GoogleButton({ label = 'continue_with' }: Props) {
   const { loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [notice, setNotice] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const onSuccess = (response: CredentialResponse) => {
+  const onSuccess = async (response: CredentialResponse) => {
     if (!response.credential) return;
-    const profile = jwtDecode<GoogleJwt>(response.credential);
-    if (!profile.email) return;
-    loginWithGoogle({
-      name: profile.name || profile.email.split('@')[0] || 'User',
-      email: profile.email,
-      avatar: profile.picture,
-    });
-    navigate('/dashboard');
+    setNotice('');
+    setLoading(true);
+    try {
+      await loginWithGoogle(response.credential);
+      navigate('/dashboard');
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Google sign-in failed.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!clientId) {
@@ -52,15 +48,22 @@ export default function GoogleButton({ label = 'continue_with' }: Props) {
 
   return (
     <div className="google-btn-wrap">
-      <GoogleLogin
-        onSuccess={onSuccess}
-        onError={() => setNotice('Google sign-in failed. Try again or use email.')}
-        theme="filled_black"
-        size="large"
-        text={label}
-        shape="rectangular"
-        width="400"
-      />
+      {loading ? (
+        <button type="button" className="google-btn" disabled>
+          <GoogleIcon />
+          Signing in with Google…
+        </button>
+      ) : (
+        <GoogleLogin
+          onSuccess={onSuccess}
+          onError={() => setNotice('Google sign-in failed. Try again or use email.')}
+          theme="filled_black"
+          size="large"
+          text={label}
+          shape="rectangular"
+          width="400"
+        />
+      )}
       {notice && <p className="google-notice">{notice}</p>}
     </div>
   );
