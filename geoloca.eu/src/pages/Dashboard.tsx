@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import DashboardMap from '../components/DashboardMap';
 import DashboardSettings from '../components/DashboardSettings';
+import { usePhoneConnection } from '../hooks/usePhoneConnection';
 import './Dashboard.css';
 
 function trialDaysLeft(iso: string) {
@@ -15,6 +16,20 @@ type Tab = 'map' | 'settings';
 export default function Dashboard() {
   const { user, loading, logout } = useAuth();
   const [tab, setTab] = useState<Tab>('map');
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [welcomeLeaving, setWelcomeLeaving] = useState(false);
+
+  const phone = usePhoneConnection();
+
+  useEffect(() => {
+    if (!showWelcome) return;
+    const fadeTimer = window.setTimeout(() => setWelcomeLeaving(true), 2600);
+    const hideTimer = window.setTimeout(() => setShowWelcome(false), 3000);
+    return () => {
+      window.clearTimeout(fadeTimer);
+      window.clearTimeout(hideTimer);
+    };
+  }, [showWelcome]);
 
   if (loading) {
     return (
@@ -33,17 +48,41 @@ export default function Dashboard() {
     <div className="dashboard">
       {tab === 'map' ? (
         <>
-          <DashboardMap />
-          <div className="dash-welcome-float">
-            <p>
-              Welcome, <strong>{firstName}</strong>
-            </p>
-            {user.trialActive && (
-              <span>
-                {daysLeft} day{daysLeft === 1 ? '' : 's'} left on trial
-              </span>
-            )}
-          </div>
+          <DashboardMap
+            connected={phone.connected}
+            connectionStatus={phone.status}
+            selectedPhone={phone.selectedPhone}
+            connectedPhone={phone.connectedPhone}
+            appliedCountry={phone.appliedCountry}
+            phones={phone.phones}
+            onSelectPhone={phone.selectPhone}
+            onConnect={phone.connect}
+            onDisconnect={phone.disconnect}
+            onApplyLocation={phone.applyLocation}
+          />
+          {showWelcome && (
+            <div
+              className={`dash-welcome-float ${welcomeLeaving ? 'dash-welcome-float--out' : ''}`}
+              role="status"
+            >
+              <p>
+                Welcome, <strong>{firstName}</strong>
+              </p>
+              {user.trialActive && (
+                <span>
+                  {daysLeft} day{daysLeft === 1 ? '' : 's'} left on trial
+                </span>
+              )}
+              <button
+                type="button"
+                className="dash-welcome-close"
+                onClick={() => setShowWelcome(false)}
+                aria-label="Dismiss welcome"
+              >
+                ×
+              </button>
+            </div>
+          )}
         </>
       ) : (
         <DashboardSettings user={user} onLogout={() => logout()} />

@@ -19,8 +19,8 @@ export default function Hero() {
             </span>
           </h1>
           <p className="hero-text">
-            Connect your phone to your laptop. Pick any country on the map — Snap, Google Maps,
-            and every other app follows.
+            Connect your phone, pick any country on the map — Snap, Google Maps, and every other app
+            follows.
           </p>
           <div className="hero-actions">
             <a href="#pricing" className="btn btn-primary">

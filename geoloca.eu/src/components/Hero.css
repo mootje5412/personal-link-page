@@ -1,6 +1,28 @@
 .hero {
-  padding: 7.5rem 0 2rem;
+  padding: 6.5rem 0 2rem;
   position: relative;
+}
+
+@media (max-width: 768px) {
+  .hero {
+    padding: 5.5rem 0 1.5rem;
+  }
+
+  .hero-copy h1 {
+    font-size: clamp(1.85rem, 8vw, 2.5rem);
+  }
+
+  .hero-text {
+    font-size: 1rem;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+  }
+
+  .hero-actions .btn {
+    width: 100%;
+  }
 }
 
 .hero::before {

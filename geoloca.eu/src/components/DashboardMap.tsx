@@ -1,21 +1,40 @@
 import { useMemo, useState } from 'react';
 import { COUNTRIES } from '../data/countries';
 import { MAP_SPOTS } from '../data/mapSpots';
+import type { ConnectionStatus, PhoneDevice } from '../data/phones';
+import PhoneConnection from './PhoneConnection';
 import './DashboardMap.css';
 
 type Country = (typeof COUNTRIES)[number];
 
 type Props = {
-  selectedCountry?: Country;
-  onSelectCountry?: (country: Country) => void;
+  connected: boolean;
+  connectionStatus: ConnectionStatus;
+  selectedPhone: PhoneDevice | null;
+  connectedPhone: PhoneDevice | null;
+  appliedCountry: string | null;
+  phones: PhoneDevice[];
+  onSelectPhone: (phone: PhoneDevice) => void;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  onApplyLocation: (country: Country) => void;
 };
 
 export default function DashboardMap({
-  selectedCountry = 'Netherlands',
-  onSelectCountry,
+  connected,
+  connectionStatus,
+  selectedPhone,
+  connectedPhone,
+  appliedCountry,
+  phones,
+  onSelectPhone,
+  onConnect,
+  onDisconnect,
+  onApplyLocation,
 }: Props) {
-  const [country, setCountry] = useState<Country>(selectedCountry);
+  const [country, setCountry] = useState<Country>('Netherlands');
   const [query, setQuery] = useState('');
+  const [showPhonePanel, setShowPhonePanel] = useState(false);
   const spot = MAP_SPOTS[country];
 
   const filtered = useMemo(() => {
@@ -27,11 +46,35 @@ export default function DashboardMap({
   const pick = (c: Country) => {
     setCountry(c);
     setQuery('');
-    onSelectCountry?.(c);
   };
+
+  const handleApply = () => {
+    if (!connected) {
+      setShowPhonePanel(true);
+      return;
+    }
+    onApplyLocation(country);
+  };
+
+  const statusLabel =
+    connectionStatus === 'connected'
+      ? 'Successfully connected'
+      : connectionStatus === 'connecting'
+        ? 'Connecting…'
+        : 'Waiting to be connected';
 
   return (
     <div className="dash-map">
+      <button
+        type="button"
+        className={`dash-map-conn ${connectionStatus}`}
+        onClick={() => setShowPhonePanel(true)}
+        aria-label="Phone connection status"
+      >
+        <span className="dash-map-conn-dot" aria-hidden />
+        {statusLabel}
+      </button>
+
       <div className="dash-map-toolbar">
         <label className="dash-map-search">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
@@ -44,6 +87,7 @@ export default function DashboardMap({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search country…"
             aria-label="Search country"
+            disabled={!connected}
           />
         </label>
         <span className="dash-map-layer">Satellite</span>
@@ -53,7 +97,7 @@ export default function DashboardMap({
         <ul className="dash-map-results">
           {filtered.slice(0, 6).map((c) => (
             <li key={c}>
-              <button type="button" onClick={() => pick(c)}>
+              <button type="button" onClick={() => pick(c)} disabled={!connected}>
                 {c}
               </button>
             </li>
@@ -114,6 +158,14 @@ export default function DashboardMap({
         </g>
       </svg>
 
+      {appliedCountry && connected && (
+        <div className="dash-map-spoof-badge">
+          <span className="dash-map-spoof-dot" />
+          Spoofing {appliedCountry}
+          {connectedPhone && <span className="dash-map-spoof-device"> · {connectedPhone.name}</span>}
+        </div>
+      )}
+
       <div className="dash-map-countries">
         {COUNTRIES.slice(0, 10).map((c) => (
           <button
@@ -121,6 +173,7 @@ export default function DashboardMap({
             type="button"
             className={`dash-map-tag ${country === c ? 'active' : ''}`}
             onClick={() => pick(c)}
+            disabled={!connected}
           >
             {c}
           </button>
@@ -128,10 +181,10 @@ export default function DashboardMap({
       </div>
 
       <div className="dash-map-controls">
-        <button type="button" className="map-ctrl" aria-label="Zoom in">
+        <button type="button" className="map-ctrl" aria-label="Zoom in" disabled={!connected}>
           +
         </button>
-        <button type="button" className="map-ctrl" aria-label="Zoom out">
+        <button type="button" className="map-ctrl" aria-label="Zoom out" disabled={!connected}>
           −
         </button>
       </div>
@@ -147,10 +200,29 @@ export default function DashboardMap({
           <span className="dash-map-location-label">Selected</span>
           <strong>{country}</strong>
         </div>
-        <button type="button" className="btn btn-primary dash-map-apply">
-          Use this location
+        <button
+          type="button"
+          className={`btn btn-primary dash-map-apply ${connected ? 'ready' : ''}`}
+          onClick={handleApply}
+        >
+          {connected ? 'Use this location' : 'Connect phone first'}
         </button>
       </div>
+
+      <PhoneConnection
+        status={connectionStatus}
+        phones={phones}
+        selectedPhone={selectedPhone}
+        connectedPhone={connectedPhone}
+        onSelectPhone={onSelectPhone}
+        onConnect={onConnect}
+        onDisconnect={() => {
+          onDisconnect();
+          setShowPhonePanel(true);
+        }}
+        open={connectionStatus === 'waiting' || showPhonePanel}
+        onClose={connectionStatus === 'connected' ? () => setShowPhonePanel(false) : undefined}
+      />
     </div>
   );
 }

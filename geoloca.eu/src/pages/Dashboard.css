@@ -105,13 +105,43 @@
   top: 5.25rem;
   left: 1rem;
   z-index: 15;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 2.25rem 0.75rem 1rem;
   background: rgba(10, 12, 18, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-sm);
   backdrop-filter: blur(12px);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
   animation: fade-up var(--duration-slow) var(--ease-out);
+  transition:
+    opacity 0.4s var(--ease-out),
+    transform 0.4s var(--ease-out);
+}
+
+.dash-welcome-float--out {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+
+.dash-welcome-close {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.dash-welcome-close:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .dash-welcome-float p {
@@ -132,13 +162,16 @@
   color: var(--accent-bright);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .dash-tabs {
     left: 1rem;
     right: 1rem;
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    top: auto;
     transform: none;
     width: calc(100% - 2rem);
     justify-content: space-between;
+    padding: 0.35rem 0.4rem 0.35rem 0.55rem;
   }
 
   .dash-tabs-logo {
@@ -152,11 +185,13 @@
   .dash-tab {
     flex: 1;
     justify-content: center;
+    min-height: 44px;
   }
 
   .dash-welcome-float {
-    top: 4.75rem;
-    right: 1rem;
-    max-width: calc(100% - 2rem);
+    top: 4.25rem;
+    left: 0.75rem;
+    right: 0.75rem;
+    max-width: none;
   }
 }

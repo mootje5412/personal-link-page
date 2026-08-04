@@ -5,6 +5,135 @@
   overflow: hidden;
 }
 
+.dash-map-conn {
+  position: absolute;
+  top: 5.25rem;
+  right: 1rem;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #fcd34d;
+  background: rgba(10, 12, 18, 0.92);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  border-radius: 999px;
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  transition:
+    color var(--duration-normal) var(--ease-smooth),
+    border-color var(--duration-normal) var(--ease-smooth);
+}
+
+.dash-map-conn.connecting {
+  color: var(--accent-bright);
+  border-color: rgba(99, 102, 241, 0.35);
+}
+
+.dash-map-conn.connected {
+  color: #86efac;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.dash-map-conn-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fbbf24;
+  animation: dash-conn-pulse 2s var(--ease-smooth) infinite;
+}
+
+.dash-map-conn.connecting .dash-map-conn-dot {
+  background: var(--accent-light);
+  animation-duration: 1s;
+}
+
+.dash-map-conn.connected .dash-map-conn-dot {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+  animation: none;
+}
+
+@keyframes dash-conn-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+.dash-map-spoof-badge {
+  position: absolute;
+  top: 7.5rem;
+  left: 50%;
+  z-index: 5;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #86efac;
+  background: rgba(10, 12, 18, 0.9);
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  border-radius: 999px;
+  backdrop-filter: blur(10px);
+  white-space: nowrap;
+}
+
+.dash-map-spoof-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+}
+
+.dash-map-spoof-device {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.dash-map-lock {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 1.5rem;
+  font-size: 0.95rem;
+  color: var(--muted);
+  background: rgba(10, 13, 20, 0.55);
+  backdrop-filter: blur(3px);
+  border: none;
+  cursor: pointer;
+}
+
+.dash-map-lock span {
+  max-width: 260px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.dash-map-lock strong {
+  padding: 0.55rem 1.1rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px var(--accent-glow);
+}
+
 .dash-map-toolbar {
   position: absolute;
   top: 5rem;
@@ -247,31 +376,85 @@
 .dash-map-apply {
   flex-shrink: 0;
   white-space: nowrap;
+  min-height: 44px;
 }
 
-@media (max-width: 640px) {
+.dash-map-apply:not(.ready) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.dash-map-search input:disabled,
+.dash-map-tag:disabled,
+.map-ctrl:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .dash-map-conn {
+    top: 4.25rem;
+    left: 0.75rem;
+    right: auto;
+    max-width: calc(100% - 1.5rem);
+    font-size: 0.68rem;
+  }
+
   .dash-map-toolbar {
-    top: 4.5rem;
+    top: 6.75rem;
+    left: 0.75rem;
+    right: 0.75rem;
     flex-wrap: wrap;
   }
 
+  .dash-map-search {
+    max-width: none;
+    flex: 1 1 100%;
+  }
+
+  .dash-map-results {
+    top: 10.5rem;
+    left: 0.75rem;
+    width: calc(100% - 1.5rem);
+  }
+
   .dash-map-coords {
-    top: auto;
-    bottom: 5.5rem;
-    left: 1rem;
-    right: auto;
+    display: none;
   }
 
   .dash-map-countries {
+    left: 0.75rem;
+    bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100% - 1.5rem);
+  }
+
+  .dash-map-controls {
     display: none;
   }
 
   .dash-map-location-bar {
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
     flex-direction: column;
     align-items: stretch;
+    gap: 0.75rem;
   }
 
   .dash-map-apply {
     width: 100%;
+  }
+
+  .dash-map-spoof-badge {
+    top: auto;
+    bottom: calc(11.5rem + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100% - 1.5rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dash-map-lock {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
   }
 }

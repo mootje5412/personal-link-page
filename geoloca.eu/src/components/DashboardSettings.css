@@ -126,3 +126,14 @@
 .settings-logout {
   width: 100%;
 }
+
+@media (max-width: 768px) {
+  .dash-settings-inner {
+    padding: 5rem 1rem calc(6.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .settings-logout,
+  .settings-btn {
+    min-height: 48px;
+  }
+}
