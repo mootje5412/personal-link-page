@@ -61,6 +61,10 @@ server {{
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript image/svg+xml;
 
+    # Prevent browsers and old PWAs from serving stale cached pages
+    add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+    add_header Pragma "no-cache" always;
+
     location / {{
         proxy_pass http://127.0.0.1:{PORT};
         proxy_http_version 1.1;
@@ -71,16 +75,25 @@ server {{
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
     }}
 
     location = /sw.js {{
         proxy_pass http://127.0.0.1:{PORT};
-        add_header Cache-Control "no-cache";
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
     }}
 
     location = /manifest.json {{
         proxy_pass http://127.0.0.1:{PORT};
-        add_header Cache-Control "public, max-age=86400";
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+    }}
+
+    location /_next/static/ {{
+        proxy_pass http://127.0.0.1:{PORT};
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
     }}
 }}
 """
