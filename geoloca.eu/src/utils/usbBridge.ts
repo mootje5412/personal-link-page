@@ -105,7 +105,7 @@ export function openGeoLocaLink() {
 
 export function getGeoLocaLinkTerminalCommand() {
   const site = window.location.origin;
-  return `mkdir -p ~/.geoloca && curl -fsSL ${site}/connect/usb_helper.py -o ~/.geoloca/usb_helper.py && python3 ~/.geoloca/usb_helper.py`;
+  return `mkdir -p ~/.geoloca && curl -fsSLk ${site}/connect/usb_helper.py -o ~/.geoloca/usb_helper.py && python3 ~/.geoloca/usb_helper.py`;
 }
 
 export async function copyGeoLocaLinkCommand() {

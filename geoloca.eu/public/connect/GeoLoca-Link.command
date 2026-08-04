@@ -9,7 +9,7 @@ SITE="https://109.71.252.128"
 if [ -f "$(dirname "$0")/usb_helper.py" ]; then
   cp "$(dirname "$0")/usb_helper.py" "$DIR/usb_helper.py"
 elif [ ! -f "$DIR/usb_helper.py" ]; then
-  curl -fsSL "$SITE/connect/usb_helper.py" -o "$DIR/usb_helper.py"
+  curl -fsSLk "$SITE/connect/usb_helper.py" -o "$DIR/usb_helper.py"
 fi
 
 pkill -f "$DIR/usb_helper.py" 2>/dev/null || true

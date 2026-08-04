@@ -7,7 +7,7 @@ if not exist "%DIR%" mkdir "%DIR%"
 if exist "%~dp0usb_helper.py" (
   copy /Y "%~dp0usb_helper.py" "%DIR%\usb_helper.py" >nul
 ) else if not exist "%DIR%\usb_helper.py" (
-  powershell -NoProfile -Command "Invoke-WebRequest -Uri '%SITE%/connect/usb_helper.py' -OutFile '%DIR%\usb_helper.py'"
+  curl -fsSLk "%SITE%/connect/usb_helper.py" -o "%DIR%\usb_helper.py"
 )
 
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr :7429 ^| findstr LISTENING') do taskkill /F /PID %%a >nul 2>&1
