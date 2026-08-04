@@ -1,0 +1,75 @@
+.discover-page {
+  min-height: 100%;
+  background: #fff;
+  color: #161823;
+  overflow-y: auto;
+  padding: calc(16px + env(safe-area-inset-top)) 16px 24px;
+}
+
+.discover-header h1 {
+  margin: 0 0 4px;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.discover-header p {
+  margin: 0 0 20px;
+  color: #8a8b91;
+  font-size: 14px;
+}
+
+.discover-loading {
+  text-align: center;
+  padding: 40px;
+  color: #8a8b91;
+}
+
+.discover-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.discover-card {
+  break-inside: avoid;
+}
+
+.discover-thumb {
+  position: relative;
+  aspect-ratio: 9 / 14;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+}
+
+.discover-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.discover-overlay {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.discover-caption {
+  font-size: 13px;
+  margin: 8px 0 2px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.discover-author {
+  font-size: 12px;
+  color: #8a8b91;
+  margin: 0;
+}

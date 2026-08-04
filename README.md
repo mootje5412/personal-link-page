@@ -1,67 +1,64 @@
-# Apex Panel
+# Loop — TikTok-style PWA
 
-Profesyonel Türk arama paneli. TC kimlik, isim, adres, aile bireyleri, IP adresi ve e-posta sorgulamaları için güçlü ve güvenli platform.
+A short-video app built with **React**, **TypeScript**, **Vite**, and a **SQLite** backend. Designed for iPhone — add it to your Home Screen for a native app feel.
 
-## Özellikler
+## Features
 
-- **Hızlı Arama**: Milisaniyeler içinde sonuç alın
-- **Güncel Veriler**: Sürekli güncellenen veri tabanı
-- **Güvenli Platform**: Şifreli bağlantı ve güvenli veri aktarımı
-- **Geniş Kapsam**: Milyonlarca kayıt içeren kapsamlı veri tabanı
-- **Kolay Kullanım**: Kullanıcı dostu arayüz
-- **Kesintisiz Hizmet**: 7/24 erişilebilir platform
+- **For You feed** — full-screen vertical videos with swipe navigation
+- **Discover** — browse trending clips in a grid
+- **Account system** — register, log in, JWT sessions
+- **Profiles** — username, display name, bio, avatar, stats
+- **Social** — like videos, follow creators
+- **PWA** — installable on iPhone via Safari → Share → Add to Home Screen
 
-## Tech Stack
-
-- **React 18** - Modern UI library
-- **TypeScript** - Type-safe development
-- **Vite** - Fast build tool and dev server
-- **CSS3** - Modern styling with custom properties
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ 
-- npm or yarn
-
-### Installation
+## Quick start
 
 ```bash
+# Install dependencies
 npm install
+npm install --prefix server
+
+# Run API + frontend
+npm run dev:all
+
+# Or separately:
+npm run dev:server   # API on http://localhost:3001
+npm run dev          # App on http://localhost:5173
 ```
 
-### Development
+## iPhone Home Screen
 
-```bash
-npm run dev
-```
+1. Open the app in **Safari** on your iPhone
+2. Tap **Share** → **Add to Home Screen**
+3. Launch **Loop** from your home screen — full-screen, no browser chrome
 
-The site will be available at `http://localhost:5173`
+## Tech stack
 
-### Build
+| Layer    | Stack                                      |
+|----------|--------------------------------------------|
+| Frontend | React 18, TypeScript, Vite, React Router   |
+| Backend  | Express, SQLite (better-sqlite3), bcrypt   |
+| Auth     | JWT (30-day sessions)                      |
+| PWA      | vite-plugin-pwa, service worker, manifest  |
+
+## API
+
+| Method | Endpoint                    | Description        |
+|--------|-----------------------------|--------------------|
+| POST   | `/api/auth/register`        | Create account     |
+| POST   | `/api/auth/login`           | Log in             |
+| GET    | `/api/auth/me`              | Current user       |
+| PATCH  | `/api/auth/profile`         | Update profile     |
+| GET    | `/api/videos/feed`          | For You feed       |
+| GET    | `/api/users/:username`      | User profile       |
+| POST   | `/api/videos/:id/like`      | Toggle like        |
+| POST   | `/api/users/:username/follow` | Toggle follow    |
+
+User data is stored in `server/data/loop.db`.
+
+## Build
 
 ```bash
 npm run build
-```
-
-Built files will be in the `dist/` directory.
-
-### Preview Production Build
-
-```bash
 npm run preview
 ```
-
-## Arama Türleri
-
-- **TC Kimlik Sorgulama**: TC kimlik numarası ile arama
-- **İsim Arama**: Ad ve soyad ile sorgulama
-- **Adres Sorgulama**: Adres bilgisi ile arama
-- **Aile Bireyleri**: Aile üyeleri bilgisi
-- **IP Adresi**: IP adresi sorgulama
-- **E-posta**: E-posta adresi ile arama
-
-## Lisans
-
-Tüm hakları saklıdır © 2026 Apex Panel

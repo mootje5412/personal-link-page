@@ -1,0 +1,62 @@
+.feed-state {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.feed-state button {
+  background: #fe2c55;
+  color: #fff;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: #fe2c55;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.guest-banner {
+  position: fixed;
+  bottom: calc(72px + env(safe-area-inset-bottom));
+  left: 16px;
+  right: 16px;
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 40;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.guest-banner p {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.guest-banner a {
+  color: #fe2c55;
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 14px;
+  white-space: nowrap;
+}

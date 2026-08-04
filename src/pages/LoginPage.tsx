@@ -1,39 +1,25 @@
 import { FormEvent, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
-import SiteHeader from '../components/SiteHeader'
-import AuthBrand from '../components/AuthBrand'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { login } from '../services/authApi'
-import { validateApiKey } from '../services/validation'
 import './AuthPages.css'
 
-const LoginPage = () => {
+export default function LoginPage() {
+  const { login } = useAuth()
   const navigate = useNavigate()
-  const { user, loginSuccess } = useAuth()
-  const [apiKey, setApiKey] = useState('')
+  const [loginValue, setLoginValue] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [showKey, setShowKey] = useState(false)
 
-  if (user) return <Navigate to="/panel" replace />
-
-  async function handleSubmit(e: FormEvent) {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
-
-    const keyError = validateApiKey(apiKey)
-    if (keyError) {
-      setError(keyError)
-      return
-    }
-
     setLoading(true)
     try {
-      const data = await login(apiKey.trim())
-      loginSuccess(data.user, data.token)
-      navigate('/panel')
+      await login(loginValue, password)
+      navigate('/')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Giriş başarısız.')
+      setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
       setLoading(false)
     }
@@ -41,74 +27,50 @@ const LoginPage = () => {
 
   return (
     <div className="auth-page">
-      <SiteHeader />
-      <main className="auth-shell">
-        <AuthBrand
-          title="Anahtar ile giriş"
-          subtitle="Kayıt olurken aldığın vp_ anahtarını gir. Şifre veya e-posta kullanılmaz."
-        />
-
-        <div className="auth-panel">
-          <div className="auth-card">
-            <h1>Giriş yap</h1>
-            <p className="auth-lead">
-              <strong>API anahtarını</strong> gir. Anahtarın şifreli olarak güvenle saklanır.
-            </p>
-
-            <div className="auth-key-badge">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" strokeWidth="1.75" />
-                <path d="M8 10V8a4 4 0 1 1 8 0v2" stroke="currentColor" strokeWidth="1.75" />
-              </svg>
-              Sadece API anahtarı — şifre yok
-            </div>
-
-            <form className="auth-form" noValidate onSubmit={handleSubmit}>
-              {error && <p className="auth-error" role="alert">{error}</p>}
-
-              <div className="auth-field">
-                <label htmlFor="login-api-key">API anahtarı</label>
-                <div className="auth-key-input-wrap">
-                  <input
-                    id="login-api-key"
-                    type={showKey ? 'text' : 'password'}
-                    autoComplete="off"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value.trimStart())}
-                    onPaste={(e) => {
-                      e.preventDefault()
-                      const pasted = e.clipboardData.getData('text').trim()
-                      setApiKey(pasted)
-                    }}
-                    placeholder="vp_xxxxxxxxxxxxxxxx"
-                    spellCheck={false}
-                    required
-                  />
-                  <button
-                    type="button"
-                    className="auth-key-toggle"
-                    onClick={() => setShowKey((v) => !v)}
-                    aria-label={showKey ? 'Anahtarı gizle' : 'Anahtarı göster'}
-                  >
-                    {showKey ? 'Gizle' : 'Göster'}
-                  </button>
-                </div>
-                <p className="auth-field-hint">Kayıt sırasında aldığınız vp_ ile başlayan anahtar</p>
-              </div>
-
-              <button type="submit" className="btn auth-submit" disabled={loading || !apiKey.trim()}>
-                {loading ? 'Doğrulanıyor…' : 'Giriş yap'}
-              </button>
-            </form>
-
-            <p className="auth-footer">
-              Hesabın yok mu? <Link to="/kayit">Kayıt ol ve anahtar al</Link>
-            </p>
-          </div>
+      <div className="auth-bg" />
+      <div className="auth-card">
+        <div className="auth-logo">
+          <span className="logo-icon">∞</span>
+          <h1>Loop</h1>
         </div>
-      </main>
+        <p className="auth-subtitle">Log in to Loop</p>
+
+        <form onSubmit={handleSubmit} className="auth-form">
+          {error && <div className="auth-error">{error}</div>}
+
+          <label>
+            <span>Username or email</span>
+            <input
+              type="text"
+              value={loginValue}
+              onChange={(e) => setLoginValue(e.target.value)}
+              placeholder="yourname or you@email.com"
+              autoComplete="username"
+              required
+            />
+          </label>
+
+          <label>
+            <span>Password</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete="current-password"
+              required
+            />
+          </label>
+
+          <button type="submit" className="auth-submit" disabled={loading}>
+            {loading ? 'Logging in...' : 'Log in'}
+          </button>
+        </form>
+
+        <p className="auth-switch">
+          Don&apos;t have an account? <Link to="/register">Sign up</Link>
+        </p>
+      </div>
     </div>
   )
 }
-
-export default LoginPage
