@@ -54,11 +54,6 @@
   border-color: rgba(99, 102, 241, 0.35);
 }
 
-.dash-map-conn.usb_not_found {
-  color: #fca5a5;
-  border-color: rgba(239, 68, 68, 0.35);
-}
-
 .dash-map-conn-dot {
   width: 7px;
   height: 7px;

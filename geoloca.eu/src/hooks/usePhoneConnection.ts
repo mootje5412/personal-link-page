@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ConnectionStatus, DetectedDevice, SetupStep } from '../data/phones';
+import type { ConnectionStatus, DetectedDevice } from '../data/phones';
 import { isBridgeOnline, scanUsbDevice, setDeviceLocation } from '../utils/usbBridge';
 
 export type AppliedLocation = {
@@ -9,109 +9,82 @@ export type AppliedLocation = {
   label: string;
 };
 
+const SCAN_INTERVAL_MS = 2000;
+
 export function usePhoneConnection() {
   const [status, setStatus] = useState<ConnectionStatus>('waiting');
-  const [setupStep, setSetupStep] = useState<SetupStep>(1);
   const [connectedDevice, setConnectedDevice] = useState<DetectedDevice | null>(null);
   const [appliedLocation, setAppliedLocation] = useState<AppliedLocation | null>(null);
   const [applyingLocation, setApplyingLocation] = useState(false);
-  const [usbError, setUsbError] = useState<string | null>(null);
   const [bridgeOnline, setBridgeOnline] = useState<boolean | null>(null);
-  const [autoScanning, setAutoScanning] = useState(false);
+  const [scanning, setScanning] = useState(true);
   const scanRef = useRef<number | null>(null);
-
-  const checkBridge = useCallback(async () => {
-    const online = await isBridgeOnline();
-    setBridgeOnline(online);
-    return online;
-  }, []);
-
-  useEffect(() => {
-    void checkBridge();
-  }, [checkBridge]);
+  const busyRef = useRef(false);
 
   const stopAutoScan = useCallback(() => {
     if (scanRef.current) {
       window.clearInterval(scanRef.current);
       scanRef.current = null;
     }
-    setAutoScanning(false);
+    setScanning(false);
   }, []);
 
   const runUsbScan = useCallback(async (): Promise<boolean> => {
-    setUsbError(null);
-    setStatus('detecting_usb');
+    if (busyRef.current) return false;
+    busyRef.current = true;
+    setScanning(true);
 
-    const online = await checkBridge();
-    if (!online) {
-      setStatus('usb_not_found');
-      setUsbError('bridge_offline');
+    try {
+      const online = await isBridgeOnline();
+      setBridgeOnline(online);
+
+      if (!online) {
+        setStatus('waiting');
+        return false;
+      }
+
+      setStatus('detecting_usb');
+      const scan = await scanUsbDevice();
+
+      if (scan.connected && scan.device) {
+        setStatus('connecting');
+        await new Promise((r) => window.setTimeout(r, 700));
+        setConnectedDevice(scan.device);
+        setStatus('connected');
+        setAppliedLocation(null);
+        stopAutoScan();
+        return true;
+      }
+
+      setStatus('waiting');
       return false;
+    } finally {
+      busyRef.current = false;
+      setScanning(true);
     }
-
-    const scan = await scanUsbDevice();
-
-    if (!scan.connected || !scan.device) {
-      setStatus('usb_not_found');
-      setUsbError(scan.error === 'bridge_offline' ? 'bridge_offline' : 'no_device');
-      return false;
-    }
-
-    setStatus('connecting');
-    await new Promise((r) => window.setTimeout(r, 800));
-    setConnectedDevice(scan.device);
-    setStatus('connected');
-    setAppliedLocation(null);
-    stopAutoScan();
-    return true;
-  }, [checkBridge, stopAutoScan]);
-
-  const detectUsb = useCallback(async () => {
-    await runUsbScan();
-  }, [runUsbScan]);
+  }, [stopAutoScan]);
 
   const startAutoScan = useCallback(() => {
     stopAutoScan();
-    setAutoScanning(true);
+    setScanning(true);
     void runUsbScan();
     scanRef.current = window.setInterval(() => {
       void runUsbScan();
-    }, 2500);
+    }, SCAN_INTERVAL_MS);
   }, [runUsbScan, stopAutoScan]);
 
-  useEffect(() => () => stopAutoScan(), [stopAutoScan]);
-
-  const nextStep = useCallback(() => {
-    setSetupStep((s) => {
-      const next = s < 3 ? ((s + 1) as SetupStep) : s;
-      if (next === 3) {
-        window.setTimeout(() => startAutoScan(), 300);
-      }
-      return next;
-    });
-  }, [startAutoScan]);
-
-  const prevStep = useCallback(() => {
-    stopAutoScan();
-    setSetupStep((s) => (s > 1 ? ((s - 1) as SetupStep) : s));
-  }, [stopAutoScan]);
-
-  const retryUsb = useCallback(() => {
-    setStatus('waiting');
-    setSetupStep(3);
-    setUsbError(null);
+  useEffect(() => {
     startAutoScan();
-  }, [startAutoScan]);
+    return () => stopAutoScan();
+  }, [startAutoScan, stopAutoScan]);
 
   const disconnect = useCallback(() => {
-    stopAutoScan();
-    setStatus('waiting');
-    setSetupStep(1);
     setConnectedDevice(null);
     setAppliedLocation(null);
     setApplyingLocation(false);
-    setUsbError(null);
-  }, [stopAutoScan]);
+    setStatus('waiting');
+    startAutoScan();
+  }, [startAutoScan]);
 
   const applyLocation = useCallback(
     async (country: string, lat: number, lng: number, label: string) => {
@@ -122,17 +95,13 @@ export function usePhoneConnection() {
 
       const result = await setDeviceLocation(lat, lng);
 
-      if (!result.ok && result.error === 'bridge_offline') {
+      if (!result.ok) {
         setApplyingLocation(false);
-        setUsbError('bridge_offline');
-        return false;
-      }
-
-      if (!result.ok && result.error === 'iphone_not_connected') {
-        setApplyingLocation(false);
-        setStatus('usb_not_found');
-        setConnectedDevice(null);
-        setUsbError('no_device');
+        if (result.error === 'iphone_not_connected') {
+          setConnectedDevice(null);
+          setStatus('waiting');
+          startAutoScan();
+        }
         return false;
       }
 
@@ -140,25 +109,19 @@ export function usePhoneConnection() {
       setApplyingLocation(false);
       return true;
     },
-    [status, connectedDevice],
+    [status, connectedDevice, startAutoScan],
   );
 
   return {
     status,
-    setupStep,
     connectedDevice,
     appliedLocation,
     applyingLocation,
-    usbError,
     bridgeOnline,
-    autoScanning,
+    scanning,
     connected: status === 'connected',
-    nextStep,
-    prevStep,
-    detectUsb,
-    retryUsb,
     disconnect,
     applyLocation,
-    checkBridge,
+    rescan: runUsbScan,
   };
 }

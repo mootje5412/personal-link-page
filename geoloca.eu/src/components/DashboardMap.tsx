@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { COUNTRIES } from '../data/countries';
 import { MAP_SPOTS } from '../data/mapSpots';
 import type { AppliedLocation } from '../hooks/usePhoneConnection';
-import type { ConnectionStatus, DetectedDevice, SetupStep } from '../data/phones';
+import type { ConnectionStatus, DetectedDevice } from '../data/phones';
 import { useLanguage } from '../i18n/LanguageContext';
 import { countryCoords } from '../utils/countryCoords';
 import PhoneConnection from './PhoneConnection';
@@ -21,19 +21,11 @@ type SearchResult = {
 type Props = {
   connected: boolean;
   connectionStatus: ConnectionStatus;
-  setupStep: SetupStep;
   connectedDevice: DetectedDevice | null;
   appliedLocation: AppliedLocation | null;
   applyingLocation: boolean;
-  usbError: string | null;
-  bridgeOnline: boolean | null;
-  autoScanning: boolean;
-  onNextStep: () => void;
-  onPrevStep: () => void;
-  onDetectUsb: () => void;
-  onRetryUsb: () => void;
+  scanning: boolean;
   onDisconnect: () => void;
-  onCheckBridge: () => void;
   onApplyLocation: (country: string, lat: number, lng: number, label: string) => void;
 };
 
@@ -66,19 +58,11 @@ async function searchPlaces(query: string): Promise<SearchResult[]> {
 export default function DashboardMap({
   connected,
   connectionStatus,
-  setupStep,
   connectedDevice,
   appliedLocation,
   applyingLocation,
-  usbError,
-  bridgeOnline,
-  autoScanning,
-  onNextStep,
-  onPrevStep,
-  onDetectUsb,
-  onRetryUsb,
+  scanning,
   onDisconnect,
-  onCheckBridge,
   onApplyLocation,
 }: Props) {
   const { t } = useLanguage();
@@ -125,7 +109,6 @@ export default function DashboardMap({
 
   const pickSearch = (result: SearchResult) => {
     setPin({ lat: result.lat, lng: result.lng, label: result.name });
-    setCountry(country);
     setQuery('');
     setSearchResults([]);
     setMapZoom(8);
@@ -151,16 +134,13 @@ export default function DashboardMap({
     onApplyLocation(pin.label, pin.lat, pin.lng, `${pin.lat.toFixed(3)}°, ${pin.lng.toFixed(3)}°`);
   };
 
-  const statusLabel =
-    connectionStatus === 'connected'
-      ? t('conn.usb_connected')
-      : connectionStatus === 'detecting_usb'
-        ? t('conn.scanning')
-        : connectionStatus === 'connecting'
-          ? t('conn.pairing')
-          : connectionStatus === 'usb_not_found'
-            ? t('conn.not_found')
-            : t('conn.connect_usb');
+  const statusLabel = connected
+    ? connectedDevice
+      ? t('conn.success_name', { name: connectedDevice.name })
+      : t('conn.success')
+    : connectionStatus === 'detecting_usb' || connectionStatus === 'connecting'
+      ? t('conn.scanning')
+      : t('conn.waiting');
 
   return (
     <div className="dash-map">
@@ -179,7 +159,7 @@ export default function DashboardMap({
         aria-label="iPhone USB connection"
       >
         <span className="dash-map-conn-dot" aria-hidden />
-        {connectionStatus === 'connected' && <span className="dash-map-conn-usb">{t('conn.usb')}</span>}
+        {connected && <span className="dash-map-conn-usb">{t('conn.usb')}</span>}
         {statusLabel}
       </button>
 
@@ -285,22 +265,14 @@ export default function DashboardMap({
 
       <PhoneConnection
         status={connectionStatus}
-        setupStep={setupStep}
         connectedDevice={connectedDevice}
-        usbError={usbError}
-        bridgeOnline={bridgeOnline}
-        autoScanning={autoScanning}
-        onNextStep={onNextStep}
-        onPrevStep={onPrevStep}
-        onDetectUsb={onDetectUsb}
-        onRetryUsb={onRetryUsb}
+        scanning={scanning}
         onDisconnect={() => {
           onDisconnect();
           setShowPhonePanel(true);
         }}
-        onCheckBridge={onCheckBridge}
-        open={connectionStatus !== 'connected' || showPhonePanel}
-        onClose={connectionStatus === 'connected' ? () => setShowPhonePanel(false) : undefined}
+        open={!connected || showPhonePanel}
+        onClose={connected ? () => setShowPhonePanel(false) : undefined}
       />
     </div>
   );
